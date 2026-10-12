@@ -73,7 +73,7 @@ try {
     await page.locator('h1').first().waitFor({timeout:10000});
     check((await page.locator('h1').innerText()).includes('Ranger'),'direct guide URL loads on first visit');
     const articleTypeface=await page.locator('main h1').first().evaluate(node=>getComputedStyle(node).fontFamily);
-    check(articleTypeface.includes('Sora'),'guide display headings use Sora');
+    check(articleTypeface.includes('Manrope'),'guide display headings use Manrope');
     const getArticleGutters=()=>page.evaluate(()=>{
       const bounds=document.querySelector('.article-hero')?.getBoundingClientRect();
       return bounds?{left:bounds.left,right:innerWidth-bounds.right,overflow:document.documentElement.scrollWidth>innerWidth+1}:null;
@@ -103,7 +103,7 @@ try {
         overflows:document.documentElement.scrollWidth>window.innerWidth+1
       };
     });
-    check(fontCheck.heroFont.includes('Sora') && fontCheck.bodyFont.includes('Inter'),'hero uses Sora while reading copy stays Inter');
+    check(fontCheck.heroFont.includes('Manrope') && fontCheck.bodyFont.includes('Inter'),'hero uses Manrope while reading copy stays Inter');
     check(!fontCheck.overflows,'updated headings do not overflow desktop');
   }
 } catch(e) {failures.push(String(e));}
