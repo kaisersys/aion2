@@ -23,6 +23,20 @@ jobs:
           test -s public/assets/hero/aion-hero-purple.avif
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Verify Supabase Guide Studio configuration
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          if [[ -n "$VITE_SUPABASE_URL" && -n "$VITE_SUPABASE_ANON_KEY" ]]; then
+            echo "Guide Studio configuration: both Supabase values are present."
+          elif [[ -z "$VITE_SUPABASE_URL" && -z "$VITE_SUPABASE_ANON_KEY" ]]; then
+            echo "::warning::Guide Studio is in setup mode: add both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
+          else
+            echo "::error::Guide Studio configuration is incomplete: both Supabase values are required."
+            exit 1
+          fi
       - name: Typecheck and build
         env:
           # Public browser credentials (never use Supabase service_role).
