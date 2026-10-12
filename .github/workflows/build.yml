@@ -61,6 +61,16 @@ jobs:
         with:
           name: aion2-website-files
           path: ./dist
+      - name: Normalize FTPS destination folder
+        id: destination
+        if: steps.configured.outputs.ready == 'true'
+        shell: bash
+        run: |
+          folder="${FTP_REMOTE_DIR%/}/"
+          if [[ "$folder" == "/" ]]; then
+            echo 'Using FTP account root as destination'
+          fi
+          echo "server_dir=$folder" >> "$GITHUB_OUTPUT"
       - name: Upload compiled website (not source) via encrypted FTPS
         if: steps.configured.outputs.ready == 'true'
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
@@ -71,5 +81,5 @@ jobs:
           protocol: ftps
           port: 21
           local-dir: ./dist/
-          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+          server-dir: ${{ steps.destination.outputs.server_dir }}
           log-level: standard
