@@ -1,13 +1,45 @@
 import { chromium } from 'playwright-core';
 const mode=process.argv[2]||'app';
-const port=mode==='fixture'?4174:4173;
+const port=mode==='fixture'?4174:mode==='editor'?4175:4173;
 const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const failures=[];
 page.on('pageerror',e=>failures.push('Uncaught JavaScript: '+e.message));
 const check=(ok,label)=>{console.log((ok?'PASS':'FAIL')+' '+label);if(!ok)failures.push(label);};
 try {
-  if(mode==='fixture') {
+  if(mode==='editor') {
+    await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
+    await page.getByRole('textbox',{name:'Guide title'}).fill('Ranger Combat Rotation');
+    await page.getByRole('textbox',{name:'Short summary'}).fill('Test summary for private preview');
+    const edit=page.locator('.studio-editor-canvas .tiptap');
+    await edit.waitFor({timeout:10000});
+    await edit.click();
+    await page.getByRole('button',{name:'Heading 2'}).click();
+    await page.keyboard.type('Combat Rotation');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Skill priority and timing.');
+    await page.getByRole('button',{name:'Info / tip box'}).click();
+    await page.getByRole('textbox',{name:'Heading'}).fill('Rotation Tip');
+    await page.getByRole('textbox',{name:'Message'}).fill('Practice on training dummies.');
+    await page.getByRole('button',{name:'Insert block'}).click();
+    check(await page.locator('.studio-editor-canvas .guide-callout').count()===1,'editor inserts reusable tip block');
+    await page.getByRole('button',{name:'Link button'}).click();
+    await page.getByRole('textbox',{name:'Button text'}).fill('More Ranger Guides');
+    await page.getByRole('textbox',{name:'Destination URL'}).fill('#/guides/ranger');
+    await page.getByRole('button',{name:'Insert block'}).click();
+    check(await page.locator('.studio-editor-canvas .guide-button-block').count()===1,'editor inserts internal-link CTA');
+    await page.getByRole('button',{name:'Skill / gear card'}).click();
+    await page.getByRole('textbox',{name:'Name'}).fill('Explosive Arrow');
+    await page.getByRole('button',{name:'Insert block'}).click();
+    check(await page.locator('.studio-editor-canvas .guide-skill-card').count()===1,'editor inserts skill card');
+    await page.getByRole('button',{name:'Full-page preview'}).click();
+    await page.locator('.studio-page-preview').waitFor({timeout:10000});
+    check((await page.locator('.studio-page-preview h1').first().innerText()).includes('Ranger Combat Rotation'),'private preview displays unsaved title');
+    check(await page.locator('.studio-page-preview .guide-callout').count()===1,'private preview displays unsaved rich blocks');
+    check((await page.locator('.studio-page-preview .article-sidebar').innerText()).includes('Combat Rotation'),'private preview displays auto table of contents');
+    await page.getByRole('button',{name:'Close preview'}).click();
+    check(await page.locator('.studio-page-preview').count()===0,'closing preview restores editor');
+  } else if(mode==='fixture') {
     await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
     await page.locator('h1').first().waitFor({timeout:10000});
     check((await page.locator('h1').innerText()).includes('Rich Article Fixture'),'article fixture title');
