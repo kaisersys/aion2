@@ -62,6 +62,21 @@ for (const [label,url,expected] of [
       const right=await layer();
       parallaxOK=Boolean(left.art!==right.art&&left.sky!==right.sky&&left.near!==right.near&&right.art!==right.near);
       console.log(JSON.stringify({label:'live-hero-parallax',ok:parallaxOK,layers:3,pointerMoves:true}));
+      const magic=await page.evaluate(()=>{
+        const motes=[...document.querySelectorAll('.hero-motes span')];
+        const aura=document.querySelector('.hero-aura');
+        return {
+          motes:motes.length,
+          active:motes.filter(mote=>getComputedStyle(mote).animationName!=='none').length,
+          glowing:motes.filter(mote=>Number(getComputedStyle(mote).opacity)>.08).length,
+          aura:aura?getComputedStyle(aura,'::before').animationName:'none',
+          sweep:aura?getComputedStyle(aura,'::after').animationName:'none',
+          clickSafe:aura?getComputedStyle(aura).pointerEvents==='none':false
+        };
+      });
+      const magicOK=magic.motes===18 && magic.active===18 && magic.glowing>=2 && magic.aura!=='none' && magic.sweep!=='none' && magic.clickSafe;
+      parallaxOK=parallaxOK && magicOK;
+      console.log(JSON.stringify({label:'live-magical-atmosphere',ok:magicOK,...magic}));
     }
     const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && fontOK && parallaxOK && pageErrors.length===0;
     if (!ok) failed = true;
