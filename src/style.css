@@ -73,7 +73,7 @@
 .brand-lines em{font-style:normal;color:#d2bd95}
 .brand-lines small{font-size:8px;letter-spacing:1.8px;margin-top:3px;white-space:nowrap}
 .hero{isolation:isolate;background:#080916;overflow:hidden}
-.hero-art{position:absolute;inset:0;z-index:0;background-image:url('/assets/hero/aion-hero-purple.avif');background-repeat:no-repeat;background-size:cover;background-position:center 35%;transform:scale(1.025);animation:atreia-drift 22s ease-in-out infinite alternate;will-change:transform}
+.hero-art{position:absolute;inset:0;z-index:0;background-image:url('/assets/hero/aion-hero-purple.avif?v=hd2');background-repeat:no-repeat;background-size:cover;background-position:center 35%;transform:scale(1.025);animation:atreia-drift 22s ease-in-out infinite alternate;will-change:transform}
 .hero:after{z-index:1;background:linear-gradient(90deg,#080b1bec 0%,#0a0a22bb 33%,#070b1b4a 56%,#05070d38 77%,#05091091 100%),linear-gradient(0deg,#090e17 0%,#070a1882 21%,transparent 55%,#0607156b 100%)}
 .hero-sky{z-index:1;mix-blend-mode:screen;opacity:.2;animation:atreia-stars 25s linear infinite alternate;pointer-events:none}
 .hero-content{max-width:1170px;width:calc(100% - 140px);text-align:left;z-index:3;padding-top:235px}
@@ -86,7 +86,7 @@
 .finder-topic:hover,.finder-topic:focus-visible{background:#483360}
 .category-tile{isolation:isolate;overflow:hidden}
 .category-tile > *{z-index:1}
-.category-tile.gold:before{content:'';position:absolute;inset:0;z-index:0;background-image:linear-gradient(90deg,#080b16e5,#090e1e6b),url('/assets/hero/aion-hero-purple.avif');background-size:cover;background-position:69% center;opacity:.65;transition:transform .6s,opacity .6s}
+.category-tile.gold:before{content:'';position:absolute;inset:0;z-index:0;background-image:linear-gradient(90deg,#080b16e5,#090e1e6b),url('/assets/hero/aion-hero-purple.avif?v=hd2');background-size:cover;background-position:69% center;opacity:.65;transition:transform .6s,opacity .6s}
 .category-tile.gold:hover:before{opacity:.95;transform:scale(1.075)}
 @keyframes atreia-drift{from{transform:scale(1.025) translate(0,0)}to{transform:scale(1.085) translate(-1%,.4%)}}
 @keyframes atreia-stars{from{transform:translateY(0)}to{transform:translateY(-18px)}}
