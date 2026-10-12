@@ -174,7 +174,7 @@ export function StudioEditor({ record, user, onSaved, onCancel }: {
     setUploading(true);setMessage('');
     try{
       const image=await uploadOne(file);
-      editor.chain().focus().setImage({src:image.src,alt:image.alt}).run();
+      editor.chain().focus().insertContentAt(editor.state.selection.to,{type:'image',attrs:{src:image.src,alt:image.alt}}).run();
       setContent(editor.getJSON());
     }catch(error){setMessage('Image upload failed: '+(error instanceof Error?error.message:String(error)));}
     finally{setUploading(false);if(fileInput.current)fileInput.current.value='';}
@@ -186,7 +186,7 @@ export function StudioEditor({ record, user, onSaved, onCancel }: {
     const images:GalleryImage[]=[];
     try{
       for(const file of Array.from(files))images.push(await uploadOne(file));
-      editor.chain().focus().insertContent({type:'guideGallery',attrs:{images,columns:images.length===2?2:3}}).run();
+      editor.chain().focus().insertContentAt(editor.state.selection.to,{type:'guideGallery',attrs:{images,columns:images.length===2?2:3}}).run();
       setContent(editor.getJSON());
       setMessage('Gallery added. Click Edit caption under any image to add captions.');
     }catch(error){setMessage('Gallery upload interrupted: '+(error instanceof Error?error.message:String(error)));}
@@ -194,7 +194,7 @@ export function StudioEditor({ record, user, onSaved, onCancel }: {
   };
   const insertBlock=(type:string,attrs:Record<string,unknown>)=>{
     if(!editor)return;
-    editor.chain().focus().insertContent({type,attrs}).run();
+    editor.chain().focus().insertContentAt(editor.state.selection.to,{type,attrs}).run();
     setContent(editor.getJSON());setBlockKind(null);
   };
   const copyGuideLink=async()=>{
