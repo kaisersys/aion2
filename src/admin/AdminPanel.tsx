@@ -242,7 +242,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
     <button className="back-link" onClick={onExit}><ArrowLeft size={16}/> BACK TO HOME</button>
     <div className="section-kicker left">ADMIN SANCTUM</div><h1>Studio <i>Setup</i></h1>
     <div className="notice"><div><strong>The editor is installed, but Supabase isn't connected yet.</strong>
-      <p>Finish the setup steps in the repository README: create a Supabase project, run the SQL migration,
+      <p>Check that GitHub's VITE_SUPABASE_URL is the full HTTPS Project URL from Supabase (for example https://your-project.supabase.co), not the database connection string. Then complete the setup steps in the repository README: run the SQL migration,
       invite your admin account, and set the GitHub Actions build secrets VITE_SUPABASE_URL and
       VITE_SUPABASE_ANON_KEY. The public site continues working until then.</p>
       <a href="https://github.com/kaisersys/aion2#guide-studio-setup" target="_blank" rel="noopener noreferrer">View setup instructions →</a>
