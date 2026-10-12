@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import GuideArticle from '../components/GuideArticle';
-import '../style.css';
+import GuideArticle from './components/GuideArticle';
+import './style.css';
 
 const content = {type:'doc',content:[
   {type:'heading',attrs:{level:2},content:[{type:'text',text:'Overview'}]},
