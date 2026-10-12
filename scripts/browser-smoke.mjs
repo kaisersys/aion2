@@ -7,7 +7,9 @@ const browser = await chromium.launch({
 });
 let failed = false;
 for (const [label,url,expected] of [
-  ['live-home','https://atreiastreet.com/?verify=studio2026','THE PATH OF'],
+  ['live-home','https://atreiastreet.com/?verify=rich-studio2026','THE PATH OF'],
+  ['live-library','https://atreiastreet.com/#/library','Guild'],
+  ['live-guide','https://atreiastreet.com/#/guides/ranger','Ranger'],
   ['live-admin','https://atreiastreet.com/#admin','Admin Sanctum']
 ]) {
   const page = await browser.newPage();
@@ -21,7 +23,8 @@ for (const [label,url,expected] of [
     const adminLoaded = label==='live-admin' ? (
       text.includes('Sign in with your approved Supabase staff account.') && text.includes('Sign in')
     ) : true;
-    const ok = response?.status()===200 && text.includes(expected) && adminLoaded && pageErrors.length===0;
+    const guideLoaded=label==='live-guide'? headline?.includes('Ranger') && await page.locator('.article-sidebar a[href*="section="]').count()>0:true;
+    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && pageErrors.length===0;
     if (!ok) failed = true;
     console.log(JSON.stringify({label,ok,status:response?.status(),headline,rootTextLength:text.length,adminLoginVisible:label==='live-admin'?adminLoaded:undefined,pageErrors:pageErrors.slice(0,5)}));
   } catch (e) {
