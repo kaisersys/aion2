@@ -478,3 +478,17 @@
 @media(prefers-reduced-motion:reduce){
   .guide-cta:hover,.guide-gallery-item button:hover img{transform:none}
 }
+
+
+/* Editorial reading gutters — shared by published guides and full-page previews.
+   Keep the TOC and article centered, never flush against the browser edge. */
+.article-wrap{
+  width:100%;
+  max-width:1280px;
+  margin-inline:auto;
+  padding-inline:clamp(24px,5.5vw,76px);
+}
+.article-wrap .article-body{max-width:860px}
+@media(max-width:650px){
+  .article-wrap{padding-inline:clamp(20px,5vw,28px)}
+}
