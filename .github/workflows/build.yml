@@ -44,6 +44,29 @@ jobs:
             echo "::error::Guide Studio configuration is incomplete: both Supabase values are required."
             exit 1
           fi
+      - name: Verify Supabase API key against the project
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          node --input-type=module <<'NODE'
+          const url = new URL('/auth/v1/settings', process.env.VITE_SUPABASE_URL);
+          try {
+            const response = await fetch(url, {
+              headers: { apikey: process.env.VITE_SUPABASE_ANON_KEY },
+              signal: AbortSignal.timeout(15000)
+            });
+            if (!response.ok) {
+              console.error('::error::Supabase rejected the configured API key (HTTP ' + response.status + '). Confirm that the publishable/anon key and Project URL belong to the same Supabase project.');
+              process.exitCode = 1;
+            } else {
+              console.log('Supabase accepted the configured API key (HTTP ' + response.status + ').');
+            }
+          } catch (error) {
+            console.error('::error::Could not verify Supabase API access: ' + error.message);
+            process.exitCode = 1;
+          }
+          NODE
       - name: Typecheck and build
         env:
           # Public browser credentials (never use Supabase service_role).
