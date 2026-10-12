@@ -16,8 +16,8 @@ Only `dist/` is uploaded to production. Do **not** place the React source files 
 
 Two optimized images are required (the build checks for both):
 
-- `public/assets/branding/aion-logo.webp` — transparent Aion logo.
-- `public/assets/hero/aion-hero-purple.webp` — purple winged-character backdrop.
+- `public/assets/branding/aion-logo.avif` — transparent Aion logo.
+- `public/assets/hero/aion-hero-purple.avif` — purple winged-character backdrop.
 
 Image usage is the responsibility of the site owner; check the source asset licensing/fan-content terms before publishing modified promotional artwork.
 
