@@ -111,6 +111,22 @@ try {
     });
     check(await page.locator('.hero-foreground[aria-hidden="true"]').count()===1,
       'decorative foreground depth layer is present');
+    check(await page.locator('.hero-motes[aria-hidden="true"] span').count()===18
+      && await page.locator('.hero-aura[aria-hidden="true"]').count()===1,
+      'gold-violet motes and aurora added as decorative layers');
+    const ambient=await page.evaluate(()=>{
+      const motes=[...document.querySelectorAll('.hero-motes span')];
+      return {
+        active:motes.filter(mote=>getComputedStyle(mote).animationName!=='none').length,
+        visible:motes.filter(mote=>Number(getComputedStyle(mote).opacity)>.08).length,
+        aura:getComputedStyle(document.querySelector('.hero-aura'),'::before').animationName,
+        light:getComputedStyle(document.querySelector('.hero-aura'),'::after').animationName,
+        blocksPointer:[...document.querySelectorAll('.hero-aura,.hero-motes')].some(el=>getComputedStyle(el).pointerEvents!=='none')
+      };
+    });
+    check(ambient.active===18 && ambient.visible>=2 &&
+      ambient.aura!=='none' && ambient.light!=='none' && !ambient.blocksPointer,
+      'ambient motes and soft light are animated without intercepting clicks');
     const artSource=await page.evaluate(()=>getComputedStyle(document.querySelector('.hero-art'),'::before').backgroundImage);
     check(artSource.includes('aion-hero-purple.avif'),'hero backdrop retains the original artwork');
     await page.mouse.move(140,450);
@@ -132,6 +148,13 @@ try {
     await page.waitForTimeout(120);
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),
       'mobile hero does not cause horizontal overflow');
+    const mobileAtmosphere=await page.evaluate(()=>({
+      fewerParticles:getComputedStyle(document.querySelector('.hero-motes span:nth-child(12)')).display==='none',
+      softerAura:Number(getComputedStyle(document.querySelector('.hero-aura')).opacity)<.5,
+      staticFinder:getComputedStyle(document.querySelector('.hero-finder')).pointerEvents!=='none'
+    }));
+    check(mobileAtmosphere.fewerParticles && mobileAtmosphere.softerAura && mobileAtmosphere.staticFinder,
+      'mobile magic is restrained and guide finder remains interactive');
     const reduce=await browser.newContext({reducedMotion:'reduce'});
     const reducePage=await reduce.newPage();
     await reducePage.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
@@ -148,6 +171,15 @@ try {
     check(staticMotion.art==='none' && staticMotion.sky==='none' &&
       staticMotion.foreground==='none' && staticMotion.breathing==='none',
       'reduced-motion mode disables parallax and breathing animation');
+    const reducedAmbient=await reducePage.evaluate(()=>({
+      mote:getComputedStyle(document.querySelector('.hero-motes span')).animationName,
+      moteOpacity:getComputedStyle(document.querySelector('.hero-motes span')).opacity,
+      aura:getComputedStyle(document.querySelector('.hero-aura'),'::before').animationName,
+      sweep:getComputedStyle(document.querySelector('.hero-aura'),'::after').animationName
+    }));
+    check(reducedAmbient.mote==='none' && reducedAmbient.moteOpacity==='0' &&
+      reducedAmbient.aura==='none' && reducedAmbient.sweep==='none',
+      'reduced-motion mode disables floating motes and glow animations');
     await reduce.close();
   }
 } catch(e) {failures.push(String(e));}
