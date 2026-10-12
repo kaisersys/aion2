@@ -7,6 +7,7 @@ import Link from '@tiptap/extension-link';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
 import { GuideButton, GuideCallout, GuideGallery, GuideSkillCard } from './GuideBlocks';
 
 export type GuideHeading = { id:string; text:string; level:number };
