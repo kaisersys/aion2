@@ -65,3 +65,58 @@
  .mobile-toggle{display:flex}
 }
 @media(max-width:980px){.mobile-admin-link{display:flex}}
+
+/* Atreia Street / Aion visual identity. Images live in public/assets. */
+.brand{gap:5px;min-width:245px}
+.brand-logo{display:block;flex:0 0 auto;width:105px;height:70px;object-fit:contain;filter:drop-shadow(0 0 7px #50a5fa32)}
+.brand-lines strong{font:600 16px/1.25 Cinzel,Georgia,serif;letter-spacing:1.3px;white-space:nowrap}
+.brand-lines em{font-style:normal;color:#d2bd95}
+.brand-lines small{font-size:8px;letter-spacing:1.8px;margin-top:3px;white-space:nowrap}
+.hero{isolation:isolate;background:#080916;overflow:hidden}
+.hero-art{position:absolute;inset:0;z-index:0;background-image:url('/assets/hero/aion-hero-purple.avif');background-repeat:no-repeat;background-size:cover;background-position:center 35%;transform:scale(1.025);animation:atreia-drift 22s ease-in-out infinite alternate;will-change:transform}
+.hero:after{z-index:1;background:linear-gradient(90deg,#080b1bec 0%,#0a0a22bb 33%,#070b1b4a 56%,#05070d38 77%,#05091091 100%),linear-gradient(0deg,#090e17 0%,#070a1882 21%,transparent 55%,#0607156b 100%)}
+.hero-sky{z-index:1;mix-blend-mode:screen;opacity:.2;animation:atreia-stars 25s linear infinite alternate;pointer-events:none}
+.hero-content{max-width:1170px;width:calc(100% - 140px);text-align:left;z-index:3;padding-top:235px}
+.hero h1{font-size:clamp(55px,6.1vw,90px);line-height:1.08;letter-spacing:3px;max-width:700px;text-shadow:0 4px 35px #080618}
+.hero p{margin:24px 0 29px;max-width:480px;color:#e0dce6;text-shadow:0 2px 12px #020413}
+.eyebrow{justify-content:flex-start;color:#e0c798}
+.ornament{max-width:430px;text-align:left;color:#d8c1a2}
+.hero-finder{z-index:7;background:linear-gradient(130deg,#0c1124ee,#1c1933e5);border-color:#c9af9b6b}
+.finder-topic{background:#2d254799}
+.finder-topic:hover,.finder-topic:focus-visible{background:#483360}
+.category-tile{isolation:isolate;overflow:hidden}
+.category-tile > *{z-index:1}
+.category-tile.gold:before{content:'';position:absolute;inset:0;z-index:0;background-image:linear-gradient(90deg,#080b16e5,#090e1e6b),url('/assets/hero/aion-hero-purple.avif');background-size:cover;background-position:69% center;opacity:.65;transition:transform .6s,opacity .6s}
+.category-tile.gold:hover:before{opacity:.95;transform:scale(1.075)}
+@keyframes atreia-drift{from{transform:scale(1.025) translate(0,0)}to{transform:scale(1.085) translate(-1%,.4%)}}
+@keyframes atreia-stars{from{transform:translateY(0)}to{transform:translateY(-18px)}}
+@media(max-width:1100px){
+ .brand{min-width:190px}
+ .brand-logo{width:75px;height:58px}
+ .brand-lines strong{font-size:13px}
+ .brand-lines small{font-size:7px;letter-spacing:1px}
+ .hero-content{width:calc(100% - 90px);padding-top:295px}
+ .hero h1{max-width:600px}
+ .hero-art{background-position:62% center}
+}
+@media(max-width:760px){
+ .brand-logo{width:65px;height:56px}
+ .brand-lines strong{font-size:12px}
+ .brand-lines small{letter-spacing:.65px}
+ .hero-art{background-position:66% center}
+ .hero:after{background:linear-gradient(90deg,#090b19bd,#090a1c58 75%),linear-gradient(0deg,#090e17 0%,#090d1c7f 45%,#0c0c1c65 100%)}
+ .hero-content{width:calc(100% - 40px);padding:350px 0 0;margin:auto;text-align:center}
+ .hero h1{font-size:clamp(43px,10vw,65px);max-width:none;letter-spacing:1px}
+ .hero p{margin:22px auto 28px}
+ .eyebrow{justify-content:center}
+ .ornament{text-align:center;max-width:none}
+}
+@media(max-width:390px){
+ .hero-content{padding-top:395px}
+ .brand-lines strong{font-size:11px}
+ .brand-lines small{font-size:6px}
+}
+@media(prefers-reduced-motion:reduce){
+ .hero-art,.hero-sky{animation:none;will-change:auto}
+ .category-tile.gold:before{transition:none}
+}

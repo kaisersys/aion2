@@ -22,7 +22,7 @@ function App(){
  const openSuggestion=(slug:string)=>{setFinderQuery('');setFinderFocused(false);go(slug)};
  const quickTopics=[{label:'CLASSES',category:'Classes',icon:<Swords size={19}/>},{label:'GEAR',category:'Progression',icon:<Gem size={19}/>},{label:'DUNGEONS',category:'Dungeons & Raids',icon:<Shield size={19}/>},{label:'ABYSS',category:'PvP & Abyss',icon:<Compass size={19}/>},{label:'CRAFTING',category:'Professions',icon:<ScrollText size={19}/>},{label:'ALL GUIDES',category:'All Guides',icon:<BookOpen size={19}/>}];
  return <div className="site">
-   <header className="header"><button className="brand" onClick={()=>go('home')} aria-label="Home"><span className="brand-mark">✦</span><span className="brand-lines"><strong>AION <em>II</em></strong><small>GUILD CODEX</small></span></button>
+   <header className="header"><button className="brand" onClick={()=>go('home')} aria-label="Home"><img className="brand-logo" src="/assets/branding/aion-logo.avif" alt="Aion" width="110" height="74"/><span className="brand-lines"><strong>ATREIA <em>STREET</em></strong><small>INDEPENDENT GUILD CODEX</small></span></button>
    <nav className={'nav '+(menu?'nav-open':'')} aria-label="Main navigation">
    <button className="nav-link" onClick={()=>go('home')}>HOME</button><button className="nav-link nav-emphasis" onClick={()=>choose('All Guides')}>GUIDE FINDER <ArrowUpRight size={13}/></button>
    {navigation.map(n=><div className="nav-group" key={n.title} onMouseEnter={()=>setOpenMenu(n.title)} onMouseLeave={()=>setOpenMenu(null)}>
@@ -31,7 +31,7 @@ function App(){
    </div>)}
    <button className="nav-link" onClick={()=>choose('All Guides')}>ALL GUIDES</button><button className="nav-link mobile-admin-link" onClick={()=>go('admin')}>ADMIN AREA</button>
    </nav><div className="header-actions"><button className="header-search" onClick={()=>go('library')} aria-label="Search guides"><Search size={19}/></button><button className="outline-button" onClick={()=>go('admin')}>ADMIN <ArrowUpRight size={14}/></button><button className="mobile-toggle" onClick={()=>setMenu(!menu)} aria-label="Toggle menu">{menu?<X/>:<Menu/>}</button></div></header>
-   {page==='home'? <><section className="hero"><div className="hero-sky"/><div className="hero-circle"/><div className="hero-mountains"/>
+   {page==='home'? <><section className="hero"><div className="hero-art" aria-hidden="true"/><div className="hero-sky" aria-hidden="true"/>
    <div className="hero-finder">
     <form className="finder-form" role="search" onSubmit={e=>{e.preventDefault();setSearch(finderQuery.trim());setCategory('All Guides');setFinderFocused(false);go('library')}}>
      <div className="finder-label"><Search size={15}/> FIND YOUR GUIDE</div>
