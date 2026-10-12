@@ -51,7 +51,7 @@ export default function GuideArticle({guide,onBack,preview=false}:{guide:Article
         {!preview && <a className="article-toc-bottom" href={guideHref(guide.slug)} onClick={e=>{e.preventDefault();window.scrollTo({top:0,behavior:'smooth'})}}>↑ BACK TO TOP</a>}
       </nav>
       <div className="article-body">
-        {guide.content ? <GuideContent key={JSON.stringify(guide.content).length+'-'+guide.slug} content={guide.content}/> :
+        {guide.content ? <GuideContent key={JSON.stringify(guide.content)} content={guide.content}/> :
           <><h2 id="overview">Overview</h2><p>{guide.body?.[0]||''}</p>
           <h2 id="fieldnotes">Field Notes</h2><p>{guide.body?.[1]||''}</p>
           <div className="editorial-note"><Sparkles size={19}/><span>This is starter content. Final guides will be written and published through the secure guild admin panel.</span></div></>}
