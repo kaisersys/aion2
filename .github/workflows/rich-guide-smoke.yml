@@ -1,7 +1,7 @@
 name: Validate rich guide editor (browser only)
 on:
-  push:
-    branches: [feature/guide-studio-rich-pages]
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
