@@ -37,7 +37,17 @@ for (const [label,url,expected] of [
       guttersOK=Boolean(desktop && desktop.left>=50 && desktop.right>=50 && !desktop.overflow && mobile && mobile.left>=18 && mobile.right>=18 && !mobile.overflow);
       console.log(JSON.stringify({label:'live-gutters',ok:guttersOK,desktop,mobile}));
     }
-    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && pageErrors.length===0;
+    const typeface = (label==='live-home'||label==='live-guide') ? await page.evaluate(()=>{
+      const heading=document.querySelector('.hero h1, .article-hero h1');
+      const body=document.querySelector('.hero p, .article-hero p');
+      return {
+        heading:heading?getComputedStyle(heading).fontFamily:'',
+        body:body?getComputedStyle(body).fontFamily:''
+      };
+    }):null;
+    const fontOK=typeface?typeface.heading.includes('Sora')&&typeface.body.includes('Inter'):true;
+    if(typeface)console.log(JSON.stringify({label:label+'-typography',ok:fontOK,...typeface}));
+    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && fontOK && pageErrors.length===0;
     if (!ok) failed = true;
     console.log(JSON.stringify({label,ok,status:response?.status(),headline,rootTextLength:text.length,adminLoginVisible:label==='live-admin'?adminLoaded:undefined,pageErrors:pageErrors.slice(0,5)}));
   } catch (e) {
