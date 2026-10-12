@@ -32,6 +32,9 @@ try {
     await page.getByRole('textbox',{name:'Name'}).fill('Explosive Arrow');
     await page.getByRole('button',{name:'Insert block'}).click();
     check(await page.locator('.studio-editor-canvas .guide-skill-card').count()===1,'editor inserts skill card');
+    check(await page.locator('.studio-editor-canvas .guide-callout').count()===1
+      && await page.locator('.studio-editor-canvas .guide-button-block').count()===1,
+      'new blocks do not overwrite earlier blocks');
     await page.getByRole('button',{name:'Full-page preview'}).click();
     await page.locator('.studio-page-preview').waitFor({timeout:10000});
     check((await page.locator('.studio-page-preview h1').first().innerText()).includes('Ranger Combat Rotation'),'private preview displays unsaved title');
