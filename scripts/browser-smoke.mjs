@@ -47,7 +47,23 @@ for (const [label,url,expected] of [
     }):null;
     const fontOK=typeface?typeface.heading.includes('Manrope')&&typeface.body.includes('Inter'):true;
     if(typeface)console.log(JSON.stringify({label:label+'-typography',ok:fontOK,...typeface}));
-    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && fontOK && pageErrors.length===0;
+    let parallaxOK=true;
+    if(label==='live-home'){
+      const layer=()=>page.evaluate(()=>({
+        art:getComputedStyle(document.querySelector('.hero-art')).transform,
+        sky:getComputedStyle(document.querySelector('.hero-sky')).transform,
+        near:getComputedStyle(document.querySelector('.hero-foreground')).transform
+      }));
+      await page.mouse.move(120,450);
+      await page.waitForTimeout(160);
+      const left=await layer();
+      await page.mouse.move(1100,455);
+      await page.waitForTimeout(160);
+      const right=await layer();
+      parallaxOK=Boolean(left.art!==right.art&&left.sky!==right.sky&&left.near!==right.near&&right.art!==right.near);
+      console.log(JSON.stringify({label:'live-hero-parallax',ok:parallaxOK,layers:3,pointerMoves:true}));
+    }
+    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && fontOK && parallaxOK && pageErrors.length===0;
     if (!ok) failed = true;
     console.log(JSON.stringify({label,ok,status:response?.status(),headline,rootTextLength:text.length,adminLoginVisible:label==='live-admin'?adminLoaded:undefined,pageErrors:pageErrors.slice(0,5)}));
   } catch (e) {
