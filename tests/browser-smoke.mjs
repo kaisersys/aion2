@@ -15,9 +15,13 @@ try {
     await edit.waitFor({timeout:10000});
     await edit.click();
     await page.getByRole('button',{name:'Heading 2'}).click();
-    await page.keyboard.type('Combat Rotation');
+    const heading=page.locator('.studio-editor-canvas .tiptap h2').first();
+    await heading.waitFor({timeout:5000});
+    await heading.click();
+    await page.keyboard.insertText('Combat Rotation');
+    check((await heading.innerText()).includes('Combat Rotation'),'editor creates persistent section heading');
     await page.keyboard.press('Enter');
-    await page.keyboard.type('Skill priority and timing.');
+    await page.keyboard.insertText('Skill priority and timing.');
     await page.getByRole('button',{name:'Info / tip box'}).click();
     await page.getByRole('textbox',{name:'Heading'}).fill('Rotation Tip');
     await page.getByRole('textbox',{name:'Message'}).fill('Practice on training dummies.');
@@ -35,6 +39,8 @@ try {
     check(await page.locator('.studio-editor-canvas .guide-callout').count()===1
       && await page.locator('.studio-editor-canvas .guide-button-block').count()===1,
       'new blocks do not overwrite earlier blocks');
+    check(await page.locator('.studio-editor-canvas .tiptap h2').count()===1,
+      'adding rich blocks preserves existing headings');
     await page.getByRole('button',{name:'Full-page preview'}).click();
     await page.locator('.studio-page-preview').waitFor({timeout:10000});
     check((await page.locator('.studio-page-preview h1').first().innerText()).includes('Ranger Combat Rotation'),'private preview displays unsaved title');
