@@ -1,0 +1,50 @@
+name: Validate rich guide editor (browser only)
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies and Chrome runner
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-save --no-audit --no-fund playwright-core
+      - name: Build regular website
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+      - name: Test guide routes and admin rendering
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/atreia-app.log 2>&1 &
+          sleep 3
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          node tests/browser-smoke.mjs app
+      - name: Build rich article fixture
+        run: |
+          cp tests/rich-article-fixture.tsx src/main.tsx
+          npm run build
+      - name: Test rich blocks in Chrome
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4174 > /tmp/atreia-blocks.log 2>&1 &
+          sleep 3
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          node tests/browser-smoke.mjs fixture
+      - name: Build isolated unsaved studio editor fixture
+        run: |
+          cp tests/studio-editor-fixture.tsx src/main.tsx
+          npm run build
+      - name: Test editor insertion and private preview in Chrome
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4175 > /tmp/atreia-editor.log 2>&1 &
+          sleep 3
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          node tests/browser-smoke.mjs editor
