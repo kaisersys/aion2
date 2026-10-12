@@ -63,12 +63,12 @@ function App(){
      frame=0;
      const scroll=Math.max(0,Math.min(window.scrollY,hero.offsetHeight));
      const factor=window.innerWidth<=760?.55:1;
-     hero.style.setProperty('--hero-bg-x',(-pointerX*8*factor).toFixed(1)+'px');
-     hero.style.setProperty('--hero-bg-y',(scroll*.13*factor-pointerY*5*factor).toFixed(1)+'px');
-     hero.style.setProperty('--hero-mid-x',(-pointerX*17*factor).toFixed(1)+'px');
-     hero.style.setProperty('--hero-mid-y',(scroll*.23*factor-pointerY*10*factor).toFixed(1)+'px');
-     hero.style.setProperty('--hero-fg-x',(-pointerX*27*factor).toFixed(1)+'px');
-     hero.style.setProperty('--hero-fg-y',(scroll*.32*factor-pointerY*14*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-bg-x',(-pointerX*11*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-bg-y',(scroll*.15*factor-pointerY*7*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-mid-x',(-pointerX*22*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-mid-y',(scroll*.25*factor-pointerY*12*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-fg-x',(-pointerX*34*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-fg-y',(scroll*.34*factor-pointerY*17*factor).toFixed(1)+'px');
    };
    const schedule=()=>{if(!frame)frame=window.requestAnimationFrame(update);};
    const onPointerMove=(event:PointerEvent)=>{
@@ -136,7 +136,7 @@ function App(){
    </div>)}
    <button className="nav-link" onClick={()=>choose('All Guides')}>ALL GUIDES</button><button className="nav-link mobile-admin-link" onClick={()=>go('admin')}>ADMIN AREA</button>
    </nav><div className="header-actions"><button className="header-search" onClick={()=>go('library')} aria-label="Search guides"><Search size={19}/></button><button className="outline-button" onClick={()=>go('admin')}>ADMIN <ArrowUpRight size={14}/></button><button className="mobile-toggle" onClick={()=>setMenu(!menu)} aria-label="Toggle menu">{menu?<X/>:<Menu/>}</button></div></header>
-   {page==='home'? <><section className="hero" ref={heroRef}><div className="hero-art" aria-hidden="true"/><div className="hero-sky" aria-hidden="true"/><div className="hero-foreground" aria-hidden="true"/>
+   {page==='home'? <><section className="hero" ref={heroRef}><div className="hero-art" aria-hidden="true"/><div className="hero-sky" aria-hidden="true"/><div className="hero-foreground" aria-hidden="true"/><div className="hero-aura" aria-hidden="true"/><div className="hero-motes" aria-hidden="true">{Array.from({length:18},(_,index)=><span key={index}/>)}</div>
    <div className="hero-content">
     <div className="hero-copy">
      <div className="eyebrow"><span/>A SANCTUARY OF KNOWLEDGE<span/></div><h1>THE PATH OF<br/><i>THE DAEVA</i></h1><div className="ornament">✧ ─── ✦ ─── ✧</div><p>Knowledge is our greatest weapon. Explore battle-tested guides, discoveries, and wisdom from your fellow guild members.</p><button className="gold-button" onClick={()=>choose('All Guides')}>EXPLORE THE CODEX <ArrowUpRight size={16}/></button>
