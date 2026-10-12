@@ -45,7 +45,7 @@ for (const [label,url,expected] of [
         body:body?getComputedStyle(body).fontFamily:''
       };
     }):null;
-    const fontOK=typeface?typeface.heading.includes('Sora')&&typeface.body.includes('Inter'):true;
+    const fontOK=typeface?typeface.heading.includes('Manrope')&&typeface.body.includes('Inter'):true;
     if(typeface)console.log(JSON.stringify({label:label+'-typography',ok:fontOK,...typeface}));
     const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && fontOK && pageErrors.length===0;
     if (!ok) failed = true;
