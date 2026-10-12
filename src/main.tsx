@@ -1,15 +1,10 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Search, Menu, X, ChevronDown, ChevronRight, ArrowUpRight, BookOpen, Shield, Swords, Sparkles, Compass, Gem, ScrollText, LogIn, ArrowLeft} from 'lucide-react';
 import './style.css';
-import AdminPanel from './admin/AdminPanel';
-import GuideContent from './components/GuideContent';
-import { getPublishedGuides, type GuideRecord } from './lib/guides';
-import { isSupabaseConfigured } from './lib/supabase';
-import type { JSONContent } from '@tiptap/core';
 
-type Guide={slug:string;title:string;category:string;summary:string;read:string;accent:string;body:string[];featured?:boolean;content?:JSONContent};
-const starterGuides:Guide[]=[
+type Guide={slug:string;title:string;category:string;summary:string;read:string;accent:string;body:string[];featured?:boolean};
+const guides:Guide[]=[
 {slug:'first-steps',title:'The First Steps of a Daeva',category:'Getting Started',summary:'Everything you need to know before your journey begins.',read:'8 MIN READ',accent:'ice',featured:true,body:['Choose your class according to how you enjoy playing. Learn your core abilities before investing heavily in equipment.','Follow the main campaign, unlock essential systems, and use the guild chat whenever you have questions.']},
 {slug:'ranger',title:'Ranger — Path of the Hunter',category:'Classes',summary:'Skills, stigma choices, rotations, and stat priorities.',read:'12 MIN READ',accent:'gold',featured:true,body:['A class overview for guild members. Add tested builds, screenshots, and rotations here.','Separate your solo, group, and PvP setups so new players can quickly find what they need.']},
 {slug:'gear',title:'Equipment Progression',category:'Progression',summary:'From your first upgrades to the next major gear milestone.',read:'10 MIN READ',accent:'violet',featured:true,body:['Prioritize efficient upgrades, and make a clear plan before spending expensive materials.','Use this page for gear tiers, enhancement priorities, and resource checklists.']},
@@ -19,32 +14,10 @@ const starterGuides:Guide[]=[
 ];
 const navigation=[{title:'DISCOVER',items:['Getting Started','Progression','Professions']},{title:'CLASSES',items:['Classes']},{title:'CHALLENGES',items:['Dungeons & Raids','PvP & Abyss']}];
 function App(){
- const [page,setPage]=useState(()=>window.location.hash==='#admin'?'admin':'home');const [category,setCategory]=useState('All Guides');const [search,setSearch]=useState('');const [finderQuery,setFinderQuery]=useState('');const [finderFocused,setFinderFocused]=useState(false);const [menu,setMenu]=useState(false);const [openMenu,setOpenMenu]=useState<string|null>(null);
- const [publishedGuides,setPublishedGuides]=useState<GuideRecord[]>([]);
- const [guidesError,setGuidesError]=useState('');
- const refreshGuides=useCallback(async()=>{
-   if(!isSupabaseConfigured) return;
-   try {
-     const results=await getPublishedGuides();
-     setPublishedGuides(results);
-     setGuidesError('');
-   }catch(error){setGuidesError('Unable to load published guides. Please try again later.');console.error(error);}
- },[]);
- useEffect(()=>{void refreshGuides();},[refreshGuides]);
- useEffect(()=>{
-   const updateRoute=()=>{if(window.location.hash==='#admin')setPage('admin');};
-   window.addEventListener('hashchange',updateRoute);
-   return ()=>window.removeEventListener('hashchange',updateRoute);
- },[]);
- const dynamicGuides:Guide[]=publishedGuides.map(g=>({
-   slug:g.slug,title:g.title,category:g.category,summary:g.summary,
-   read:'GUILD GUIDE',accent:g.category==='Classes'?'gold':g.category==='Progression'?'violet':g.category==='PvP & Abyss'?'red':'ice',
-   body:[],featured:g.featured,content:g.content
- }));
- const guides:Guide[]=[...dynamicGuides,...starterGuides.filter(g=>!dynamicGuides.some(d=>d.slug===g.slug))];
+ const [page,setPage]=useState('home');const [category,setCategory]=useState('All Guides');const [search,setSearch]=useState('');const [finderQuery,setFinderQuery]=useState('');const [finderFocused,setFinderFocused]=useState(false);const [menu,setMenu]=useState(false);const [openMenu,setOpenMenu]=useState<string|null>(null);
  const current=guides.find(g=>g.slug===page);const filtered=guides.filter(g=>(category==='All Guides'||g.category===category)&&(g.title+' '+g.summary+' '+g.category).toLowerCase().includes(search.toLowerCase()));
  const suggestions=finderQuery.trim()?guides.filter(g=>(g.title+' '+g.category+' '+g.summary).toLowerCase().includes(finderQuery.toLowerCase())).slice(0,4):[];
- const go=(slug:string)=>{if(slug==='admin')window.history.replaceState(null,'','#admin');else if(window.location.hash==='#admin')window.history.replaceState(null,'',window.location.pathname);setPage(slug);setMenu(false);setOpenMenu(null);window.scrollTo({top:0,behavior:'smooth'})};
+ const go=(slug:string)=>{setPage(slug);setMenu(false);setOpenMenu(null);window.scrollTo({top:0,behavior:'smooth'})};
  const choose=(cat:string)=>{setSearch('');setFinderQuery('');setFinderFocused(false);setCategory(cat);go('library');};
  const openSuggestion=(slug:string)=>{setFinderQuery('');setFinderFocused(false);go(slug)};
  const quickTopics=[{label:'CLASSES',category:'Classes',icon:<Swords size={19}/>},{label:'GEAR',category:'Progression',icon:<Gem size={19}/>},{label:'DUNGEONS',category:'Dungeons & Raids',icon:<Shield size={19}/>},{label:'ABYSS',category:'PvP & Abyss',icon:<Compass size={19}/>},{label:'CRAFTING',category:'Professions',icon:<ScrollText size={19}/>},{label:'ALL GUIDES',category:'All Guides',icon:<BookOpen size={19}/>}];
@@ -78,9 +51,9 @@ function App(){
    <section className="intro section-wrap"><div className="section-kicker">✦ &nbsp; THE GUILD ARCHIVES &nbsp; ✦</div><h2>Discover Your <i>Destiny</i></h2><p className="section-description">From your first steps in Atreia to the fiercest battles, every journey begins with knowledge.</p><div className="category-grid">{[{title:'CLASS GUIDES',sub:'Master your calling',icon:<Swords size={30}/>,cat:'Classes',style:'gold'},{title:'GEAR & PROGRESSION',sub:'Forge your strength',icon:<Gem size={30}/>,cat:'Progression',style:'violet'},{title:'DUNGEONS & RAIDS',sub:'Face the unknown',icon:<Shield size={30}/>,cat:'Dungeons & Raids',style:'ice'},{title:'THE ABYSS',sub:'Conquer the skies',icon:<Compass size={30}/>,cat:'PvP & Abyss',style:'red'}].map(c=><button className={'category-tile '+c.style} key={c.title} onClick={()=>choose(c.cat)}><span className="tile-icon">{c.icon}</span><div><strong>{c.title}</strong><small>{c.sub}</small></div><ArrowUpRight className="tile-arrow" size={19}/></button>)}</div></section>
    <section className="featured section-wrap"><div className="section-top"><div><div className="section-kicker left">CURATED BY THE GUILD</div><h2>Featured <i>Guides</i></h2></div><button className="text-action" onClick={()=>choose('All Guides')}>VIEW ALL GUIDES <ArrowUpRight size={17}/></button></div><div className="guide-grid">{guides.filter(g=>g.featured).map(g=><GuideCard guide={g} key={g.slug} onClick={()=>go(g.slug)}/>)}</div></section>
    <section className="join-banner"><span>THE JOURNEY IS BETTER TOGETHER</span><h2>United by <i>Purpose</i></h2><p>Built for our guild. Written by our adventurers. Shared with everyone.</p><button className="gold-button" onClick={()=>choose('All Guides')}>ENTER THE ARCHIVES <ArrowUpRight size={16}/></button></section></>:
-   page==='library'?<main className="inner-page section-wrap"><button className="back-link" onClick={()=>go('home')}><ArrowLeft size={16}/> BACK TO HOME</button><div className="section-kicker left">THE KNOWLEDGE ARCHIVE</div><h1>Guild <i>Guides</i></h1><p className="page-intro">Explore field manuals, class builds, progression paths, and guild strategies.</p><div className="library-controls"><label className="search-box"><Search size={20}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search guides..." aria-label="Search guides"/></label><select value={category} onChange={e=>setCategory(e.target.value)} aria-label="Filter by category">{['All Guides',...new Set(guides.map(g=>g.category))].map(c=><option key={c}>{c}</option>)}</select></div>{guidesError&&<p role="status" className="studio-message">{guidesError}</p>}<div className="guide-grid">{filtered.map(g=><GuideCard key={g.slug} guide={g} onClick={()=>go(g.slug)}/>)}</div>{filtered.length===0&&<p>No matching guides. Try another search.</p>}</main>:
-   page==='admin'?<AdminPanel onExit={()=>go('home')} onContentChanged={()=>{void refreshGuides()}}/>:
-   current?<main className="inner-page article-wrap"><button className="back-link" onClick={()=>go('library')}><ArrowLeft size={16}/> ALL GUIDES</button><div className="article-hero"><span className="section-kicker left">{current.category.toUpperCase()} · {current.read}</span><h1>{current.title}</h1><p>{current.summary}</p></div><article className="article"><div className="article-sidebar"><span>IN THIS GUIDE</span><a href="#overview">Overview</a><a href="#fieldnotes">Field Notes</a></div><div className="article-body">{current.content ? <GuideContent key={current.slug} content={current.content}/> : <><h2 id="overview">Overview</h2><p>{current.body[0]}</p><h2 id="fieldnotes">Field Notes</h2><p>{current.body[1]}</p><div className="editorial-note"><Sparkles size={19}/><span>This is starter content. Final guides will be written and published through the secure guild admin panel.</span></div></>}</div></article></main>:null}
+   page==='library'?<main className="inner-page section-wrap"><button className="back-link" onClick={()=>go('home')}><ArrowLeft size={16}/> BACK TO HOME</button><div className="section-kicker left">THE KNOWLEDGE ARCHIVE</div><h1>Guild <i>Guides</i></h1><p className="page-intro">Explore field manuals, class builds, progression paths, and guild strategies.</p><div className="library-controls"><label className="search-box"><Search size={20}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search guides..." aria-label="Search guides"/></label><select value={category} onChange={e=>setCategory(e.target.value)} aria-label="Filter by category">{['All Guides',...new Set(guides.map(g=>g.category))].map(c=><option key={c}>{c}</option>)}</select></div><div className="guide-grid">{filtered.map(g=><GuideCard key={g.slug} guide={g} onClick={()=>go(g.slug)}/>)}</div>{filtered.length===0&&<p>No matching guides. Try another search.</p>}</main>:
+   page==='admin'?<main className="inner-page section-wrap narrow"><button className="back-link" onClick={()=>go('home')}><ArrowLeft size={16}/> BACK TO HOME</button><div className="section-kicker left">GUILD STAFF ONLY</div><h1>Admin <i>Sanctum</i></h1><div className="notice"><LogIn size={25}/><div><strong>Admin publishing is not configured yet.</strong><p>To keep guild content secure, editing and publishing will be enabled after we connect Supabase authentication and a database. No insecure demo login or browser-only publishing is exposed.</p></div></div></main>:
+   current?<main className="inner-page article-wrap"><button className="back-link" onClick={()=>go('library')}><ArrowLeft size={16}/> ALL GUIDES</button><div className="article-hero"><span className="section-kicker left">{current.category.toUpperCase()} · {current.read}</span><h1>{current.title}</h1><p>{current.summary}</p></div><article className="article"><div className="article-sidebar"><span>IN THIS GUIDE</span><a href="#overview">Overview</a><a href="#fieldnotes">Field Notes</a></div><div className="article-body"><h2 id="overview">Overview</h2><p>{current.body[0]}</p><h2 id="fieldnotes">Field Notes</h2><p>{current.body[1]}</p><div className="editorial-note"><Sparkles size={19}/><span>This is starter content. Final guides will be written and published through the secure guild admin panel.</span></div></div></article></main>:null}
    <footer><div className="footer-brand">✦ &nbsp; AION II <span>GUILD CODEX</span></div><p>An independent fan-made community guide project. Not affiliated with or endorsed by NCSOFT.</p><div>FORGED IN KNOWLEDGE · UNITED IN PURPOSE</div></footer>
  </div>
 }
