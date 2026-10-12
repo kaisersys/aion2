@@ -52,3 +52,16 @@
  .hero-content{padding-top:395px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.category-tile,.guide-card{transition:none}}
+
+/* Collapse navigation before links become crowded on tablets. */
+.mobile-admin-link{display:none}
+@media(min-width:761px) and (max-width:980px){
+ .header{height:72px}
+ .nav{display:none;position:absolute;top:72px;left:0;right:0;padding:16px 30px 24px;background:#0b1422;align-items:stretch;flex-direction:column;gap:0;max-height:75vh;overflow:auto}
+ .nav.nav-open{display:flex}
+ .nav-link{padding:14px 0}
+ .nav-group{width:100%}
+ .dropdown{display:none;position:static;width:100%;box-shadow:none;margin-bottom:10px}
+ .mobile-toggle{display:flex}
+}
+@media(max-width:980px){.mobile-admin-link{display:flex}}
