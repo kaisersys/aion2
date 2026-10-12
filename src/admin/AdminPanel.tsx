@@ -119,7 +119,7 @@ function BlockComposer({kind,onClose,onInsert}:{
   </div>;
 }
 
-function StudioEditor({ record, user, onSaved, onCancel }: {
+export function StudioEditor({ record, user, onSaved, onCancel }: {
   record: GuideRecord | null;
   user: User;
   onSaved: () => void;
@@ -264,7 +264,10 @@ function StudioEditor({ record, user, onSaved, onCancel }: {
     </div>
     {preview&&createPortal(<div className="studio-page-preview" role="dialog" aria-modal="true" aria-label="Full page guide preview">
       <div className="studio-preview-bar"><span><Eye size={17}/> PRIVATE FULL-PAGE PREVIEW · NOT PUBLISHED</span><button type="button" className="studio-quiet-button" onClick={()=>setPreview(false)}><X size={17}/> Close preview</button></div>
-      <div className="site studio-preview-site">
+      <div className="site studio-preview-site" onClickCapture={event=>{
+        const anchor=(event.target as HTMLElement).closest('a');
+        if(anchor && !anchor.closest('.article-sidebar'))event.preventDefault();
+      }}>
         <header className="header studio-preview-header">
           <div className="brand"><img className="brand-logo" src="/assets/branding/aion-logo.avif" alt="Aion" width="110" height="74"/><span className="brand-lines"><strong>ATREIA <em>STREET</em></strong><small>INDEPENDENT GUILD CODEX</small></span></div>
           <span className="studio-preview-nav">DISCOVER &nbsp; · &nbsp; CLASSES &nbsp; · &nbsp; CHALLENGES &nbsp; · &nbsp; ALL GUIDES</span>
