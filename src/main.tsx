@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Search, Menu, X, ChevronDown, ChevronRight, ArrowUpRight, BookOpen, Shield, Swords, Sparkles, Compass, Gem, ScrollText, LogIn, ArrowLeft} from 'lucide-react';
 import './style.css';
@@ -30,6 +30,7 @@ function routeFromHash():string {
 const navigation=[{title:'DISCOVER',items:['Getting Started','Progression','Professions']},{title:'CLASSES',items:['Classes']},{title:'CHALLENGES',items:['Dungeons & Raids','PvP & Abyss']}];
 function App(){
  const [page,setPage]=useState(routeFromHash);const [category,setCategory]=useState('All Guides');const [search,setSearch]=useState('');const [finderQuery,setFinderQuery]=useState('');const [finderFocused,setFinderFocused]=useState(false);const [menu,setMenu]=useState(false);const [openMenu,setOpenMenu]=useState<string|null>(null);
+ const heroRef=useRef<HTMLElement|null>(null);
  const [publishedGuides,setPublishedGuides]=useState<GuideRecord[]>([]);
  const [guidesError,setGuidesError]=useState('');
  const [guidesLoading,setGuidesLoading]=useState(isSupabaseConfigured);
@@ -48,6 +49,60 @@ function App(){
    window.addEventListener('hashchange',updateRoute);
    return ()=>window.removeEventListener('hashchange',updateRoute);
  },[]);
+ // Move the painting, distant starlight and nearby haze independently.
+ // CSS variables avoid re-rendering the guide finder on pointer or scroll events.
+ useEffect(()=>{
+   if(page!=='home')return;
+   const hero=heroRef.current;
+   if(!hero)return;
+   const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+   const finePointer=window.matchMedia('(hover: hover) and (pointer: fine)');
+   if(reduceMotion.matches)return;
+   let pointerX=0,pointerY=0,frame=0;
+   const update=()=>{
+     frame=0;
+     const scroll=Math.max(0,Math.min(window.scrollY,hero.offsetHeight));
+     const factor=window.innerWidth<=760?.55:1;
+     hero.style.setProperty('--hero-bg-x',(-pointerX*8*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-bg-y',(scroll*.13*factor-pointerY*5*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-mid-x',(-pointerX*17*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-mid-y',(scroll*.23*factor-pointerY*10*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-fg-x',(-pointerX*27*factor).toFixed(1)+'px');
+     hero.style.setProperty('--hero-fg-y',(scroll*.32*factor-pointerY*14*factor).toFixed(1)+'px');
+   };
+   const schedule=()=>{if(!frame)frame=window.requestAnimationFrame(update);};
+   const onPointerMove=(event:PointerEvent)=>{
+     if(!finePointer.matches)return;
+     const rect=hero.getBoundingClientRect();
+     pointerX=(event.clientX-(rect.left+rect.width/2))/(rect.width/2);
+     pointerY=(event.clientY-(rect.top+rect.height/2))/(rect.height/2);
+     schedule();
+   };
+   const onPointerLeave=()=>{pointerX=0;pointerY=0;schedule();};
+   const onMotionChange=()=>{
+     if(reduceMotion.matches){
+       if(frame)window.cancelAnimationFrame(frame);
+       frame=0;
+       for(const property of ['--hero-bg-x','--hero-bg-y','--hero-mid-x','--hero-mid-y','--hero-fg-x','--hero-fg-y']){
+         hero.style.removeProperty(property);
+       }
+     }else schedule();
+   };
+   hero.addEventListener('pointermove',onPointerMove,{passive:true});
+   hero.addEventListener('pointerleave',onPointerLeave);
+   window.addEventListener('scroll',schedule,{passive:true});
+   window.addEventListener('resize',schedule,{passive:true});
+   reduceMotion.addEventListener('change',onMotionChange);
+   schedule();
+   return ()=>{
+     if(frame)window.cancelAnimationFrame(frame);
+     hero.removeEventListener('pointermove',onPointerMove);
+     hero.removeEventListener('pointerleave',onPointerLeave);
+     window.removeEventListener('scroll',schedule);
+     window.removeEventListener('resize',schedule);
+     reduceMotion.removeEventListener('change',onMotionChange);
+   };
+ },[page]);
  const dynamicGuides:Guide[]=publishedGuides.map(g=>({
    slug:g.slug,title:g.title,category:g.category,summary:g.summary,
    read:'GUILD GUIDE',accent:g.category==='Classes'?'gold':g.category==='Progression'?'violet':g.category==='PvP & Abyss'?'red':'ice',
@@ -81,7 +136,7 @@ function App(){
    </div>)}
    <button className="nav-link" onClick={()=>choose('All Guides')}>ALL GUIDES</button><button className="nav-link mobile-admin-link" onClick={()=>go('admin')}>ADMIN AREA</button>
    </nav><div className="header-actions"><button className="header-search" onClick={()=>go('library')} aria-label="Search guides"><Search size={19}/></button><button className="outline-button" onClick={()=>go('admin')}>ADMIN <ArrowUpRight size={14}/></button><button className="mobile-toggle" onClick={()=>setMenu(!menu)} aria-label="Toggle menu">{menu?<X/>:<Menu/>}</button></div></header>
-   {page==='home'? <><section className="hero"><div className="hero-art" aria-hidden="true"/><div className="hero-sky" aria-hidden="true"/>
+   {page==='home'? <><section className="hero" ref={heroRef}><div className="hero-art" aria-hidden="true"/><div className="hero-sky" aria-hidden="true"/><div className="hero-foreground" aria-hidden="true"/>
    <div className="hero-content">
     <div className="hero-copy">
      <div className="eyebrow"><span/>A SANCTUARY OF KNOWLEDGE<span/></div><h1>THE PATH OF<br/><i>THE DAEVA</i></h1><div className="ornament">✧ ─── ✦ ─── ✧</div><p>Knowledge is our greatest weapon. Explore battle-tested guides, discoveries, and wisdom from your fellow guild members.</p><button className="gold-button" onClick={()=>choose('All Guides')}>EXPLORE THE CODEX <ArrowUpRight size={16}/></button>
