@@ -105,6 +105,50 @@ try {
     });
     check(fontCheck.heroFont.includes('Manrope') && fontCheck.bodyFont.includes('Inter'),'hero uses Manrope while reading copy stays Inter');
     check(!fontCheck.overflows,'updated headings do not overflow desktop');
+    const depth=()=>page.evaluate(()=>{
+      const transform=(selector)=>getComputedStyle(document.querySelector(selector)).transform;
+      return {art:transform('.hero-art'),sky:transform('.hero-sky'),foreground:transform('.hero-foreground')};
+    });
+    check(await page.locator('.hero-foreground[aria-hidden="true"]').count()===1,
+      'decorative foreground depth layer is present');
+    const artSource=await page.evaluate(()=>getComputedStyle(document.querySelector('.hero-art'),'::before').backgroundImage);
+    check(artSource.includes('aion-hero-purple.avif'),'hero backdrop retains the original artwork');
+    await page.mouse.move(140,450);
+    await page.waitForTimeout(120);
+    const nearLeft=await depth();
+    await page.mouse.move(1110,480);
+    await page.waitForTimeout(120);
+    const nearRight=await depth();
+    check(nearLeft.art!==nearRight.art && nearLeft.sky!==nearRight.sky &&
+      nearLeft.foreground!==nearRight.foreground,'all three planes respond to desktop pointer movement');
+    check(nearRight.art!==nearRight.sky && nearRight.sky!==nearRight.foreground,
+      'background, midground and foreground move at different speeds');
+    await page.evaluate(()=>window.scrollTo({top:300,behavior:'instant'}));
+    await page.waitForTimeout(120);
+    const afterScroll=await depth();
+    check(afterScroll.art!==nearRight.art && afterScroll.sky!==nearRight.sky &&
+      afterScroll.foreground!==nearRight.foreground,'scrolling creates multi-plane parallax depth');
+    await page.setViewportSize({width:390,height:844});
+    await page.waitForTimeout(120);
+    check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),
+      'mobile hero does not cause horizontal overflow');
+    const reduce=await browser.newContext({reducedMotion:'reduce'});
+    const reducePage=await reduce.newPage();
+    await reducePage.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
+    await reducePage.locator('.hero-art').waitFor();
+    const staticMotion=await reducePage.evaluate(()=>{
+      const art=document.querySelector('.hero-art');
+      return {
+        art:getComputedStyle(art).transform,
+        sky:getComputedStyle(document.querySelector('.hero-sky')).transform,
+        foreground:getComputedStyle(document.querySelector('.hero-foreground')).transform,
+        breathing:getComputedStyle(art,'::before').animationName
+      };
+    });
+    check(staticMotion.art==='none' && staticMotion.sky==='none' &&
+      staticMotion.foreground==='none' && staticMotion.breathing==='none',
+      'reduced-motion mode disables parallax and breathing animation');
+    await reduce.close();
   }
 } catch(e) {failures.push(String(e));}
 await browser.close();
