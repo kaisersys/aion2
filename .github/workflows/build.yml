@@ -19,8 +19,8 @@ jobs:
           node-version: '22'
       - name: Verify required website artwork
         run: |
-          test -s public/assets/branding/aion-logo.webp
-          test -s public/assets/hero/aion-hero-purple.webp
+          test -s public/assets/branding/aion-logo.avif
+          test -s public/assets/hero/aion-hero-purple.avif
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Typecheck and build
