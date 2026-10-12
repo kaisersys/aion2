@@ -1,20 +1,33 @@
 import { chromium } from 'playwright-core';
 
-const chrome = process.env.CHROME_BIN || '/usr/bin/google-chrome';
-const browser = await chromium.launch({executablePath: chrome, headless: true, args:['--no-sandbox','--disable-dev-shm-usage']});
-for (const [label,url] of [['live','https://atreiastreet.com/'],['faulty-local','http://127.0.0.1:4173/'],['faulty-admin','http://127.0.0.1:4173/#admin']]) {
+const browser = await chromium.launch({
+  executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome',
+  headless: true,
+  args: ['--no-sandbox', '--disable-dev-shm-usage']
+});
+let failed = false;
+for (const [label,url,expected] of [
+  ['live-home','https://atreiastreet.com/?verify=studio2026','THE PATH OF'],
+  ['live-admin','https://atreiastreet.com/#admin','Admin Sanctum']
+]) {
   const page = await browser.newPage();
-  const errors = [];
-  page.on('pageerror', e => errors.push('JS: '+e.message));
-  page.on('console', msg => { if(msg.type()==='error') errors.push('CONSOLE: '+msg.text().slice(0,200)); });
+  const pageErrors = [];
+  page.on('pageerror', e => pageErrors.push(e.message));
   try {
     const response = await page.goto(url,{waitUntil:'domcontentloaded',timeout:20000});
     await page.waitForTimeout(3500);
-    const title = await page.locator('h1').first().textContent({timeout:3500}).catch(()=>null);
-    const rootLength = await page.locator('#root').evaluate(el => el.textContent?.length||0).catch(()=>0);
-    console.log(JSON.stringify({label,status:response?.status(),headline:title,rootTextLength:rootLength,errors:errors.slice(0,7)}));
-  } catch (err) {
-    console.log(JSON.stringify({label,error:String(err).slice(0,500),errors:errors.slice(0,7)}));
+    const text = await page.locator('#root').innerText();
+    const headline = await page.locator('h1').first().innerText().catch(()=>null);
+    const adminLoaded = label==='live-admin' ? (
+      text.includes('Sign in with your approved Supabase staff account.') && text.includes('Sign in')
+    ) : true;
+    const ok = response?.status()===200 && text.includes(expected) && adminLoaded && pageErrors.length===0;
+    if (!ok) failed = true;
+    console.log(JSON.stringify({label,ok,status:response?.status(),headline,rootTextLength:text.length,adminLoginVisible:label==='live-admin'?adminLoaded:undefined,pageErrors:pageErrors.slice(0,5)}));
+  } catch (e) {
+    failed = true;
+    console.log(JSON.stringify({label,ok:false,error:String(e).slice(0,400),pageErrors}));
   } finally {await page.close();}
 }
 await browser.close();
+if(failed)process.exitCode=1;
