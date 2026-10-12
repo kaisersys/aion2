@@ -32,6 +32,7 @@ function App(){
  const [page,setPage]=useState(routeFromHash);const [category,setCategory]=useState('All Guides');const [search,setSearch]=useState('');const [finderQuery,setFinderQuery]=useState('');const [finderFocused,setFinderFocused]=useState(false);const [menu,setMenu]=useState(false);const [openMenu,setOpenMenu]=useState<string|null>(null);
  const [publishedGuides,setPublishedGuides]=useState<GuideRecord[]>([]);
  const [guidesError,setGuidesError]=useState('');
+ const [guidesLoading,setGuidesLoading]=useState(isSupabaseConfigured);
  const refreshGuides=useCallback(async()=>{
    if(!isSupabaseConfigured) return;
    try {
@@ -39,6 +40,7 @@ function App(){
      setPublishedGuides(results);
      setGuidesError('');
    }catch(error){setGuidesError('Unable to load published guides. Please try again later.');console.error(error);}
+   finally{setGuidesLoading(false);}
  },[]);
  useEffect(()=>{void refreshGuides();},[refreshGuides]);
  useEffect(()=>{
@@ -103,7 +105,12 @@ function App(){
    page==='admin'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading Guide Studio...</p></main>}><AdminPanel onExit={()=>go('home')} onContentChanged={()=>{void refreshGuides()}}/></React.Suspense>:
    current?<React.Suspense fallback={<main className="inner-page article-wrap"><p>Loading guide...</p></main>}>
      <GuideArticle key={current.slug} guide={current} onBack={()=>go('library')}/>
-   </React.Suspense>:null}
+   </React.Suspense>:page.startsWith('guide:')?<main className="inner-page section-wrap">
+     <button className="back-link" onClick={()=>go('library')}><ArrowLeft size={16}/> ALL GUIDES</button>
+     <div className="section-kicker left">THE GUILD ARCHIVES</div>
+     <h1>{guidesLoading?'Loading guide...':'Guide unavailable'}</h1>
+     {!guidesLoading&&<p className="page-intro">This guide may not exist yet, or it has not been published. Only published posts are visible to visitors.</p>}
+   </main>:null}
 
    <footer><div className="footer-brand">✦ &nbsp; AION II <span>GUILD CODEX</span></div><p>An independent fan-made community guide project. Not affiliated with or endorsed by NCSOFT.</p><div>FORGED IN KNOWLEDGE · UNITED IN PURPOSE</div></footer>
  </div>
