@@ -29,7 +29,7 @@ function App(){
     <button className="nav-link" aria-expanded={openMenu===n.title} onClick={()=>setOpenMenu(openMenu===n.title?null:n.title)}>{n.title}<ChevronDown size={13}/></button>
     <div className={'dropdown '+(openMenu===n.title?'show':'')}>{n.items.map(item=><button key={item} onClick={()=>choose(item)}><span>{item}</span><ChevronRight size={14}/></button>)}</div>
    </div>)}
-   <button className="nav-link" onClick={()=>choose('All Guides')}>ALL GUIDES</button>
+   <button className="nav-link" onClick={()=>choose('All Guides')}>ALL GUIDES</button><button className="nav-link mobile-admin-link" onClick={()=>go('admin')}>ADMIN AREA</button>
    </nav><div className="header-actions"><button className="header-search" onClick={()=>go('library')} aria-label="Search guides"><Search size={19}/></button><button className="outline-button" onClick={()=>go('admin')}>ADMIN <ArrowUpRight size={14}/></button><button className="mobile-toggle" onClick={()=>setMenu(!menu)} aria-label="Toggle menu">{menu?<X/>:<Menu/>}</button></div></header>
    {page==='home'? <><section className="hero"><div className="hero-sky"/><div className="hero-circle"/><div className="hero-mountains"/>
    <div className="hero-finder">
