@@ -43,3 +43,37 @@ The FTPS action keeps its own sync state on the webserver. Before the first run,
 ## Admin area
 
 The public guide pages are currently sample content. The admin page is intentionally a placeholder: editing, logins, and live publishing require a database and authentication layer and aren't enabled yet.
+
+## Guide Studio setup
+
+Atreia Street includes a Tiptap WYSIWYG editor with previews, image uploads, draft/publish workflow, category assignment, featured guides, and a protected staff dashboard. Supabase stores articles and assets. **The editor will show a setup notice until the following one-time steps are completed.**
+
+1. Create a project at https://supabase.com/dashboard. Keep your Supabase database password private.
+2. Open **SQL Editor** in your Supabase project. Run the entire file `supabase/migrations/20261012_guide_studio.sql`. This creates the guides table, image storage bucket, administrator membership, and restrictive **row-level security** policies.
+3. Open **Authentication → Users** in Supabase. Create your editor account with an email address and password. There is intentionally no public sign-up on the website.
+4. Grant *only that account* publishing access: in the **Supabase SQL Editor** run the following, replacing the email address with your editor email:
+   ```sql
+   insert into public.admin_users (user_id)
+   select id from auth.users where email = 'your-email@example.com'
+   on conflict (user_id) do nothing;
+   ```
+   If no row is inserted, confirm the user exists in Authentication → Users. Do not give everyone admin access.
+5. In the Supabase dashboard, open **Project Settings → API** (depending on the dashboard version, **Connect → Project URL and publishable key**).
+   Find the **Project URL** and **publishable key** or legacy **anon/public key**. These are intended for browser use; do **not** use a secret/service_role key.
+6. In the GitHub repository open **Settings → Secrets and variables → Actions → New repository secret**. Add:
+   - `VITE_SUPABASE_URL` — your Supabase project URL, e.g. `https://example.supabase.co`.
+   - `VITE_SUPABASE_ANON_KEY` — the project **publishable** or **anon** key. Never the service_role key.
+7. Open **Actions → Build, package and (when configured) deploy → Run workflow**, select **main**, then run it. These variables are injected **at build time** by Vite. Ensure the build and FTPS deployment both pass.
+8. Visit **https://atreiastreet.com/#admin**, sign in, select **New Guide**, draft your guide, and click **Publish**. Published guides appear to visitors without another GitHub deployment.
+
+### Important security details
+
+- Supabase Auth validates logins; there is no hard-coded username/password.
+- Anyone can read only `published` guide rows. Drafts are readable only by approved staff.
+- Write and image-upload policies verify membership in `public.admin_users` **on the database server**. Client checks alone do not provide authorization.
+- All images are publicly readable once uploaded; use public images only, not sensitive documents. Upload size limit is 10 MB per image.
+- The `service_role` key **must never be used** in frontend code, GitHub Actions, a commit, or a public website. It bypasses RLS.
+- The `VITE_...` values above are embedded into the browser bundle; that is safe *only for the Supabase publishable/anon key*.
+- GitHub's existing `FTP_HOST`, `FTP_USER`, `FTP_PASSWORD`, and `FTP_REMOTE_DIR=public_html/` secrets remain unchanged. GitHub builds and deploys the editor frontend; actual article edits save to Supabase immediately and do not require redeployment.
+- The six starter/example articles remain visible and are read-only examples. Newly published guides take priority if a matching slug exists; create fresh guides through the Studio.
+- There is no public user registration. Add other trusted guild editors manually through Supabase Authentication and the `admin_users` table.
