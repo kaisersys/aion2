@@ -1,0 +1,66 @@
+name: Diagnose website deploy path
+
+on:
+  push:
+    branches: [diagnose/deploy-path]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare public website and deployed FTP folder
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+        run: |
+          python - <<'PY'
+          import ftplib, html, os, re, ssl, urllib.request
+          for url in [
+              'https://atreiastreet.com/?diagnose=1',
+              'https://atreiastreet.com/assets/branding/aion-logo.avif',
+              'https://atreiastreet.com/assets/hero/aion-hero-purple.avif',
+          ]:
+              try:
+                  request=urllib.request.Request(url,headers={'User-Agent':'AtreiaStreetSiteCheck/1.0'})
+                  with urllib.request.urlopen(request,timeout=15) as res:
+                      data=res.read(100000)
+                      print('WEB',url.split('atreiastreet.com')[-1], 'HTTP',res.status, 'TYPE',res.headers.get('Content-Type'),'BYTES_READ',len(data))
+                      if 'diagnose=1' in url:
+                          title=re.search(rb'<title[^>]*>(.*?)</title>',data,re.I|re.S)
+                          print('WEB_TITLE',html.unescape(title.group(1).decode('utf8','replace')) if title else 'none')
+                          print('WEB_BUILD_ASSETS',re.findall(rb'/assets/[^"\s<>]+',data)[:6])
+              except Exception as e:
+                  print('WEB_ERROR',url.split('atreiastreet.com')[-1],type(e).__name__,str(e)[:180])
+          if all(os.getenv(x) for x in ['FTP_HOST','FTP_USER','FTP_PASSWORD','FTP_REMOTE_DIR']):
+              try:
+                  ftp=ftplib.FTP_TLS()
+                  ftp.connect(os.environ['FTP_HOST'],21,timeout=20)
+                  ftp.login(os.environ['FTP_USER'],os.environ['FTP_PASSWORD'])
+                  ftp.prot_p()
+                  def listfiles(label):
+                      try:
+                          files=ftp.nlst()
+                          basenames={x.rstrip('/').rsplit('/',1)[-1] for x in files}
+                          print('FTP',label,'HAS_INDEX', 'index.html' in basenames,'HAS_ASSETS','assets' in basenames,'HAS_PUBLIC_HTML','public_html' in basenames,'SAMPLE',sorted(basenames)[:12])
+                      except Exception as e:
+                          print('FTP_LIST_ERROR',label,type(e).__name__,str(e)[:100])
+                  listfiles('account_login_root')
+                  ftp.cwd(os.environ['FTP_REMOTE_DIR'])
+                  listfiles('configured_deploy_destination')
+                  for name in ['assets/branding/aion-logo.avif','assets/hero/aion-hero-purple.avif']:
+                      try:
+                          ftp.sendcmd('TYPE I')
+                          print('FTP_FILE',name,'BYTES',ftp.size(name))
+                      except Exception as e:
+                          print('FTP_FILE_ERROR',name,type(e).__name__,str(e)[:100])
+                  ftp.quit()
+              except Exception as e:
+                  print('FTP_ERROR',type(e).__name__,str(e)[:180])
+          else:
+              print('FTP_SECRETS_MISSING')
+          PY
