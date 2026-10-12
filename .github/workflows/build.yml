@@ -1,9 +1,13 @@
-name: Build and package website
+name: Build, package and (when configured) deploy
 
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -13,6 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify required website artwork
+        run: |
+          test -s public/assets/branding/aion-logo.webp
+          test -s public/assets/hero/aion-hero-purple.webp
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Typecheck and build
@@ -24,3 +32,44 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 30
+
+  deploy:
+    name: Deploy to hosting.com (FTPS)
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_USER: ${{ secrets.FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+    steps:
+      - name: Check deployment settings
+        id: configured
+        shell: bash
+        run: |
+          if [[ -n "$FTP_HOST" && -n "$FTP_USER" && -n "$FTP_PASSWORD" && -n "$FTP_REMOTE_DIR" ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'FTPS not configured yet: add FTP_HOST, FTP_USER, FTP_PASSWORD and FTP_REMOTE_DIR to repository secrets.'
+          fi
+      - name: Download site build
+        if: steps.configured.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: aion2-website-files
+          path: ./dist
+      - name: Upload compiled website (not source) via encrypted FTPS
+        if: steps.configured.outputs.ready == 'true'
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+          log-level: standard
