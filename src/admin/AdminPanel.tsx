@@ -143,7 +143,7 @@ export function StudioEditor({ record, user, onSaved, onCancel }: {
     if(!preview)return;
     const oldOverflow=document.body.style.overflow;
     document.body.style.overflow='hidden';
-    const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setPreview(false);};
+    const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('.guide-lightbox'))setPreview(false);};
     window.addEventListener('keydown',onKey);
     return ()=>{document.body.style.overflow=oldOverflow;window.removeEventListener('keydown',onKey);};
   },[preview]);
