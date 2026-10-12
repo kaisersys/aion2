@@ -120,3 +120,169 @@
  .hero-art,.hero-sky{animation:none;will-change:auto}
  .category-tile.gold:before{transition:none}
 }
+
+/* Hero v0.3: all functional content lives in a compact left column.
+   The right half is deliberately free for the winged-character artwork. */
+.hero {
+  height: auto;
+  min-height: 940px;
+  padding: 138px 0 100px;
+}
+.hero-content {
+  width: min(calc(100% - 96px), 1128px);
+  max-width: none;
+  padding: 0;
+  margin: auto;
+  text-align: left;
+}
+.hero-copy {
+  width: min(100%, 565px);
+}
+.hero h1 {
+  font-size: clamp(51px, 5.25vw, 82px);
+  line-height: 1.08;
+  letter-spacing: 2px;
+  max-width: 100%;
+  margin: 21px 0 12px;
+}
+.hero p {
+  max-width: 495px;
+  margin: 18px 0 25px;
+  line-height: 1.85;
+}
+.hero .ornament {
+  margin: 12px 0;
+}
+.hero-finder {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  z-index: 6;
+  width: 100%;
+  max-width: 565px;
+  margin-top: 29px;
+  padding: 18px 19px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  text-align: left;
+  background: linear-gradient(125deg, #0c1124f0, #1c1933e8);
+  box-shadow: 0 15px 45px #01040a99;
+}
+.finder-form,.finder-topics {
+  min-width: 0;
+}
+.hero-finder .finder-topic-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.hero-finder .finder-topic {
+  flex-direction: row;
+  gap: 6px;
+  min-height: 40px;
+  padding: 7px 5px;
+  font-size: 9px;
+  letter-spacing: .4px;
+  white-space: nowrap;
+}
+.hero-finder .finder-topic svg {
+  width: 16px;
+  height: 16px;
+}
+.hero-finder .finder-label {
+  margin-bottom: 10px;
+}
+@media (min-width: 1051px) {
+  .hero-art {
+    background-position: center 35%;
+  }
+}
+@media (min-width: 761px) and (max-width: 1050px) {
+  .hero {
+    height: auto;
+    min-height: 950px;
+    padding: 130px 0 95px;
+  }
+  .hero-content {
+    width: calc(100% - 64px);
+    padding: 0;
+  }
+  .hero-copy { width: min(100%, 535px); }
+  .hero-art { background-position: 30% center; }
+  .hero h1 { font-size: clamp(47px, 5.7vw, 67px); }
+  .hero-finder {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    padding: 17px 18px;
+    max-width: 535px;
+  }
+}
+@media (max-width: 760px) {
+  .hero {
+    height: auto;
+    min-height: 0;
+    padding: 315px 0 105px;
+    align-items: flex-start;
+  }
+  .hero-art {
+    background-size: auto 680px;
+    background-position: 66% top;
+  }
+  .hero:after {
+    background:
+      linear-gradient(180deg, #03050d24 0%, #090c1b9c 25%, #090e17ec 57%, #090e17 100%),
+      linear-gradient(90deg, #0509185c, transparent 70%);
+  }
+  .hero-content {
+    width: calc(100% - 34px);
+    max-width: 590px;
+    padding: 0;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .hero-copy { width: 100%; }
+  .hero h1 {
+    font-size: clamp(37px, 9vw, 65px);
+    letter-spacing: .8px;
+    margin-top: 18px;
+  }
+  .hero p {
+    margin: 18px auto 23px;
+    font-size: 12px;
+    max-width: 480px;
+  }
+  .hero .ornament { text-align: center; }
+  .hero-finder {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    margin-top: 28px;
+    padding: 16px;
+    gap: 16px;
+    text-align: left;
+  }
+  .hero-finder .finder-topic-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .hero-finder .finder-topic {
+    flex-direction: row;
+    min-height: 43px;
+    font-size: 9px;
+    white-space: normal;
+  }
+  .hero-bottom { bottom: 22px; }
+}
+@media (max-width: 390px) {
+  .hero {
+    height: auto;
+    min-height: 0;
+    padding-top: 275px;
+  }
+  .hero-content { padding: 0; }
+  .hero-finder .finder-topic { font-size: 8px; }
+}
