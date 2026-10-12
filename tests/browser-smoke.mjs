@@ -47,6 +47,8 @@ try {
     await page.locator('.studio-page-preview .guide-callout').waitFor({timeout:3500});
     check(await page.locator('.studio-page-preview .guide-callout').count()===1,'private preview displays unsaved rich blocks');
     check((await page.locator('.studio-page-preview .article-sidebar').innerText()).includes('Combat Rotation'),'private preview displays auto table of contents');
+    const previewInset=await page.evaluate(()=>{const b=document.querySelector('.studio-page-preview .article-hero')?.getBoundingClientRect();return b?{left:b.left,right:innerWidth-b.right}:null;});
+    check(Boolean(previewInset && previewInset.left>=50 && previewInset.right>=50),'private full-page preview has desktop reading gutters');
     await page.getByRole('button',{name:'Close preview'}).click();
     check(await page.locator('.studio-page-preview').count()===0,'closing preview restores editor');
   } else if(mode==='fixture') {
@@ -70,6 +72,16 @@ try {
     await page.goto('http://127.0.0.1:'+port+'/#/guides/ranger',{waitUntil:'domcontentloaded'});
     await page.locator('h1').first().waitFor({timeout:10000});
     check((await page.locator('h1').innerText()).includes('Ranger'),'direct guide URL loads on first visit');
+    const getArticleGutters=()=>page.evaluate(()=>{
+      const bounds=document.querySelector('.article-hero')?.getBoundingClientRect();
+      return bounds?{left:bounds.left,right:innerWidth-bounds.right,overflow:document.documentElement.scrollWidth>innerWidth+1}:null;
+    });
+    const desktop=await getArticleGutters();
+    check(Boolean(desktop && desktop.left>=50 && desktop.right>=50 && !desktop.overflow),'published guide has balanced desktop reading gutters');
+    await page.setViewportSize({width:390,height:844});
+    const mobile=await getArticleGutters();
+    check(Boolean(mobile && mobile.left>=18 && mobile.right>=18 && !mobile.overflow),'published guide has mobile reading gutters without horizontal overflow');
+    await page.setViewportSize({width:1280,height:900});
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('h1').first().waitFor({timeout:10000});
     check((await page.locator('h1').innerText()).includes('Ranger'),'guide URL survives reload');
