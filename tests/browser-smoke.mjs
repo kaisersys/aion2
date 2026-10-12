@@ -35,7 +35,13 @@ try {
     await page.getByRole('button',{name:'Full-page preview'}).click();
     await page.locator('.studio-page-preview').waitFor({timeout:10000});
     check((await page.locator('.studio-page-preview h1').first().innerText()).includes('Ranger Combat Rotation'),'private preview displays unsaved title');
-    await page.locator('.studio-page-preview .guide-callout').waitFor({timeout:8000});
+    console.log('PREVIEW-DIAG',JSON.stringify(await page.evaluate(()=>({
+      previewArticle:document.querySelector('.studio-page-preview .article-body')?.innerHTML.slice(0,1400),
+      editorArticle:document.querySelector('.studio-editor-canvas .tiptap')?.innerHTML.slice(-1400),
+      previewNodes:document.querySelectorAll('.studio-page-preview .tiptap').length,
+      editorNodes:document.querySelectorAll('.studio-editor-canvas .tiptap').length
+    }))));
+    await page.locator('.studio-page-preview .guide-callout').waitFor({timeout:3500});
     check(await page.locator('.studio-page-preview .guide-callout').count()===1,'private preview displays unsaved rich blocks');
     check((await page.locator('.studio-page-preview .article-sidebar').innerText()).includes('Combat Rotation'),'private preview displays auto table of contents');
     await page.getByRole('button',{name:'Close preview'}).click();
