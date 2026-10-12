@@ -34,7 +34,11 @@ jobs:
           if [[ -n "$VITE_SUPABASE_URL" && -n "$VITE_SUPABASE_ANON_KEY" ]]; then
             echo "Guide Studio configuration: both Supabase values are present."
           elif [[ -z "$VITE_SUPABASE_URL" && -z "$VITE_SUPABASE_ANON_KEY" ]]; then
-            echo "::warning::Guide Studio is in setup mode: add both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
+            if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+              echo "::error::Production deployment requires both Supabase credentials; refusing to ship disabled Guide Studio."
+              exit 1
+            fi
+            echo "::warning::Guide Studio preview is in setup mode: add both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
           else
             echo "::error::Guide Studio configuration is incomplete: both Supabase values are required."
             exit 1
