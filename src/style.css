@@ -286,3 +286,82 @@
   .hero-content { padding: 0; }
   .hero-finder .finder-topic { font-size: 8px; }
 }
+
+/* WYSIWYG guide content and secure staff studio */
+.guide-rich-text .tiptap{outline:none;line-height:1.9;color:#d5d9e4;overflow-wrap:anywhere}
+.guide-rich-text .tiptap p{margin:0 0 1.25em}
+.guide-rich-text .tiptap h1,.guide-rich-text .tiptap h2,.guide-rich-text .tiptap h3{font-family:Cinzel,Georgia,serif;color:#eee4cf;line-height:1.3;margin:1.3em 0 .5em}
+.guide-rich-text .tiptap h1{font-size:clamp(28px,3vw,40px)}
+.guide-rich-text .tiptap h2{font-size:clamp(22px,2.6vw,30px)}
+.guide-rich-text .tiptap h3{font-size:21px}
+.guide-rich-text .tiptap ul,.guide-rich-text .tiptap ol{padding-left:1.4em;margin:1em 0}
+.guide-rich-text .tiptap li p{margin:.25em 0}
+.guide-rich-text .tiptap blockquote{margin:22px 0;padding:8px 20px;border-left:3px solid #ccb48c;background:#d8c19c0e;color:#efe5d0}
+.guide-rich-text .tiptap a{color:#d8bc8c;text-decoration:underline;text-underline-offset:3px}
+.guide-rich-text .tiptap img{display:block;max-width:100%;height:auto;margin:25px auto;border:1px solid #aebcd033}
+.guide-rich-text .tiptap table{table-layout:fixed;border-collapse:collapse;margin:18px 0;width:100%;max-width:100%}
+.guide-rich-text .tiptap td,.guide-rich-text .tiptap th{border:1px solid #66758a8a;padding:8px 12px;min-width:65px;vertical-align:top;overflow-wrap:anywhere}
+.guide-rich-text .tiptap th{background:#2e354b;color:#e9dbbf}
+.guide-rich-text .tiptap pre{padding:16px;overflow-x:auto;background:#060d19;border:1px solid #8d98af33;border-radius:4px;line-height:1.5}
+.guide-rich-text .tiptap code{color:#e0c89e;font-size:.94em}
+.guide-rich-text .tiptap hr{border:0;border-top:1px solid #bdad8f55;margin:26px 0}
+.studio-page{max-width:1200px}
+.studio-page h1{margin:8px 0 16px}
+.studio-page .back-link{margin-bottom:24px}
+.studio-page .page-intro{max-width:100%}
+.studio-topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:20px}
+.studio-topbar .back-link{margin:0}
+.studio-topbar h2{font-size:26px;margin:0;color:#f4f1eb}
+.studio-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.studio-page .gold-button{padding:13px 18px;font-size:10px}
+.studio-quiet-button{padding:11px 13px;display:inline-flex;align-items:center;justify-content:center;gap:9px;font-size:12px;background:#1a2535;border:1px solid #9ca2af66;color:#ece4d5;cursor:pointer}
+.studio-quiet-button:hover:not(:disabled){border-color:#d7bf8f;background:#303a4a}
+.studio-page button:disabled{opacity:.55;cursor:wait}
+.studio-login{max-width:540px;margin:15px auto;padding:32px;background:#131c2d;border:1px solid #a9967155}
+.studio-login form{display:grid;gap:16px}
+.studio-login label,.studio-fields label{display:grid;gap:9px;color:#dfccaa;font-size:12px;font-weight:600;letter-spacing:.6px}
+.studio-login input,.studio-fields input:not([type=checkbox]),.studio-fields select,.studio-fields textarea{width:100%;min-width:0;padding:12px 14px;border:1px solid #71809677;background:#0a1222;color:#f0ede7;border-radius:0;outline:none}
+.studio-login input:focus,.studio-fields input:focus,.studio-fields select:focus,.studio-fields textarea:focus{border-color:#d4b881}
+.studio-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:25px 0}
+.studio-fields label:has(textarea),.studio-fields .studio-checkbox{grid-column:1/-1}
+.studio-fields textarea{resize:vertical;min-height:74px}
+.studio-fields .studio-checkbox{display:flex;align-items:center;gap:12px;letter-spacing:0;color:#cdd4de;font-weight:400}
+.studio-checkbox input{accent-color:#ccb083;width:17px;height:17px}
+.studio-message{border:1px solid #e1a99c80;padding:12px;background:#49221e38;color:#f6c5bd;font-size:12px;line-height:1.6}
+.studio-count{margin-left:5px;color:#d9c099;font-size:15px}
+.studio-guide-list{display:grid;gap:11px}
+.studio-guide-row{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid #c2b59e33;background:linear-gradient(110deg,#182235,#111b2a);padding:19px 21px}
+.studio-guide-row h3{font:500 20px Cinzel,Georgia,serif;margin:12px 0;color:#f0ebdc}
+.studio-guide-row small{color:#9aabbc}
+.studio-category{font-size:10px;color:#b2bacc;margin-left:12px}
+.studio-status{font-size:9px;letter-spacing:1px;padding:5px 7px;border:1px solid #8994a360;color:#bfc8d8}
+.studio-status.published{border-color:#a9b98088;color:#cfdeb4}
+.studio-row-actions{display:flex;align-items:center;gap:10px}
+.studio-icon-danger{border:1px solid #c6aaa944;color:#d49c98;background:#3b232944;padding:10px;display:flex;align-items:center}
+.studio-icon-danger:hover{background:#6d2a33}
+.studio-empty{border:1px dashed #ad9e7e6b;background:#152031;padding:40px 28px;text-align:center;color:#c8ced8}
+.studio-editor-card{border:1px solid #a9967155;background:#0d1423;overflow:hidden;margin-top:20px}
+.studio-editor-title{display:flex;justify-content:space-between;padding:15px 19px;color:#ccb88e;font-size:10px;letter-spacing:2px}
+.studio-editor-title span:last-child{color:#8796ab;letter-spacing:0}
+.studio-toolbar{display:flex;align-items:center;gap:2px;flex-wrap:wrap;background:#212b3e;border-top:1px solid #60708040;border-bottom:1px solid #60708050;padding:9px 10px}
+.studio-tool{display:flex;align-items:center;justify-content:center;color:#d6dae0;background:none;border:1px solid transparent;padding:9px;min-width:36px;height:38px}
+.studio-tool:hover,.studio-tool.active{color:#e6c68c;background:#455065;border-color:#d7bb8655}
+.studio-toolbar-spacer{flex:1}
+.studio-editor-canvas{background:#0f1828;min-height:355px;padding:30px 38px}
+.studio-editor-canvas .tiptap{min-height:260px;outline:none}
+.studio-editor-canvas .tiptap p.is-editor-empty:first-child::before{color:#73809a;content:'Write your guide here...';float:left;height:0;pointer-events:none}
+.studio-editor-foot{display:flex;align-items:center;gap:16px;padding:13px 18px;border-top:1px solid #c6b48936;color:#8594a9;font-size:11px}
+.studio-preview{border-top:1px solid #c6b48936}
+@media(max-width:760px){
+ .studio-page{padding-left:15px;padding-right:15px}
+ .studio-login{padding:20px}
+ .studio-guide-row{flex-direction:column;align-items:stretch}
+ .studio-fields{grid-template-columns:1fr}
+ .studio-fields label{grid-column:1/-1}
+ .studio-topbar{align-items:flex-start}
+ .studio-actions{width:100%}
+ .studio-editor-canvas{padding:20px 18px}
+ .studio-toolbar{gap:1px}
+ .studio-tool{padding:7px;min-width:32px}
+ .studio-editor-foot{flex-wrap:wrap}
+}
