@@ -1,19 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { User } from '@supabase/supabase-js';
 import type { JSONContent } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
 import {
   ArrowLeft, Bold, Italic, Heading1, Heading2, List, ListOrdered,
   Link2, ImagePlus, Table2, Quote, Undo2, Redo2,
-  Save, Eye, Pencil, Plus, Trash2, LogOut, Upload, Globe2
+  Save, Eye, Pencil, Plus, Trash2, LogOut, Upload, Globe2, Images, MousePointerClick, PanelTop, Sparkles, ExternalLink, X, Copy
 } from 'lucide-react';
-import GuideContent, { guideExtensions } from '../components/GuideContent';
+import { guideExtensions } from '../components/GuideContent';
+import GuideArticle, { guideHref } from '../components/GuideArticle';
+import { safeGuideHref, safeGuideImage, type GalleryImage } from '../components/GuideBlocks';
 import { CATEGORIES, emptyDocument, guideSlug, type GuideRecord, type GuideStatus } from '../lib/guides';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 type Props = { onExit: () => void; onContentChanged: () => void };
 
-function Toolbar({ editor, onChooseImage }: { editor: ReturnType<typeof useEditor>; onChooseImage: () => void }) {
+type StudioBlock = 'button' | 'callout' | 'skill';
+
+function Toolbar({ editor, onChooseImage, onChooseGallery, onInsertBlock }: {
+  editor:ReturnType<typeof useEditor>;
+  onChooseImage:()=>void;
+  onChooseGallery:()=>void;
+  onInsertBlock:(type:StudioBlock)=>void;
+}) {
   const [, tick] = useState(0);
   useEffect(() => {
     if (!editor) return;
@@ -31,25 +41,81 @@ function Toolbar({ editor, onChooseImage }: { editor: ReturnType<typeof useEdito
     {b('Italic', <Italic size={17}/>, () => editor.chain().focus().toggleItalic().run(), editor.isActive('italic'))}
     {b('Heading 1', <Heading1 size={19}/>, () => editor.chain().focus().toggleHeading({level:1}).run(), editor.isActive('heading',{level:1}))}
     {b('Heading 2', <Heading2 size={19}/>, () => editor.chain().focus().toggleHeading({level:2}).run(), editor.isActive('heading',{level:2}))}
+    {b('Heading 3', <Heading2 size={15}/>, () => editor.chain().focus().toggleHeading({level:3}).run(), editor.isActive('heading',{level:3}))}
     {b('Bulleted list', <List size={18}/>, () => editor.chain().focus().toggleBulletList().run(), editor.isActive('bulletList'))}
     {b('Numbered list', <ListOrdered size={18}/>, () => editor.chain().focus().toggleOrderedList().run(), editor.isActive('orderedList'))}
     {b('Quote', <Quote size={18}/>, () => editor.chain().focus().toggleBlockquote().run(), editor.isActive('blockquote'))}
     {b('Link', <Link2 size={18}/>, () => {
-      const href = window.prompt('Paste a URL (https://...)', editor.getAttributes('link').href || 'https://');
-      if (href === null) return;
-      if (!href.trim()) { editor.chain().focus().unsetLink().run(); return; }
-      try {
-        const url = new URL(href.trim());
-        if (!['https:','http:','mailto:'].includes(url.protocol)) throw new Error('Unsupported URL protocol');
-        editor.chain().focus().extendMarkRange('link').setLink({href:url.href}).run();
-      } catch { window.alert('Please enter a valid HTTPS, HTTP, or mailto link.'); }
-    }, editor.isActive('link'))}
+      const existing=String(editor.getAttributes('link').href||'');
+      const input=window.prompt('Link to a URL or another guide (#/guides/your-slug). Clear to remove.',existing||'#/guides/');
+      if(input===null)return;
+      if(!input.trim()){editor.chain().focus().unsetLink().run();return;}
+      const href=safeGuideHref(input);
+      if(!href){window.alert('Use HTTPS, HTTP, mailto, or an internal #/guides/... link.');return;}
+      const internal=href.startsWith('#')||href.startsWith('/')||(href.startsWith('http')&&new URL(href).origin===window.location.origin);
+      editor.chain().focus().extendMarkRange('link').setLink({href,target:internal?'_self':'_blank'}).run();
+    },editor.isActive('link'))}
     {b('Upload image', <ImagePlus size={18}/>, onChooseImage)}
+    {b('Image gallery', <Images size={18}/>, onChooseGallery)}
+    {b('Link button', <MousePointerClick size={18}/>, ()=>onInsertBlock('button'))}
+    {b('Info / tip box', <PanelTop size={18}/>, ()=>onInsertBlock('callout'))}
+    {b('Skill / gear card', <Sparkles size={18}/>, ()=>onInsertBlock('skill'))}
     {b('Insert table', <Table2 size={18}/>, () => editor.chain().focus().insertTable({rows:3,cols:3,withHeaderRow:true}).run())}
     {editor.isActive('table') && b('Delete table', <Trash2 size={17}/>, () => editor.chain().focus().deleteTable().run())}
     <span className="studio-toolbar-spacer"/>
     {b('Undo', <Undo2 size={18}/>, () => editor.chain().focus().undo().run())}
     {b('Redo', <Redo2 size={18}/>, () => editor.chain().focus().redo().run())}
+  </div>;
+}
+
+function BlockComposer({kind,onClose,onInsert}:{
+  kind:StudioBlock;onClose:()=>void;
+  onInsert:(type:string,attrs:Record<string,unknown>)=>void;
+}) {
+  const [label,setLabel]=useState('View related guide');
+  const [href,setHref]=useState('#/guides/');
+  const [variant,setVariant]=useState('gold');
+  const [title,setTitle]=useState(kind==='skill'?'Skill or equipment name':'Field note');
+  const [description,setDescription]=useState('');
+  const [tag,setTag]=useState('RANGER · SKILL GUIDE');
+  const [tone,setTone]=useState('tip');
+  const [iconSrc,setIconSrc]=useState('');
+  const [relatedHref,setRelatedHref]=useState('');
+  const [error,setError]=useState('');
+  const submit=(event:React.FormEvent)=>{
+    event.preventDefault();setError('');
+    if(kind==='button'){
+      if(!safeGuideHref(href)){setError('Provide a safe link (https://... or #/guides/guide-slug).');return;}
+      onInsert('guideButton',{label:label.trim()||'Read guide',href:href.trim(),variant});
+    }else if(kind==='callout'){
+      onInsert('guideCallout',{title:title.trim()||'Field note',body:description.trim(),tone});
+    }else{
+      if(iconSrc&&!safeGuideImage(iconSrc)){setError('Use a safe HTTPS icon image URL.');return;}
+      if(relatedHref&&!safeGuideHref(relatedHref)){setError('Use a valid related guide URL.');return;}
+      onInsert('guideSkillCard',{title:title.trim()||'Skill or equipment',description:description.trim(),tag:tag.trim(),iconSrc:iconSrc.trim(),relatedHref:relatedHref.trim()});
+    }
+  };
+  return <div className="studio-block-composer" role="dialog" aria-label="Insert a reusable article block">
+    <div className="studio-block-heading"><strong>{kind==='button'?'INSERT LINK BUTTON':kind==='callout'?'INSERT FIELD NOTE':'INSERT SKILL OR GEAR CARD'}</strong><button type="button" className="studio-tool" onClick={onClose} aria-label="Close block editor"><X size={17}/></button></div>
+    <form onSubmit={submit} className="studio-block-fields">
+      {kind==='button'?<>
+        <label>Button text<input value={label} maxLength={90} onChange={e=>setLabel(e.target.value)} required/></label>
+        <label>Destination URL<input value={href} onChange={e=>setHref(e.target.value)} placeholder="#/guides/ranger" required/></label>
+        <label>Button style<select value={variant} onChange={e=>setVariant(e.target.value)}><option value="gold">Gold</option><option value="outline">Outlined</option></select></label>
+      </>:kind==='callout'?<>
+        <label>Heading<input value={title} maxLength={100} onChange={e=>setTitle(e.target.value)}/></label>
+        <label>Message<textarea rows={3} maxLength={1200} value={description} onChange={e=>setDescription(e.target.value)}/></label>
+        <label>Style<select value={tone} onChange={e=>setTone(e.target.value)}><option value="tip">Tip</option><option value="note">Note</option><option value="warning">Warning</option></select></label>
+      </>:<>
+        <label>Name<input value={title} maxLength={100} onChange={e=>setTitle(e.target.value)} required/></label>
+        <label>Skill or gear description<textarea rows={3} maxLength={600} value={description} onChange={e=>setDescription(e.target.value)}/></label>
+        <label>Category / tags<input value={tag} maxLength={100} onChange={e=>setTag(e.target.value)}/></label>
+        <label>Icon URL (optional)<input value={iconSrc} onChange={e=>setIconSrc(e.target.value)} placeholder="https://.../skill-icon.png"/></label>
+        <label>Related guide URL (optional)<input value={relatedHref} onChange={e=>setRelatedHref(e.target.value)} placeholder="#/guides/ranger"/></label>
+      </>}
+      {error&&<p className="studio-message" role="alert">{error}</p>}
+      <div className="studio-actions"><button type="button" className="studio-quiet-button" onClick={onClose}>Cancel</button><button type="submit" className="gold-button"><Plus size={15}/> Insert block</button></div>
+    </form>
   </div>;
 }
 
@@ -70,7 +136,17 @@ function StudioEditor({ record, user, onSaved, onCancel }: {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
+  const [blockKind,setBlockKind] = useState<StudioBlock|null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const galleryInput=useRef<HTMLInputElement>(null);
+  useEffect(()=>{
+    if(!preview)return;
+    const oldOverflow=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setPreview(false);};
+    window.addEventListener('keydown',onKey);
+    return ()=>{document.body.style.overflow=oldOverflow;window.removeEventListener('keydown',onKey);};
+  },[preview]);
   const editor = useEditor({
     extensions: guideExtensions,
     content: record?.content ?? emptyDocument(),
@@ -79,29 +155,52 @@ function StudioEditor({ record, user, onSaved, onCancel }: {
   });
 
   const chooseImage = () => fileInput.current?.click();
-  const uploadImage = async (file?: File) => {
-    if (!file || !supabase || !editor) return;
-    const allowed: Record<string,string> = {
-      'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/avif':'avif', 'image/gif':'gif'
+  const chooseGallery = () => galleryInput.current?.click();
+  const uploadOne = async (file:File): Promise<GalleryImage> => {
+    if(!supabase)throw new Error('Supabase is unavailable');
+    const allowed:Record<string,string>={
+      'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/avif':'avif','image/gif':'gif'
     };
-    const suffix = allowed[file.type];
-    if (!suffix || file.size > 10 * 1024 * 1024) {
-      setMessage('Images must be JPG, PNG, WebP, AVIF, or GIF and under 10 MB.');
-      return;
-    }
-    setUploading(true); setMessage('');
-    const path = `${user.id}/${crypto.randomUUID()}.${suffix}`;
-    const { error } = await supabase.storage.from('guide-images').upload(path, file, {
-      contentType: file.type, upsert: false,
-    });
-    if (error) setMessage('Image upload failed: ' + error.message);
-    else {
-      const { data } = supabase.storage.from('guide-images').getPublicUrl(path);
-      editor.chain().focus().setImage({ src: data.publicUrl, alt: file.name }).run();
+    const suffix=allowed[file.type];
+    if(!suffix||file.size>10*1024*1024)throw new Error('Images must be JPG, PNG, WebP, AVIF, or GIF and under 10 MB each.');
+    const path=`${user.id}/${crypto.randomUUID()}.${suffix}`;
+    const {error}=await supabase.storage.from('guide-images').upload(path,file,{contentType:file.type,upsert:false});
+    if(error)throw new Error(error.message);
+    const {data}=supabase.storage.from('guide-images').getPublicUrl(path);
+    return {src:data.publicUrl,alt:file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' '),caption:''};
+  };
+  const uploadImage = async (file?:File) => {
+    if(!file||!editor||uploading)return;
+    setUploading(true);setMessage('');
+    try{
+      const image=await uploadOne(file);
+      editor.chain().focus().setImage({src:image.src,alt:image.alt}).run();
       setContent(editor.getJSON());
-    }
-    setUploading(false);
-    if (fileInput.current) fileInput.current.value = '';
+    }catch(error){setMessage('Image upload failed: '+(error instanceof Error?error.message:String(error)));}
+    finally{setUploading(false);if(fileInput.current)fileInput.current.value='';}
+  };
+  const uploadGallery = async (files?:FileList|null) => {
+    if(!files||!files.length||!editor||uploading)return;
+    if(files.length>12){setMessage('Select up to 12 gallery images at once.');return;}
+    setUploading(true);setMessage('');
+    const images:GalleryImage[]=[];
+    try{
+      for(const file of Array.from(files))images.push(await uploadOne(file));
+      editor.chain().focus().insertContent({type:'guideGallery',attrs:{images,columns:images.length===2?2:3}}).run();
+      setContent(editor.getJSON());
+      setMessage('Gallery added. Click Edit caption under any image to add captions.');
+    }catch(error){setMessage('Gallery upload interrupted: '+(error instanceof Error?error.message:String(error)));}
+    finally{setUploading(false);if(galleryInput.current)galleryInput.current.value='';}
+  };
+  const insertBlock=(type:string,attrs:Record<string,unknown>)=>{
+    if(!editor)return;
+    editor.chain().focus().insertContent({type,attrs}).run();
+    setContent(editor.getJSON());setBlockKind(null);
+  };
+  const copyGuideLink=async()=>{
+    const url=window.location.origin+window.location.pathname+guideHref(guideSlug(slug||title));
+    try{await navigator.clipboard.writeText(url);setMessage('Guide URL copied. It works publicly after this guide is published.');}
+    catch{window.prompt('Copy this guide link',url);}
   };
 
   const save = async (status: GuideStatus) => {
@@ -130,7 +229,7 @@ function StudioEditor({ record, user, onSaved, onCancel }: {
     <div className="studio-topbar">
       <button className="back-link" onClick={onCancel}><ArrowLeft size={16}/> ALL GUIDES</button>
       <div className="studio-actions">
-        <button type="button" className="studio-quiet-button" onClick={()=>setPreview(!preview)}><Eye size={16}/>{preview?'Edit':'Preview'}</button>
+        <button type="button" className="studio-quiet-button" onClick={()=>setPreview(true)}><Eye size={16}/> Full-page preview</button>
         <button type="button" className="studio-quiet-button" disabled={saving||uploading} onClick={()=>void save('draft')}><Save size={16}/> Save draft</button>
         <button type="button" className="gold-button" disabled={saving||uploading} onClick={()=>void save('published')}><Globe2 size={16}/>{saving?'Saving...':'Publish'}</button>
       </div>
@@ -142,25 +241,38 @@ function StudioEditor({ record, user, onSaved, onCancel }: {
         setTitle(e.target.value);
         if (!slugTouched) setSlug(guideSlug(e.target.value));
       }} placeholder="e.g. Ranger PvE Build Guide"/></label>
-      <label>URL slug<input value={slug} maxLength={100} onChange={e=>{setSlug(guideSlug(e.target.value));setSlugTouched(true)}} placeholder="ranger-pve-guide"/></label>
+      <label>URL slug<input value={slug} maxLength={100} onChange={e=>{setSlug(guideSlug(e.target.value));setSlugTouched(true)}} placeholder="ranger-pve-guide"/><span className="studio-field-hint">Shareable guide: atreiastreet.com/{guideHref(guideSlug(slug||title))}</span></label>
       <label>Category<select value={category} onChange={e=>setCategory(e.target.value)}>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></label>
       <label>Short summary<textarea maxLength={600} rows={3} value={summary} onChange={e=>setSummary(e.target.value)} placeholder="A short introduction used on guide cards..."/></label>
       <label className="studio-checkbox"><input type="checkbox" checked={featured} onChange={e=>setFeatured(e.target.checked)}/> Feature this guide on the homepage</label>
     </div>
     <div className="studio-editor-card">
-      <div className="studio-editor-title"><span>ARTICLE CONTENT</span><span>{uploading?'Uploading image...':preview?'Live preview':'Visual editor'}</span></div>
-      <div style={{display:preview?'none':'block'}}>
-        <Toolbar editor={editor} onChooseImage={chooseImage}/>
-        <div className="studio-editor-canvas guide-rich-text"><EditorContent editor={editor}/></div>
-      </div>
-      {preview && <div className="studio-editor-canvas studio-preview"><GuideContent content={content}/></div>}
+      <div className="studio-editor-title"><span>ARTICLE CONTENT</span><span>{uploading?'Uploading images...':'Visual editor · Insert reusable blocks from the toolbar'}</span></div>
+      <Toolbar editor={editor} onChooseImage={chooseImage} onChooseGallery={chooseGallery} onInsertBlock={setBlockKind}/>
+      {blockKind&&<BlockComposer key={blockKind} kind={blockKind} onClose={()=>setBlockKind(null)} onInsert={insertBlock}/>}
+      <div className="studio-editor-canvas guide-rich-text"><EditorContent editor={editor}/></div>
       <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" hidden
         onChange={e=>void uploadImage(e.currentTarget.files?.[0])}/>
+      <input ref={galleryInput} type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" multiple hidden
+        onChange={e=>void uploadGallery(e.currentTarget.files)}/>
       <div className="studio-editor-foot">
         <button type="button" className="studio-quiet-button" onClick={chooseImage} disabled={uploading}><Upload size={15}/> Add image</button>
-        <span>Click into the page to write, format, and insert screenshots.</span>
+        <button type="button" className="studio-quiet-button" onClick={chooseGallery} disabled={uploading}><Images size={15}/> Image gallery</button>
+        <button type="button" className="studio-quiet-button" onClick={()=>void copyGuideLink()}><Copy size={15}/> Copy guide link</button>
+        <span>Headings create an automatic table of contents. Click inserted blocks to edit them.</span>
       </div>
     </div>
+    {preview&&createPortal(<div className="studio-page-preview" role="dialog" aria-modal="true" aria-label="Full page guide preview">
+      <div className="studio-preview-bar"><span><Eye size={17}/> PRIVATE FULL-PAGE PREVIEW · NOT PUBLISHED</span><button type="button" className="studio-quiet-button" onClick={()=>setPreview(false)}><X size={17}/> Close preview</button></div>
+      <div className="site studio-preview-site">
+        <header className="header studio-preview-header">
+          <div className="brand"><img className="brand-logo" src="/assets/branding/aion-logo.avif" alt="Aion" width="110" height="74"/><span className="brand-lines"><strong>ATREIA <em>STREET</em></strong><small>INDEPENDENT GUILD CODEX</small></span></div>
+          <span className="studio-preview-nav">DISCOVER &nbsp; · &nbsp; CLASSES &nbsp; · &nbsp; CHALLENGES &nbsp; · &nbsp; ALL GUIDES</span>
+        </header>
+        <GuideArticle preview guide={{slug:guideSlug(slug||title)||'preview',title,category,summary,read:'GUILD GUIDE',content:editor?.getJSON()??content}} onBack={()=>setPreview(false)}/>
+        <footer><div className="footer-brand">✦ &nbsp; AION II <span>GUILD CODEX</span></div><p>An independent fan-made community guide project. Not affiliated with or endorsed by NCSOFT.</p><div>FORGED IN KNOWLEDGE · UNITED IN PURPOSE</div></footer>
+      </div>
+    </div>,document.body)}
     {message && <p className="studio-message" role="alert">{message}</p>}
   </div>;
 }
@@ -292,6 +404,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
               <small>/{record.slug} · Updated {new Date(record.updated_at).toLocaleDateString()}</small>
             </div>
             <div className="studio-row-actions">
+              {record.status==='published'&&<a className="studio-quiet-button" href={guideHref(record.slug)} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/> View</a>}
               <button className="studio-quiet-button" onClick={()=>setEditing(record)}><Pencil size={16}/> Edit</button>
               <button className="studio-icon-danger" title="Delete guide" aria-label={`Delete ${record.title}`} onClick={()=>void remove(record)}><Trash2 size={18}/></button>
             </div>
