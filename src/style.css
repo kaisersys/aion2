@@ -506,3 +506,68 @@
 @media(max-width:760px){
   .hero h1{letter-spacing:-.038em}
 }
+
+
+/* Layered hero parallax — the original painted art stays intact.
+   Backdrop, distant starlight, and near-field light move at different rates.
+   Transforms are driven by RAF-throttled variables; hero UI never moves. */
+.hero-art{
+  inset:-5%;
+  background-image:none;
+  animation:none;
+  transform:translate3d(var(--hero-bg-x,0px),var(--hero-bg-y,0px),0);
+  will-change:transform;
+  pointer-events:none;
+}
+.hero-art::before{
+  content:'';
+  position:absolute;
+  inset:-2%;
+  background-image:url('/assets/hero/aion-hero-purple.avif?v=hd2');
+  background-position:inherit;
+  background-size:cover;
+  background-repeat:no-repeat;
+  transform:scale(1.03);
+  animation:atreia-art-breathe 30s ease-in-out infinite alternate;
+  will-change:transform;
+}
+@keyframes atreia-art-breathe{
+  from{transform:scale(1.03)}
+  to{transform:scale(1.085)}
+}
+.hero-sky{
+  inset:-5%;
+  animation:none;
+  transform:translate3d(var(--hero-mid-x,0px),var(--hero-mid-y,0px),0);
+  will-change:transform;
+}
+.hero-foreground{
+  position:absolute;
+  inset:-12% -10%;
+  z-index:2;
+  pointer-events:none;
+  opacity:.62;
+  mix-blend-mode:screen;
+  filter:blur(22px);
+  background:
+    radial-gradient(ellipse 30% 23% at 78% 60%,#b98aff32 0%,transparent 78%),
+    radial-gradient(ellipse 37% 22% at 85% 86%,#485bb52c 0%,transparent 85%),
+    radial-gradient(ellipse 28% 18% at 63% 91%,#a477c21e 0%,transparent 85%);
+  transform:translate3d(var(--hero-fg-x,0px),var(--hero-fg-y,0px),0);
+  will-change:transform;
+}
+@media(max-width:760px){
+  .hero-foreground{opacity:.35;filter:blur(16px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-art,.hero-sky,.hero-foreground{
+    transform:none;
+    animation:none;
+    will-change:auto;
+  }
+  .hero-art::before{
+    animation:none;
+    transform:scale(1.03);
+    will-change:auto;
+  }
+}
