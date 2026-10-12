@@ -1,0 +1,34 @@
+name: Diagnose Browser Startup (no deployment)
+on:
+  push:
+    branches: [diagnose/browser-runtime]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm install --no-save --no-audit --no-fund playwright-core
+      - name: Restore the broken build (without deploying)
+        run: git show 1bf100228cdfd50aea8c2d1e76713f9273ff1b2d:src/main.tsx > src/main.tsx
+      - name: Build broken revision in isolation
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+      - name: Launch local preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/vite-preview.log 2>&1 &
+          sleep 3
+      - name: Launch Chrome smoke tests
+        run: |
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          node scripts/browser-smoke.mjs
