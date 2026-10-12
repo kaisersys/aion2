@@ -39,7 +39,7 @@ try {
     check(await page.locator('.studio-editor-canvas .guide-callout').count()===1
       && await page.locator('.studio-editor-canvas .guide-button-block').count()===1,
       'new blocks do not overwrite earlier blocks');
-    check(await page.locator('.studio-editor-canvas .tiptap h2').count()===1,
+    check(await page.locator('.studio-editor-canvas .tiptap h2').allTextContents().then(headings=>headings.some(text=>text.includes('Combat Rotation'))),
       'adding rich blocks preserves existing headings');
     await page.getByRole('button',{name:'Full-page preview'}).click();
     await page.locator('.studio-page-preview').waitFor({timeout:10000});
