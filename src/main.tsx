@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {Search, Menu, X, ChevronDown, ChevronRight, ArrowUpRight, BookOpen, Shield, Swords, Sparkles, Compass, Gem, ScrollText, LogIn, ArrowLeft} from 'lucide-react';
 import './style.css';
 const AdminPanel = React.lazy(() => import('./admin/AdminPanel'));
-const GuideContent = React.lazy(() => import('./components/GuideContent'));
+const GuideArticle = React.lazy(() => import('./components/GuideArticle'));
 import { getPublishedGuides, type GuideRecord } from './lib/guides';
 import { isSupabaseConfigured } from './lib/supabase';
 import type { JSONContent } from '@tiptap/core';
@@ -17,9 +17,19 @@ const starterGuides:Guide[]=[
 {slug:'dungeons',title:'Dungeon Expedition Guide',category:'Dungeons & Raids',summary:'Preparation, team roles, and encounter notes.',read:'9 MIN READ',accent:'ice',body:['List each encounter’s critical mechanics and recommended preparation.','Keep guides short enough to review before a run, with expandable detail for anyone who needs it.']},
 {slug:'crafting',title:'Crafting & Gathering',category:'Professions',summary:'Materials, equipment recipes, and economy essentials.',read:'6 MIN READ',accent:'gold',body:['Track ingredients and explain which items are worth crafting.','Add a guild materials wishlist and update it as content changes.']}
 ];
+function routeFromHash():string {
+  const hash=window.location.hash;
+  if(hash==='#admin')return 'admin';
+  if(hash==='#/library')return 'library';
+  if(hash.startsWith('#/guides/')) {
+    try {return 'guide:'+decodeURIComponent(hash.slice('#/guides/'.length).split('?')[0]);}
+    catch{return 'home';}
+  }
+  return 'home';
+}
 const navigation=[{title:'DISCOVER',items:['Getting Started','Progression','Professions']},{title:'CLASSES',items:['Classes']},{title:'CHALLENGES',items:['Dungeons & Raids','PvP & Abyss']}];
 function App(){
- const [page,setPage]=useState(()=>window.location.hash==='#admin'?'admin':'home');const [category,setCategory]=useState('All Guides');const [search,setSearch]=useState('');const [finderQuery,setFinderQuery]=useState('');const [finderFocused,setFinderFocused]=useState(false);const [menu,setMenu]=useState(false);const [openMenu,setOpenMenu]=useState<string|null>(null);
+ const [page,setPage]=useState(routeFromHash);const [category,setCategory]=useState('All Guides');const [search,setSearch]=useState('');const [finderQuery,setFinderQuery]=useState('');const [finderFocused,setFinderFocused]=useState(false);const [menu,setMenu]=useState(false);const [openMenu,setOpenMenu]=useState<string|null>(null);
  const [publishedGuides,setPublishedGuides]=useState<GuideRecord[]>([]);
  const [guidesError,setGuidesError]=useState('');
  const refreshGuides=useCallback(async()=>{
@@ -32,7 +42,7 @@ function App(){
  },[]);
  useEffect(()=>{void refreshGuides();},[refreshGuides]);
  useEffect(()=>{
-   const updateRoute=()=>{if(window.location.hash==='#admin')setPage('admin');};
+   const updateRoute=()=>{setPage(routeFromHash());window.scrollTo({top:0,behavior:'instant'});};
    window.addEventListener('hashchange',updateRoute);
    return ()=>window.removeEventListener('hashchange',updateRoute);
  },[]);
@@ -42,9 +52,20 @@ function App(){
    body:[],featured:g.featured,content:g.content
  }));
  const guides:Guide[]=[...dynamicGuides,...starterGuides.filter(g=>!dynamicGuides.some(d=>d.slug===g.slug))];
- const current=guides.find(g=>g.slug===page);const filtered=guides.filter(g=>(category==='All Guides'||g.category===category)&&(g.title+' '+g.summary+' '+g.category).toLowerCase().includes(search.toLowerCase()));
+ const current=guides.find(g=>page==='guide:'+g.slug);const filtered=guides.filter(g=>(category==='All Guides'||g.category===category)&&(g.title+' '+g.summary+' '+g.category).toLowerCase().includes(search.toLowerCase()));
  const suggestions=finderQuery.trim()?guides.filter(g=>(g.title+' '+g.category+' '+g.summary).toLowerCase().includes(finderQuery.toLowerCase())).slice(0,4):[];
- const go=(slug:string)=>{if(slug==='admin')window.history.replaceState(null,'','#admin');else if(window.location.hash==='#admin')window.history.replaceState(null,'',window.location.pathname);setPage(slug);setMenu(false);setOpenMenu(null);window.scrollTo({top:0,behavior:'smooth'})};
+ const go=(slug:string)=>{
+   window.location.hash=slug==='admin'?'admin':slug==='home'?'':slug==='library'?'/library':'/guides/'+encodeURIComponent(slug);
+   setPage(slug==='admin'||slug==='home'||slug==='library'?slug:'guide:'+slug);
+   setMenu(false);setOpenMenu(null);window.scrollTo({top:0,behavior:'smooth'});
+ };
+ useEffect(()=>{
+   if(!page.startsWith('guide:'))return;
+   const section=new URLSearchParams(window.location.hash.split('?')[1]||'').get('section');
+   if(!section)return;
+   const task=window.setTimeout(()=>document.getElementById(section)?.scrollIntoView({block:'start'}),350);
+   return ()=>window.clearTimeout(task);
+ },[page,publishedGuides.length]);
  const choose=(cat:string)=>{setSearch('');setFinderQuery('');setFinderFocused(false);setCategory(cat);go('library');};
  const openSuggestion=(slug:string)=>{setFinderQuery('');setFinderFocused(false);go(slug)};
  const quickTopics=[{label:'CLASSES',category:'Classes',icon:<Swords size={19}/>},{label:'GEAR',category:'Progression',icon:<Gem size={19}/>},{label:'DUNGEONS',category:'Dungeons & Raids',icon:<Shield size={19}/>},{label:'ABYSS',category:'PvP & Abyss',icon:<Compass size={19}/>},{label:'CRAFTING',category:'Professions',icon:<ScrollText size={19}/>},{label:'ALL GUIDES',category:'All Guides',icon:<BookOpen size={19}/>}];
@@ -80,7 +101,10 @@ function App(){
    <section className="join-banner"><span>THE JOURNEY IS BETTER TOGETHER</span><h2>United by <i>Purpose</i></h2><p>Built for our guild. Written by our adventurers. Shared with everyone.</p><button className="gold-button" onClick={()=>choose('All Guides')}>ENTER THE ARCHIVES <ArrowUpRight size={16}/></button></section></>:
    page==='library'?<main className="inner-page section-wrap"><button className="back-link" onClick={()=>go('home')}><ArrowLeft size={16}/> BACK TO HOME</button><div className="section-kicker left">THE KNOWLEDGE ARCHIVE</div><h1>Guild <i>Guides</i></h1><p className="page-intro">Explore field manuals, class builds, progression paths, and guild strategies.</p><div className="library-controls"><label className="search-box"><Search size={20}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search guides..." aria-label="Search guides"/></label><select value={category} onChange={e=>setCategory(e.target.value)} aria-label="Filter by category">{['All Guides',...new Set(guides.map(g=>g.category))].map(c=><option key={c}>{c}</option>)}</select></div>{guidesError&&<p role="status" className="studio-message">{guidesError}</p>}<div className="guide-grid">{filtered.map(g=><GuideCard key={g.slug} guide={g} onClick={()=>go(g.slug)}/>)}</div>{filtered.length===0&&<p>No matching guides. Try another search.</p>}</main>:
    page==='admin'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading Guide Studio...</p></main>}><AdminPanel onExit={()=>go('home')} onContentChanged={()=>{void refreshGuides()}}/></React.Suspense>:
-   current?<main className="inner-page article-wrap"><button className="back-link" onClick={()=>go('library')}><ArrowLeft size={16}/> ALL GUIDES</button><div className="article-hero"><span className="section-kicker left">{current.category.toUpperCase()} · {current.read}</span><h1>{current.title}</h1><p>{current.summary}</p></div><article className="article"><div className="article-sidebar"><span>IN THIS GUIDE</span><a href="#overview">Overview</a><a href="#fieldnotes">Field Notes</a></div><div className="article-body">{current.content ? <React.Suspense fallback={<p>Loading guide...</p>}><GuideContent key={current.slug} content={current.content}/></React.Suspense> : <><h2 id="overview">Overview</h2><p>{current.body[0]}</p><h2 id="fieldnotes">Field Notes</h2><p>{current.body[1]}</p><div className="editorial-note"><Sparkles size={19}/><span>This is starter content. Final guides will be written and published through the secure guild admin panel.</span></div></>}</div></article></main>:null}
+   current?<React.Suspense fallback={<main className="inner-page article-wrap"><p>Loading guide...</p></main>}>
+     <GuideArticle key={current.slug} guide={current} onBack={()=>go('library')}/>
+   </React.Suspense>:null}
+
    <footer><div className="footer-brand">✦ &nbsp; AION II <span>GUILD CODEX</span></div><p>An independent fan-made community guide project. Not affiliated with or endorsed by NCSOFT.</p><div>FORGED IN KNOWLEDGE · UNITED IN PURPOSE</div></footer>
  </div>
 }
