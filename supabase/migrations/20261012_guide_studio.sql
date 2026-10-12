@@ -48,6 +48,13 @@ create index if not exists guides_category_index
   on public.guides (category, status);
 alter table public.guides enable row level security;
 
+-- Explicit PostgREST grants; RLS policies still gate every row.
+revoke all on public.admin_users from anon, authenticated;
+grant select on public.admin_users to authenticated;
+revoke all on public.guides from anon, authenticated;
+grant select on public.guides to anon, authenticated;
+grant insert, update, delete on public.guides to authenticated;
+
 drop policy if exists "Published guides visible to all" on public.guides;
 create policy "Published guides visible to all"
   on public.guides for select to anon, authenticated
