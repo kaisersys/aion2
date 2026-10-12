@@ -72,6 +72,8 @@ try {
     await page.goto('http://127.0.0.1:'+port+'/#/guides/ranger',{waitUntil:'domcontentloaded'});
     await page.locator('h1').first().waitFor({timeout:10000});
     check((await page.locator('h1').innerText()).includes('Ranger'),'direct guide URL loads on first visit');
+    const articleTypeface=await page.locator('main h1').first().evaluate(node=>getComputedStyle(node).fontFamily);
+    check(articleTypeface.includes('Sora'),'guide display headings use Sora');
     const getArticleGutters=()=>page.evaluate(()=>{
       const bounds=document.querySelector('.article-hero')?.getBoundingClientRect();
       return bounds?{left:bounds.left,right:innerWidth-bounds.right,overflow:document.documentElement.scrollWidth>innerWidth+1}:null;
@@ -91,6 +93,18 @@ try {
     await page.waitForTimeout(2000);
     const text=await page.locator('main').innerText();
     check(text.includes('Admin Sanctum')||text.includes('Guide Studio')||text.includes('Studio Setup'),'admin route renders without crash');
+    await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
+    const fontCheck=await page.evaluate(()=>{
+      const hero=document.querySelector('.hero h1');
+      const body=document.querySelector('.hero p');
+      return {
+        heroFont:hero?getComputedStyle(hero).fontFamily:'',
+        bodyFont:body?getComputedStyle(body).fontFamily:'',
+        overflows:document.documentElement.scrollWidth>window.innerWidth+1
+      };
+    });
+    check(fontCheck.heroFont.includes('Sora') && fontCheck.bodyFont.includes('Inter'),'hero uses Sora while reading copy stays Inter');
+    check(!fontCheck.overflows,'updated headings do not overflow desktop');
   }
 } catch(e) {failures.push(String(e));}
 await browser.close();
