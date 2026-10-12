@@ -33,6 +33,7 @@ jobs:
         run: |
           if [[ -n "$VITE_SUPABASE_URL" && -n "$VITE_SUPABASE_ANON_KEY" ]]; then
             echo "Guide Studio configuration: both Supabase values are present."
+            node -e 'try { const u = new URL(process.env.VITE_SUPABASE_URL); if (u.protocol !== "https:" || !u.hostname || u.username || u.password || u.pathname !== "/" || u.search || u.hash) throw new Error("Invalid origin"); console.log("Supabase Project URL format is valid."); } catch { console.error("::error::Invalid Supabase Project URL. It must be an HTTPS origin, such as https://your-project.supabase.co"); process.exit(1); }'
           elif [[ -z "$VITE_SUPABASE_URL" && -z "$VITE_SUPABASE_ANON_KEY" ]]; then
             if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
               echo "::error::Production deployment requires both Supabase credentials; refusing to ship disabled Guide Studio."
