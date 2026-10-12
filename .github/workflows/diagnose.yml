@@ -50,6 +50,12 @@ jobs:
                       except Exception as e:
                           print('FTP_LIST_ERROR',label,type(e).__name__,str(e)[:100])
                   listfiles('account_login_root')
+                  try:
+                      ftp.cwd('public_html')
+                      listfiles('public_html_explicit')
+                      ftp.cwd('..')
+                  except Exception as exc:
+                      print('FTP_PUBLIC_HTML_ERROR',type(exc).__name__,str(exc)[:140])
                   ftp.cwd(os.environ['FTP_REMOTE_DIR'])
                   listfiles('configured_deploy_destination')
                   for name in ['assets/branding/aion-logo.avif','assets/hero/aion-hero-purple.avif']:
