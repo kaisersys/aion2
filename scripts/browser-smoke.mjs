@@ -24,7 +24,20 @@ for (const [label,url,expected] of [
       text.includes('Sign in with your approved Supabase staff account.') && text.includes('Sign in')
     ) : true;
     const guideLoaded=label==='live-guide'? headline?.includes('Ranger') && await page.locator('.article-sidebar a[href*="section="]').count()>0:true;
-    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && pageErrors.length===0;
+    let guttersOK=true;
+    if (label==='live-guide') {
+      const getInsets=()=>page.evaluate(()=>{
+        const rect=document.querySelector('.article-hero')?.getBoundingClientRect();
+        return rect?{left:Math.round(rect.left),right:Math.round(innerWidth-rect.right),overflow:document.documentElement.scrollWidth>innerWidth+1}:null;
+      });
+      await page.setViewportSize({width:1280,height:900});
+      const desktop=await getInsets();
+      await page.setViewportSize({width:390,height:844});
+      const mobile=await getInsets();
+      guttersOK=Boolean(desktop && desktop.left>=50 && desktop.right>=50 && !desktop.overflow && mobile && mobile.left>=18 && mobile.right>=18 && !mobile.overflow);
+      console.log(JSON.stringify({label:'live-gutters',ok:guttersOK,desktop,mobile}));
+    }
+    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && pageErrors.length===0;
     if (!ok) failed = true;
     console.log(JSON.stringify({label,ok,status:response?.status(),headline,rootTextLength:text.length,adminLoginVisible:label==='live-admin'?adminLoaded:undefined,pageErrors:pageErrors.slice(0,5)}));
   } catch (e) {
