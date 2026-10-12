@@ -1,0 +1,48 @@
+name: Import Aion artwork
+
+on:
+  push:
+    branches: [feat/aion-art-and-direct-deploy]
+    paths: [.github/workflows/import-aion-art.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/aion-art-and-direct-deploy
+      - name: Download matching official artwork
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/aion-art public/assets/{branding,hero}
+          curl --fail --location --retry 2 --max-time 60 --silent --show-error "https://about.ncsoft.com/GSTAR2025/static/media/ip-aion-slide04.254700a469100774ec89.webp" -o /tmp/aion-art/hero.webp
+          curl --fail --location --retry 2 --max-time 60 --silent --show-error "https://fizz-download.playnccdn.com/download/v2/buckets/conti-upload/files/19912837684-7f24d48d-b1c8-422a-8a36-f6009a287f32" -o /tmp/aion-art/logo.bin
+          file /tmp/aion-art/hero.webp /tmp/aion-art/logo.bin
+      - name: Optimize and import
+        run: |
+          python -m pip install Pillow --quiet
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          for input_file, output, max_width in [
+              ("/tmp/aion-art/hero.webp", "public/assets/hero/aion-hero-purple.webp", 1920),
+              ("/tmp/aion-art/logo.bin", "public/assets/branding/aion-logo.webp", 600),
+          ]:
+              im = Image.open(input_file)
+              im.thumbnail((max_width, 2000), Image.Resampling.LANCZOS)
+              im.save(output, "WEBP", quality=82, method=5)
+              assert Path(output).stat().st_size > 1000
+              print(output, im.size, Path(output).stat().st_size)
+          PY
+      - name: Commit images to feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/assets/hero/aion-hero-purple.webp public/assets/branding/aion-logo.webp
+          git diff --cached --quiet || (git commit -m "Add locally hosted Aion artwork" && git push origin HEAD:feat/aion-art-and-direct-deploy)
