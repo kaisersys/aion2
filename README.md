@@ -40,10 +40,6 @@ The workflow `.github/workflows/build.yml` builds the Vite site, saves a downloa
 
 The FTPS action keeps its own sync state on the webserver. Before the first run, back up any unrelated files in the document root.
 
-## Admin area
-
-The public guide pages are currently sample content. The admin page is intentionally a placeholder: editing, logins, and live publishing require a database and authentication layer and aren't enabled yet.
-
 ## Guide Studio setup
 
 Atreia Street includes a Tiptap WYSIWYG editor with previews, image uploads, draft/publish workflow, category assignment, featured guides, and a protected staff dashboard. Supabase stores articles and assets. **The editor will show a setup notice until the following one-time steps are completed.**
@@ -77,3 +73,21 @@ Atreia Street includes a Tiptap WYSIWYG editor with previews, image uploads, dra
 - GitHub's existing `FTP_HOST`, `FTP_USER`, `FTP_PASSWORD`, and `FTP_REMOTE_DIR=public_html/` secrets remain unchanged. GitHub builds and deploys the editor frontend; actual article edits save to Supabase immediately and do not require redeployment.
 - The six starter/example articles remain visible and are read-only examples. Newly published guides take priority if a matching slug exists; create fresh guides through the Studio.
 - There is no public user registration. Add other trusted guild editors manually through Supabase Authentication and the `admin_users` table.
+
+## Rich Guide Studio authoring
+
+Open `https://atreiastreet.com/#admin` and log in with a confirmed Supabase Authentication user who is present in `public.admin_users`.
+
+- **Private full-page preview:** `Full-page preview` uses the exact reader article layout (hero, title, category, contents sidebar, custom blocks, footer) with the current **unsaved** editor content. It is an in-browser modal; it does not publish the draft or create a publicly accessible preview link.
+- **Permanent guide links:** When published, a guide is reachable at `https://atreiastreet.com/#/guides/YOUR-SLUG`. These hash URLs work without server rewrite rules. Copy the public URL with `Copy guide link`. Links to unpublished guides will not show a private draft to visitors.
+- **Inline links:** Highlight text, click the Link icon, and paste either a regular `https://...` URL or an internal guide link like `#/guides/ranger-pve`. Internal links navigate in the same tab.
+- **Automatic table of contents:** Use Heading 1/2/3 tools to create sections. The published article and full-page preview generate clickable section navigation; duplicate headings receive unique IDs. Readers can copy/share a link to a section via a `?section=...` suffix in the hash URL.
+- **Image gallery:** Click the Gallery tool or `Image gallery` button, choose up to 12 JPG/PNG/WebP/AVIF/GIF files of up to 10 MB each, and upload. Visitors can click images to enlarge, use arrow buttons or keyboard arrows, and press Escape to close. Use each image's `Edit caption` control in the editor to add captions and accessible descriptions, and `Edit block` to change between two and three columns.
+- **Reusable blocks:** The toolbar inserts Link Button, Info/Tip/Warning, and Skill/Gear cards. Each one displays a form for its details. After inserting it, use the visible `Edit block` button to change its content or `Remove` to delete it. Skill cards accept an optional icon image URL and related-guide link.
+- **Existing content remains compatible:** Previous published/draft guide JSON is still supported; no new Supabase schema migration is necessary.
+
+**Important:** Uploaded images are placed in the public `guide-images` Supabase Storage bucket even when the article remains a draft. Don't upload confidential images. The article content and preview themselves remain private until published. Images added through the editor are not automatically deleted if you later remove them from an article.
+
+### Quality and deployment safety
+
+Production build checks both Supabase configuration values, validates the project URL, and asks the project's Auth API to accept the publishable/anon key before FTP upload. Invalid configuration stops a new deployment instead of replacing the working site. The public website also tolerates an unavailable or malformed Supabase client without blanking the homepage.
