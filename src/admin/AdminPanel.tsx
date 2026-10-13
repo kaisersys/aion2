@@ -103,7 +103,7 @@ function BlockComposer({kind,onClose,onInsert}:{
       {kind==='button'?<>
         <label>Button text<input value={label} maxLength={90} onChange={e=>setLabel(e.target.value)} required/></label>
         <label>Destination URL<input value={href} onChange={e=>setHref(e.target.value)} placeholder="#/guides/ranger" required/></label>
-        <label>Button style<select value={variant} onChange={e=>setVariant(e.target.value)}><option value="gold">Gold</option><option value="outline">Outlined</option></select></label>
+        <label>Button style<select value={variant} onChange={e=>setVariant(e.target.value)}><option value="gold">Silver</option><option value="outline">Outlined</option></select></label>
       </>:kind==='callout'?<>
         <label>Heading<input value={title} maxLength={100} onChange={e=>setTitle(e.target.value)}/></label>
         <label>Message<textarea rows={3} maxLength={1200} value={description} onChange={e=>setDescription(e.target.value)}/></label>

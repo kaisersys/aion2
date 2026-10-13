@@ -15,7 +15,7 @@ type Props = {
 };
 const labelFor=(key:SiteContentKey)=>key
   .replace(/([a-z])([A-Z])/g,'$1 $2')
-  .replace(/^(Hero|Intro|Navigation|Featured|Join|Library|Footer|Brand|Topic|Category) /i,'')
+  .replace(/^(Hero|Intro|Navigation|Featured|Join|Journey|Mission|Library|Footer|Brand|Topic|Category) /i,'')
   .replace(/^([a-z])/,(c)=>c.toUpperCase());
 const isLong=(key:SiteContentKey)=>key.toLowerCase().includes('description');
 
@@ -148,6 +148,14 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
             <div className="site-copy-preview-search"><strong>{draft.heroFinderTitle}</strong><span>{draft.heroSearchPlaceholder}</span><b>{draft.heroSearchButton}</b></div>
           </section>
           <section className="site-copy-preview-section">
+            <div className="section-kicker">{draft.journeyEyebrow}</div><h2>{draft.journeyTitle} <i>{draft.journeyAccent}</i></h2><p>{draft.journeyDescription}</p>
+            <div className="site-copy-preview-steps">{[
+              [draft.journeyStepOneLabel,draft.journeyStepOneTitle,draft.journeyStepOneDescription],
+              [draft.journeyStepTwoLabel,draft.journeyStepTwoTitle,draft.journeyStepTwoDescription],
+              [draft.journeyStepThreeLabel,draft.journeyStepThreeTitle,draft.journeyStepThreeDescription]
+            ].map(([label,title,description])=><div key={title}><small>{label}</small><strong>{title}</strong><span>{description}</span></div>)}</div>
+          </section>
+          <section className="site-copy-preview-section">
             <div className="section-kicker">{draft.introEyebrow}</div>
             <h2>{draft.introTitle} <i>{draft.introAccent}</i></h2>
             <p>{draft.introDescription}</p>
@@ -160,6 +168,8 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
           </section>
           <section className="site-copy-preview-section">
             <div className="section-kicker">{draft.featuredEyebrow}</div><h2>{draft.featuredTitle} <i>{draft.featuredAccent}</i></h2><p>{draft.featuredButton}</p>
+            <div className="section-kicker">{draft.missionEyebrow}</div><h2>{draft.missionTitle} <i>{draft.missionAccent}</i></h2><p>{draft.missionDescription}</p>
+            <div className="site-copy-preview-steps">{[[draft.missionOneTitle,draft.missionOneDescription],[draft.missionTwoTitle,draft.missionTwoDescription],[draft.missionThreeTitle,draft.missionThreeDescription]].map(([title,description])=><div key={title}><strong>{title}</strong><span>{description}</span></div>)}</div>
             <div className="section-kicker">{draft.joinEyebrow}</div><h2>{draft.joinTitle} <i>{draft.joinAccent}</i></h2>
             <p>{draft.joinDescription}</p><span className="site-copy-preview-button">{draft.joinButton}</span>
           </section>
