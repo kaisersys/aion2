@@ -740,7 +740,7 @@
 @media(max-width:760px){
   .hero-sky{opacity:.45;filter:brightness(1.1)}
   .hero-sky::before{opacity:.62}
-  .hero-sky::after{opacity:.38}
+  .hero-sky::after{opacity:.38;animation:none}
 }
 @media(prefers-reduced-motion:reduce){
   .hero-sky::before,.hero-sky::after{
