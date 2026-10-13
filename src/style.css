@@ -1141,3 +1141,17 @@
     mask-image:linear-gradient(to bottom,transparent 0px,#00000033 65px,#000000a6 145px,#000 260px);
   }
 }
+
+
+/* Homepage ends after Recently Updated: balance the news-to-guide spacing
+   and prevent a large empty gap before the existing site footer. */
+.upcoming-news + .recent{
+  padding-top:clamp(52px,6vw,88px);
+}
+.recent + footer{
+  margin-top:0;
+}
+@media(max-width:760px){
+  .upcoming-news + .recent{padding-top:44px}
+  .recent + footer{margin-top:0}
+}
