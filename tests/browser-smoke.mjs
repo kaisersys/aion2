@@ -173,6 +173,22 @@ try {
     check(creatorDesktop.width>=180 && creatorDesktop.width<=240 && creatorDesktop.ratio>.76 &&
       creatorDesktop.ratio<.84 && creatorDesktop.bleed && creatorDesktop.background,
       'About Me has full-bleed background and a separate smaller 4:5 portrait');
+    const heroAboutBlend=await page.evaluate(()=>{
+      const hero=document.querySelector('.hero');
+      const about=document.querySelector('.creator.creator-bleed');
+      const backdrop=document.querySelector('.creator-backdrop');
+      const wash=document.querySelector('.creator-backdrop-wash');
+      if(!hero||!about||!backdrop||!wash)return null;
+      const overlap=hero.getBoundingClientRect().bottom-about.getBoundingClientRect().top;
+      const backdropStyle=getComputedStyle(backdrop);
+      const washStyle=getComputedStyle(wash);
+      return {overlap, mask:backdropStyle.maskImage, washMask:washStyle.maskImage,
+        transparent:getComputedStyle(about).backgroundColor==='rgba(0, 0, 0, 0)'};
+    });
+    check(Boolean(heroAboutBlend&&heroAboutBlend.overlap>=130 && heroAboutBlend.overlap<=190 &&
+      heroAboutBlend.mask.includes('linear-gradient') && heroAboutBlend.washMask.includes('linear-gradient') &&
+      heroAboutBlend.transparent),
+      'landing hero and About Me artwork overlap with a soft transparent fade');
     check(await page.locator('.upcoming-news').count()===1 &&
       await page.locator('.intro .category-grid').count()===0,
       'upcoming AION 2 news replaces the old destination category tiles');
@@ -254,6 +270,15 @@ try {
     check(creatorMobile.width>=130 && creatorMobile.width<=200 && creatorMobile.ratio>.76 &&
       creatorMobile.ratio<.84 && !creatorMobile.overflow && creatorMobile.backgroundVisible && creatorMobile.fullBleed,
       'full-bleed background and smaller portrait fit mobile screens without overflow');
+    const blendMobile=await page.evaluate(()=>{
+      const hero=document.querySelector('.hero')?.getBoundingClientRect();
+      const about=document.querySelector('.creator.creator-bleed')?.getBoundingClientRect();
+      const mask=getComputedStyle(document.querySelector('.creator-backdrop')).maskImage;
+      return {overlap:hero&&about?hero.bottom-about.top:0,mask};
+    });
+    check(blendMobile.overlap>=125 && blendMobile.overlap<=135 &&
+      blendMobile.mask.includes('linear-gradient'),
+      'mobile hero-to-About Me transition retains the gradual image dissolve');
     const mobileAtmosphere=await page.evaluate(()=>({
       fewerParticles:getComputedStyle(document.querySelector('.hero-motes span:nth-child(12)')).display==='none',
       softerAura:Number(getComputedStyle(document.querySelector('.hero-aura')).opacity)<.5,
