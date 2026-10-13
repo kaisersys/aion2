@@ -22,7 +22,7 @@ const starterGuides:Guide[]=[
 ];
 function routeFromHash():string {
   const hash=window.location.hash;
-  if(new URLSearchParams(window.location.search).has('password-reset'))return 'account';
+  if(new URLSearchParams(window.location.search).has('password-reset') || new URLSearchParams(window.location.search).has('welcome'))return 'account';
   if(hash==='#/account')return 'account';
   if(hash==='#admin')return 'admin';
   if(hash==='#/library')return 'library';
