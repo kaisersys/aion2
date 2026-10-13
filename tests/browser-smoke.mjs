@@ -34,6 +34,16 @@ try {
     await page.locator('.site-news-editor-card').last().getByRole('button',{name:'Remove'}).click();
     check(await page.locator('.site-copy-news-editor .site-news-editor-card').count()===3,
       'announcement removal is reversible before publishing');
+    await page.getByRole('button',{name:'Homepage · About me'}).click();
+    check(await page.getByRole('button',{name:'Upload background'}).count()===1 &&
+      await page.getByRole('button',{name:'Upload photo'}).count()===1 &&
+      await page.locator('.site-copy-backdrop-preview img').count()===1,
+      'About Me editor offers independent background and portrait uploads');
+    await page.getByRole('button',{name:'Preview changes'}).click();
+    check(await page.getByRole('dialog',{name:'Preview site text'})
+      .locator('.site-copy-preview-profile-backdrop img').count()===1,
+      'private preview shows separate About Me background image');
+    await page.keyboard.press('Escape');
     await page.getByRole('button',{name:'Footer'}).click();
     await page.getByRole('textbox',{name:'Description',exact:true}).fill('Independent community guide project. Test footer.');
     await page.getByRole('button',{name:'Preview changes'}).click();
@@ -156,10 +166,13 @@ try {
     check(!fontCheck.overflows,'updated headings do not overflow desktop');
     const creatorDesktop=await page.locator('.creator-portrait').evaluate(node=>{
       const rect=node.getBoundingClientRect();
-      return {width:rect.width,ratio:rect.width/rect.height};
+      const section=document.querySelector('.creator.creator-bleed')?.getBoundingClientRect();
+      const background=document.querySelector('.creator-backdrop img');
+      return {width:rect.width,ratio:rect.width/rect.height,bleed:section?Math.abs(section.width-innerWidth)<2:false,background:Boolean(background?.getAttribute('src'))};
     });
-    check(creatorDesktop.width>=310 && creatorDesktop.ratio>1.5 && creatorDesktop.ratio<1.7,
-      'About Me image is a larger 16:10 landscape frame on desktop');
+    check(creatorDesktop.width>=180 && creatorDesktop.width<=240 && creatorDesktop.ratio>.76 &&
+      creatorDesktop.ratio<.84 && creatorDesktop.bleed && creatorDesktop.background,
+      'About Me has full-bleed background and a separate smaller 4:5 portrait');
     check(await page.locator('.upcoming-news').count()===1 &&
       await page.locator('.intro .category-grid').count()===0,
       'upcoming AION 2 news replaces the old destination category tiles');
@@ -233,11 +246,14 @@ try {
       'mobile hero does not cause horizontal overflow');
     const creatorMobile=await page.locator('.creator-portrait').evaluate(node=>{
       const rect=node.getBoundingClientRect();
-      return {width:rect.width,ratio:rect.width/rect.height,overflow:rect.right>innerWidth+1};
+      const section=document.querySelector('.creator.creator-bleed')?.getBoundingClientRect();
+      return {width:rect.width,ratio:rect.width/rect.height,overflow:rect.right>innerWidth+1,
+        backgroundVisible:Boolean(document.querySelector('.creator-backdrop img')),
+        fullBleed:section?Math.abs(section.width-innerWidth)<2:false};
     });
-    check(creatorMobile.width>=280 && creatorMobile.ratio>1.5 &&
-      creatorMobile.ratio<1.7 && !creatorMobile.overflow,
-      'landscape About Me image remains wide and fits narrow mobile screens');
+    check(creatorMobile.width>=130 && creatorMobile.width<=200 && creatorMobile.ratio>.76 &&
+      creatorMobile.ratio<.84 && !creatorMobile.overflow && creatorMobile.backgroundVisible && creatorMobile.fullBleed,
+      'full-bleed background and smaller portrait fit mobile screens without overflow');
     const mobileAtmosphere=await page.evaluate(()=>({
       fewerParticles:getComputedStyle(document.querySelector('.hero-motes span:nth-child(12)')).display==='none',
       softerAura:Number(getComputedStyle(document.querySelector('.hero-aura')).opacity)<.5,
