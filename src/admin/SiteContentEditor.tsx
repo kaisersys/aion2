@@ -15,7 +15,7 @@ type Props = {
 };
 const labelFor=(key:SiteContentKey)=>key
   .replace(/([a-z])([A-Z])/g,'$1 $2')
-  .replace(/^(Hero|Intro|Navigation|Featured|Join|Library|Footer|Brand|Topic|Category) /,'')
+  .replace(/^(Hero|Intro|Navigation|Featured|Join|Library|Footer|Brand|Topic|Category) /i,'')
   .replace(/^([a-z])/,(c)=>c.toUpperCase());
 const isLong=(key:SiteContentKey)=>key.toLowerCase().includes('description');
 
