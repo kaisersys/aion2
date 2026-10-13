@@ -120,3 +120,17 @@ The homepage **About Me** section now has two independent image layers: a full-b
 Edit at **Admin → Site Content → Homepage · About me**. Use **Upload background** for an optional wide 16:9 or 21:9 JPG/PNG/WebP/AVIF up to 8 MB, and **Upload photo** for a separate portrait/avatar up to 5 MB. You may replace either independently, preview both together, or reset the background to the default artwork without removing the portrait. The existing portrait remains saved; no migration or new storage bucket is needed. Choose **Publish changes** to update the public homepage.
 
 Both uploads use the existing admin-protected public `guide-images` bucket. **Uploaded images are publicly accessible immediately**, even before publishing the new site content; unused files are not removed automatically. The saved settings contain only public image URLs and reuse the existing Supabase RLS and version history.
+
+
+## Homepage section order
+
+The public landing page is intentionally limited to four sections, followed immediately by the site footer:
+
+1. **Landing hero** with the guide finder and topic shortcuts.
+2. **About Me** with the full-bleed scene, individual portrait, and biography.
+3. **Upcoming AION 2 News** with owner-curated announcements and official source links.
+4. **Recently Updated** showing the newest published guides.
+
+The previous Start Here, Featured Guides, About the Codex, and final Join banner sections no longer appear on the homepage. Their old text remains in saved content and defaults for compatibility with the version history, but their inactive panels are hidden from **Admin → Site Content**. The Site Content unsaved preview now follows the public homepage order.
+
+The full **Guide Library**, individual article routes, category navigation, and Guide Studio are unchanged and still accessible. These sections were removed from homepage presentation only; guide content was not deleted.
