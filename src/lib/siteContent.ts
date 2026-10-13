@@ -36,6 +36,13 @@ export const DEFAULT_SITE_CONTENT = {
   topicAbyss: 'ABYSS',
   topicCrafting: 'CRAFTING',
   topicAll: 'ALL GUIDES',
+  profileEyebrow: 'FROM THE CREATOR',
+  profileTitle: 'A little',
+  profileAccent: 'about me',
+  profileName: 'The curator',
+  profileRole: 'CREATOR OF ATREIA STREET',
+  profileBio: "I started Atreia Street as a place for clear AION 2 guides, practical discoveries, and shared knowledge. This space is where I'll tell you a little more about myself and the journey behind the codex.",
+  profilePhotoUrl: '',
   journeyEyebrow: 'YOUR ADVENTURE STARTS HERE',
   journeyTitle: 'Every path has',
   journeyAccent: 'a beginning',
@@ -66,6 +73,12 @@ export const DEFAULT_SITE_CONTENT = {
   featuredTitle: 'Featured',
   featuredAccent: 'Guides',
   featuredButton: 'VIEW ALL GUIDES',
+  latestEyebrow: 'FRESH FROM THE ARCHIVES',
+  latestTitle: 'Recently',
+  latestAccent: 'Updated',
+  latestDescription: 'New field notes and recently revised guides, straight from the archive.',
+  latestButton: 'BROWSE ALL GUIDES',
+  latestEmpty: 'New and updated guides will appear here as soon as they are published.',
   missionEyebrow: 'ABOUT ATREIA STREET',
   missionTitle: 'Knowledge for',
   missionAccent: 'the journey',
@@ -99,9 +112,11 @@ export type SiteContentKey = keyof SiteContent;
 export const SITE_CONTENT_GROUPS: { title: string; keys: SiteContentKey[] }[] = [
   {title:'Homepage · Hero', keys:['heroEyebrow','heroTitle','heroAccent','heroDescription','heroButton','heroFinderTitle','heroSearchPlaceholder','heroSearchButton','heroTopicTitle','heroScrollLeft','heroScrollRight']},
   {title:'Homepage · Guide topics', keys:['topicClasses','topicGear','topicDungeons','topicAbyss','topicCrafting','topicAll']},
+  {title:'Homepage · About me', keys:['profileEyebrow','profileTitle','profileAccent','profileName','profileRole','profileBio','profilePhotoUrl']},
   {title:'Homepage · Start here', keys:['journeyEyebrow','journeyTitle','journeyAccent','journeyDescription','journeyStepOneLabel','journeyStepOneTitle','journeyStepOneDescription','journeyStepTwoLabel','journeyStepTwoTitle','journeyStepTwoDescription','journeyStepThreeLabel','journeyStepThreeTitle','journeyStepThreeDescription','journeyCardButton']},
   {title:'Homepage · Categories', keys:['introEyebrow','introTitle','introAccent','introDescription','categoryClassesTitle','categoryClassesDescription','categoryGearTitle','categoryGearDescription','categoryDungeonsTitle','categoryDungeonsDescription','categoryAbyssTitle','categoryAbyssDescription']},
   {title:'Homepage · Featured & banner', keys:['featuredEyebrow','featuredTitle','featuredAccent','featuredButton','joinEyebrow','joinTitle','joinAccent','joinDescription','joinButton']},
+  {title:'Homepage · Recently updated', keys:['latestEyebrow','latestTitle','latestAccent','latestDescription','latestButton','latestEmpty']},
   {title:'Homepage · About the codex', keys:['missionEyebrow','missionTitle','missionAccent','missionDescription','missionOneTitle','missionOneDescription','missionTwoTitle','missionTwoDescription','missionThreeTitle','missionThreeDescription','missionButton']},
   {title:'Navigation & branding', keys:['brandTitle','brandAccent','brandSubtitle','navigationHome','navigationFinder','navigationDiscover','navigationClasses','navigationChallenges','navigationAllGuides','navigationAdmin']},
   {title:'Guide library', keys:['libraryEyebrow','libraryTitle','libraryAccent','libraryDescription','librarySearchPlaceholder']},
@@ -118,14 +133,24 @@ export type SiteSnapshot = {
 
 const keys = Object.keys(DEFAULT_SITE_CONTENT) as SiteContentKey[];
 export const siteContentLimit = (key: SiteContentKey): number =>
-  key.toLowerCase().includes('description') ? 400 : 120;
+  key === 'profilePhotoUrl' ? 1024 : key === 'profileBio' ? 1600 :
+  key.toLowerCase().includes('description') || key === 'latestEmpty' ? 400 : 120;
+
+/** The portrait is optional and must come from our admin-managed public image bucket. */
+export const validProfilePhotoUrl = (value:string):boolean => {
+  if(!value)return true;
+  try{
+    const url=new URL(value);
+    return url.protocol==='https:' && url.pathname.includes('/storage/v1/object/public/guide-images/') && !url.username && !url.password;
+  }catch{return false;}
+};
 
 export function normalizeSiteContent(raw: unknown): SiteContent {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
   const result = {...DEFAULT_SITE_CONTENT} as SiteContent;
   for(const key of keys) {
     const value = source[key];
-    if(typeof value === 'string' && value.trim() && value.length <= siteContentLimit(key)) result[key] = value;
+    if(typeof value === 'string' && (value.trim() || key==='profilePhotoUrl') && value.length <= siteContentLimit(key) && (key!=='profilePhotoUrl'||validProfilePhotoUrl(value))) result[key] = value;
   }
   return result;
 }
@@ -166,8 +191,9 @@ export async function saveSiteContent(values:SiteContent,old:SiteSnapshot,userId
   if(!supabase)throw new Error('Supabase is not configured.');
   if(!userId)throw new Error('Sign in as a staff member before saving.');
   for(const key of keys){
-    if(!values[key].trim())throw new Error('Every site text field must contain some text.');
+    if(!values[key].trim() && key!=='profilePhotoUrl')throw new Error('Every site text field must contain some text.');
     if(values[key].length > siteContentLimit(key))throw new Error('Text is too long: '+key);
+    if(key==='profilePhotoUrl' && !validProfilePhotoUrl(values[key]))throw new Error('Profile photo must be an image uploaded through Guide Studio.');
   }
   const cleaned=normalizeSiteContent(values);
   const history=[{at:new Date().toISOString(),values:old.values},...old.revisions].slice(0,12);

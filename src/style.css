@@ -908,3 +908,77 @@
 /* Warning blocks retain a semantic warm highlight, distinct from neutral branding. */
 .guide-callout-warning{border-left-color:#e9a880}
 .guide-callout-warning .guide-callout-heading{color:#f5b69f}
+
+/* Creator introduction — placed immediately beneath the cinematic landing hero. */
+.creator{padding-top:92px}
+.creator-shell{display:grid;grid-template-columns:210px minmax(0,1fr);gap:clamp(30px,6vw,75px);align-items:center;max-width:1020px;margin:0 auto;padding:0 0 82px;border-bottom:1px solid #b6c7dc38}
+.creator-portrait{width:210px;aspect-ratio:4/5;position:relative;background:#121d2e;border:1px solid #c8d6e75c;padding:8px;box-shadow:0 18px 50px #0005}
+.creator-portrait:after{content:'';position:absolute;inset:16px;border:1px solid #e5efff26;pointer-events:none}
+.creator-portrait img{width:100%;height:100%;display:block;object-fit:cover;object-position:50% 35%}
+.creator-portrait-placeholder{width:100%;height:100%;display:flex;flex-direction:column;gap:24px;justify-content:center;align-items:center;background:radial-gradient(circle at 45% 30%,#8194b448,transparent 60%),linear-gradient(145deg,#22324a,#0c1626);color:#d2deef}
+.creator-portrait-placeholder span{font-size:9px;letter-spacing:2.4px;font-weight:700;color:#b8c8dd}
+.creator-copy h2{font:500 clamp(33px,4vw,46px)/1.2 Manrope,Inter,sans-serif;margin:14px 0 19px;color:#f0f4fb;letter-spacing:-.5px}
+.creator-copy h2 i{font-style:normal;color:#bfcbdc}
+.creator-byline{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:15px}
+.creator-byline>span:first-child{font:600 14px Manrope,Inter,sans-serif;color:#ecf3fe}
+.creator-byline small{letter-spacing:1.4px;font-size:9px;color:#b6c6d9;font-weight:700}
+.creator-dot{width:3px;height:3px;background:#bfcde0;transform:rotate(45deg)}
+.creator-bio p{color:#adbacd;font-size:13px;line-height:1.95;margin:0 0 12px;max-width:690px;white-space:pre-wrap}
+.creator-bio p:last-child{margin-bottom:0}
+.creator + .journey{padding-top:78px}
+
+/* Recently updated — only genuinely published guide records are displayed. */
+.recent{padding-bottom:118px}
+.recent .section-top{align-items:end;margin-bottom:34px}
+.recent-description{font-size:13px;line-height:1.85;color:#aebacd;max-width:620px;margin:12px 0 0}
+.recent-list{border-top:1px solid #b8cadb52}
+.recent-guide{width:100%;display:grid;grid-template-columns:65px minmax(0,1fr) 45px;gap:23px;align-items:center;border:0;border-bottom:1px solid #b8cadb3a;background:transparent;text-align:left;color:#eaf0f8;padding:28px 10px 28px 3px;transition:background .2s,padding .2s}
+.recent-guide:hover,.recent-guide:focus-visible{background:#bacadb0c;padding-left:14px}
+.recent-index{font:500 25px Manrope,Inter,sans-serif;color:#8296b1}
+.recent-detail{display:flex;flex-direction:column;gap:9px;min-width:0}
+.recent-meta{display:flex;flex-wrap:wrap;gap:14px;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:#c4d2e6}
+.recent-meta time{color:#93a3b8}
+.recent-detail strong{font:600 clamp(17px,2.2vw,23px)/1.35 Manrope,Inter,sans-serif;color:#eff5fc}
+.recent-summary{font-size:12px;line-height:1.7;color:#a3afc1;max-width:820px}
+.recent-arrow{display:flex;align-items:center;justify-content:center;color:#d3e0f0}
+.recent-empty{display:flex;align-items:center;gap:19px;flex-wrap:wrap;border:1px solid #b8cadb40;background:#141e2d;padding:25px 29px;color:#aebed2;font-size:13px;line-height:1.7}
+.recent-empty>svg{color:#b9cce5;flex-shrink:0}
+.recent-empty>span{flex:1;min-width:220px}
+.recent-empty>button{border:1px solid #b4c6df77;background:transparent;color:#e4edf9;display:flex;align-items:center;gap:11px;padding:11px 14px;font-size:10px;font-weight:700;letter-spacing:1.1px;white-space:nowrap}
+
+/* Site Content portrait upload and unsaved text preview */
+.site-copy-photo-field{display:flex;flex-direction:column;gap:12px;min-width:0}
+.site-copy-photo-label{color:#d0c3a8;font-size:11px;font-weight:700}
+.site-copy-photo-layout{display:flex;gap:24px;align-items:start;border:1px solid #8c97aa62;background:#111b2b;padding:20px}
+.site-copy-photo-preview{width:155px;height:190px;flex:0 0 155px;border:1px solid #b8c9df6b;background:#17243a;overflow:hidden}
+.site-copy-photo-preview img{display:block;width:100%;height:100%;object-fit:cover}
+.site-copy-photo-placeholder{height:100%;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;color:#b9cbe1;background:radial-gradient(circle at 50% 25%,#93b0d02c,transparent 70%),#19273a;text-align:center;padding:16px}
+.site-copy-photo-placeholder span{font-size:11px;line-height:1.4}
+.site-copy-photo-actions{flex:1;min-width:0}
+.site-copy-photo-actions p{font-size:12px;color:#c0cad8;line-height:1.85;margin:2px 0 20px}
+.site-copy-photo-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:17px}
+.site-copy-photo-actions small{font-size:11px;line-height:1.7;color:#90a2bc}
+.site-copy-preview-profile{display:grid;grid-template-columns:160px 1fr;gap:34px;align-items:center;padding:55px 40px;border-top:1px solid #ffffff1c}
+.site-copy-preview-portrait{width:160px;height:205px;border:1px solid #bbcce368;background:#152136;overflow:hidden}
+.site-copy-preview-portrait img{width:100%;height:100%;display:block;object-fit:cover}
+.site-copy-preview-profile h2{font:600 34px Manrope,Inter,sans-serif;margin:12px 0;color:#f0f4fb}
+.site-copy-preview-profile h2 i{font-style:normal;color:#c5d2e3}
+.site-copy-preview-profile strong{display:inline-block;font-size:14px;color:#f5f8fc;margin-right:15px}
+.site-copy-preview-profile small{font-size:10px;color:#9bacc2;letter-spacing:1px}
+.site-copy-preview-profile p{color:#aebed0;line-height:1.8;font-size:13px;white-space:pre-wrap}
+@media(max-width:760px){
+  .creator{padding-top:62px}
+  .creator-shell{grid-template-columns:1fr;gap:26px;padding-bottom:52px}
+  .creator-portrait{width:172px;aspect-ratio:1/1}
+  .creator + .journey{padding-top:65px}
+  .recent{padding-bottom:75px}
+  .recent .section-top{align-items:flex-start}
+  .recent-guide{grid-template-columns:32px minmax(0,1fr) 24px;gap:13px;padding:23px 3px}
+  .recent-guide:hover{padding-left:8px}
+  .recent-index{font-size:17px}
+  .recent-arrow svg{width:18px;height:18px}
+  .site-copy-photo-layout{flex-direction:column}
+  .site-copy-photo-preview{height:190px}
+  .site-copy-preview-profile{grid-template-columns:1fr;padding:32px 24px;gap:20px}
+}
+@media(prefers-reduced-motion:reduce){.recent-guide{transition:none}}
