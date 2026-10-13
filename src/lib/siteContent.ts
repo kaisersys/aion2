@@ -179,8 +179,18 @@ export const validNewsItems=(value:string):boolean=>{
     })&&new Set(rows.map((row:UpcomingNewsItem)=>row.id)).size===rows.length;
   }catch{return false;}
 };
-export const parseNewsItems=(value:string):UpcomingNewsItem[]=>
-  validNewsItems(value)?JSON.parse(value) as UpcomingNewsItem[]:[];
+/** Parse incomplete editor drafts too. Only fully validated entries reach published site settings. */
+export const parseNewsItems=(value:string):UpcomingNewsItem[]=>{
+  try{
+    const rows:unknown=JSON.parse(value);
+    if(!Array.isArray(rows))return [];
+    return rows.slice(0,NEWS_LIMIT).filter((item:unknown)=>{
+      if(!item||typeof item!=='object'||Array.isArray(item))return false;
+      const row=item as Record<string,unknown>;
+      return ['id','date','through','category','title','summary','sourceUrl'].every(key=>typeof row[key]==='string');
+    }) as UpcomingNewsItem[];
+  }catch{return [];}
+};
 /** Compare event dates using the region of official Pacific-time announcements. */
 export const activeNewsItems=(items:UpcomingNewsItem[],now:Date=new Date()):UpcomingNewsItem[]=>{
   const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
