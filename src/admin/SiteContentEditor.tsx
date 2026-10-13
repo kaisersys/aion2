@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Check, Eye, ImagePlus, RotateCcw, Save, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Check, Eye, ImagePlus, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react';
 import {
   DEFAULT_SITE_CONTENT, SITE_CONTENT_GROUPS, getSiteSnapshot,
   normalizeSiteContent, saveSiteContent, siteContentLimit, validProfilePhotoUrl,
-  type SiteContent, type SiteContentKey, type SiteSnapshot
+  parseNewsItems, NEWS_LIMIT, activeNewsItems,
+  type UpcomingNewsItem, type SiteContent, type SiteContentKey, type SiteSnapshot
 } from '../lib/siteContent';
 import { supabase } from '../lib/supabase';
 
@@ -16,9 +17,9 @@ type Props = {
 };
 const labelFor=(key:SiteContentKey)=>key
   .replace(/([a-z])([A-Z])/g,'$1 $2')
-  .replace(/^(Hero|Intro|Navigation|Featured|Join|Journey|Mission|Profile|Latest|Library|Footer|Brand|Topic|Category) /i,'')
+  .replace(/^(Hero|Intro|Navigation|Featured|Join|Journey|Mission|Profile|Latest|News|Library|Footer|Brand|Topic|Category) /i,'')
   .replace(/^([a-z])/,(c)=>c.toUpperCase());
-const isLong=(key:SiteContentKey)=>key==='profileBio' || key==='latestEmpty' || key.toLowerCase().includes('description');
+const isLong=(key:SiteContentKey)=>key==='profileBio' || key==='latestEmpty' || key==='newsEmpty' || key.toLowerCase().includes('description');
 
 export default function SiteContentEditor({userId,onBack,onPublished,loadSnapshot=getSiteSnapshot,publishContent=saveSiteContent}:Props){
   const [snapshot,setSnapshot]=useState<SiteSnapshot|null>(null);
@@ -56,6 +57,16 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
     setNotice('');setError('');
     setDraft(prev=>({...prev,[key]:value}));
   };
+  const editNews=(items:UpcomingNewsItem[])=>update('newsItemsJson',JSON.stringify(items));
+  const addNews=()=>{
+    const items=parseNewsItems(draft.newsItemsJson);
+    if(items.length>=NEWS_LIMIT)return;
+    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    editNews([...items,{id:crypto.randomUUID(),date:today,through:today,category:'GAME UPDATE',title:'',summary:'',sourceUrl:''}]);
+  };
+  const setNewsField=(id:string,key:Exclude<keyof UpcomingNewsItem,'id'>,value:string)=>
+    editNews(parseNewsItems(draft.newsItemsJson).map(item=>item.id===id?{...item,[key]:value}:item));
+  const removeNews=(id:string)=>editNews(parseNewsItems(draft.newsItemsJson).filter(item=>item.id!==id));
   const uploadPhoto=async(file?:File)=>{
     if(!file || uploadingPhoto)return;
     const extensions:Record<string,string>={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/avif':'avif'};
@@ -117,7 +128,27 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
         <section className="site-copy-fields" aria-labelledby="copy-section-title">
           <h2 id="copy-section-title">{SITE_CONTENT_GROUPS[section].title}</h2>
           <div className="site-copy-field-grid">
-            {SITE_CONTENT_GROUPS[section].keys.map(key=>key==='profilePhotoUrl'
+            {SITE_CONTENT_GROUPS[section].keys.map(key=>key==='newsItemsJson'
+              ? <div key={key} className="site-copy-news-editor site-copy-wide">
+                  <div className="site-news-editor-top">
+                    <div><strong>Scheduled game announcements</strong><p>Add, revise or remove verified announcements. Past dates disappear from the homepage after the end date. Nothing changes publicly until Publish changes.</p></div>
+                    <button type="button" className="studio-quiet-button" onClick={addNews} disabled={parseNewsItems(draft.newsItemsJson).length>=NEWS_LIMIT}><Plus size={16}/> Add announcement</button>
+                  </div>
+                  {parseNewsItems(draft.newsItemsJson).length===0&&<p className="site-news-empty">No announcements yet. Use Add announcement to add an official update.</p>}
+                  {parseNewsItems(draft.newsItemsJson).map((item,i)=><div key={item.id} className="site-news-editor-card">
+                    <div className="site-news-card-head"><strong>ANNOUNCEMENT {i+1}</strong><button type="button" className="studio-quiet-button" onClick={()=>removeNews(item.id)}><Trash2 size={15}/> Remove</button></div>
+                    <div className="site-news-input-grid">
+                      <label>Start date<input type="date" value={item.date} onChange={e=>setNewsField(item.id,'date',e.target.value)} required/></label>
+                      <label>Last day shown<input type="date" value={item.through} onChange={e=>setNewsField(item.id,'through',e.target.value)} required/></label>
+                      <label>Category<input value={item.category} maxLength={55} onChange={e=>setNewsField(item.id,'category',e.target.value)} placeholder="PATCH / EVENT / MAINTENANCE" required/></label>
+                      <label>Headline<input value={item.title} maxLength={130} onChange={e=>setNewsField(item.id,'title',e.target.value)} placeholder="What is happening?" required/></label>
+                      <label className="site-news-wide">Brief description<textarea rows={3} maxLength={380} value={item.summary} onChange={e=>setNewsField(item.id,'summary',e.target.value)} placeholder="Summarize the official announcement…" required/></label>
+                      <label className="site-news-wide">Official source link<input type="url" maxLength={600} value={item.sourceUrl} onChange={e=>setNewsField(item.id,'sourceUrl',e.target.value)} placeholder="https://…" required/></label>
+                    </div>
+                  </div>)}
+                  <small>Maximum {NEWS_LIMIT} announcements. Dates use Pacific time. Only HTTPS source links are accepted.</small>
+                </div>
+              : key==='profilePhotoUrl'
               ? <div key={key} className="site-copy-photo-field site-copy-wide">
                   <span className="site-copy-photo-label">Your portrait</span>
                   <div className="site-copy-photo-layout">
@@ -206,15 +237,13 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
             ].map(([label,title,description])=><div key={title}><small>{label}</small><strong>{title}</strong><span>{description}</span></div>)}</div>
           </section>
           <section className="site-copy-preview-section">
-            <div className="section-kicker">{draft.introEyebrow}</div>
-            <h2>{draft.introTitle} <i>{draft.introAccent}</i></h2>
-            <p>{draft.introDescription}</p>
-            <div className="site-copy-preview-categories">{([
-              [draft.categoryClassesTitle,draft.categoryClassesDescription],
-              [draft.categoryGearTitle,draft.categoryGearDescription],
-              [draft.categoryDungeonsTitle,draft.categoryDungeonsDescription],
-              [draft.categoryAbyssTitle,draft.categoryAbyssDescription]
-            ] as const).map(([name,description])=><div key={name}><strong>{name}</strong><span>{description}</span></div>)}</div>
+            <div className="section-kicker">{draft.newsEyebrow}</div>
+            <h2>{draft.newsTitle} <i>{draft.newsAccent}</i></h2><p>{draft.newsDescription}</p>
+            {activeNewsItems(parseNewsItems(draft.newsItemsJson)).length>0
+              ? <div className="site-copy-preview-news">{activeNewsItems(parseNewsItems(draft.newsItemsJson)).map(item=><article key={item.id}>
+                  <small>{item.date} · {item.category}</small><strong>{item.title||'Untitled announcement'}</strong><p>{item.summary}</p><span>{draft.newsSourceLabel} ↗</span>
+                </article>)}</div>
+              : <p>{draft.newsEmpty}</p>}
           </section>
           <section className="site-copy-preview-section">
             <div className="section-kicker">{draft.featuredEyebrow}</div><h2>{draft.featuredTitle} <i>{draft.featuredAccent}</i></h2><p>{draft.featuredButton}</p>
