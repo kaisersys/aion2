@@ -100,3 +100,12 @@ After signing in at `https://atreiastreet.com/#admin`, choose **Site Content →
 Under **History & reset**, select **Restore version** for an earlier saved version, or **Reset to defaults** for the initial website wording. Both load values into the editor; neither changes the public site until you publish again. Up to 12 previous saved versions are retained.
 
 **No new Supabase migration or service-role secret is necessary.** Website copy lives in a single reserved published `guides` row with slug `site-content-settings`, using the existing `admin_users` permission/RLS policies. The reserved row is excluded from the guide directory and hidden from the guide management list, and cannot be created as a guide from the editor. On a new setup, the site's current hardcoded wording remains the default until the first Site Content publish. The version history also uses the existing row's JSONB `content` field.
+
+
+## Creator profile and recently updated guides
+
+The homepage displays a creator introduction immediately after the hero artwork. To personalize it, sign in at `https://atreiastreet.com/#admin`, open **Site Content → Homepage · About Me**, and edit the name, subtitle, heading and biography. The bio supports line breaks (up to 1,500 characters).
+
+To add a portrait or in-game character picture, choose **Upload photo**. JPG, PNG, WebP and AVIF images under 5 MB are supported. The existing `guide-images` Supabase public bucket and admin-only storage policy are reused; **no new migration, credentials or storage bucket** is necessary. A photo preview appears immediately, but selecting **Publish changes** is required to change the public homepage. Uploaded image files become publicly reachable immediately, even if you do not publish the changed website copy. Choosing **Remove from homepage** clears the public site setting when published, but does not delete previously uploaded files from Supabase Storage. Before uploading, make sure you are comfortable with the picture being public.
+
+The **Recently Updated** homepage section automatically shows up to three genuinely published guides, ordered by their `updated_at` timestamps. Updates made through Guide Studio appear after publishing and reloading the homepage. Drafts, the reserved site settings record, and starter example guides are excluded. When no guides are published, the homepage shows an explanatory empty state rather than invented updates. The heading, introduction, empty-state text and archive button label are editable under **Site Content → Homepage · Recently updated**.
