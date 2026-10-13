@@ -163,8 +163,30 @@ function App(){
    </div>
     </div>
    </div><div className="hero-bottom"><span>{t.heroScrollLeft}</span><span className="line"/><span>{t.heroScrollRight}</span></div></section>
+   <section className="journey section-wrap" aria-labelledby="journey-heading">
+     <div className="journey-heading"><div><div className="section-kicker left">{t.journeyEyebrow}</div><h2 id="journey-heading">{t.journeyTitle} <i>{t.journeyAccent}</i></h2></div><p>{t.journeyDescription}</p></div>
+     <div className="journey-grid">{[
+       {number:'01',icon:<Compass size={24}/>,label:t.journeyStepOneLabel,title:t.journeyStepOneTitle,description:t.journeyStepOneDescription,category:'Getting Started'},
+       {number:'02',icon:<Gem size={24}/>,label:t.journeyStepTwoLabel,title:t.journeyStepTwoTitle,description:t.journeyStepTwoDescription,category:'Progression'},
+       {number:'03',icon:<Shield size={24}/>,label:t.journeyStepThreeLabel,title:t.journeyStepThreeTitle,description:t.journeyStepThreeDescription,category:'Dungeons & Raids'}
+     ].map(step=><button key={step.number} className="journey-card" onClick={()=>choose(step.category)} aria-label={step.title+' — browse '+step.category}>
+       <span className="journey-card-top"><span className="journey-number">{step.number}</span><span className="journey-icon">{step.icon}</span></span>
+       <span className="journey-label">{step.label}</span><strong>{step.title}</strong><span className="journey-description">{step.description}</span>
+       <span className="journey-link">{t.journeyCardButton}<ArrowUpRight size={17}/></span>
+     </button>)}</div>
+   </section>
    <section className="intro section-wrap"><div className="section-kicker">✦ &nbsp; {t.introEyebrow} &nbsp; ✦</div><h2>{t.introTitle} <i>{t.introAccent}</i></h2><p className="section-description">{t.introDescription}</p><div className="category-grid">{[{title:t.categoryClassesTitle,sub:t.categoryClassesDescription,icon:<Swords size={30}/>,cat:'Classes',style:'gold'},{title:t.categoryGearTitle,sub:t.categoryGearDescription,icon:<Gem size={30}/>,cat:'Progression',style:'violet'},{title:t.categoryDungeonsTitle,sub:t.categoryDungeonsDescription,icon:<Shield size={30}/>,cat:'Dungeons & Raids',style:'ice'},{title:t.categoryAbyssTitle,sub:t.categoryAbyssDescription,icon:<Compass size={30}/>,cat:'PvP & Abyss',style:'red'}].map(c=><button className={'category-tile '+c.style} key={c.title} onClick={()=>choose(c.cat)}><span className="tile-icon">{c.icon}</span><div><strong>{c.title}</strong><small>{c.sub}</small></div><ArrowUpRight className="tile-arrow" size={19}/></button>)}</div></section>
    <section className="featured section-wrap"><div className="section-top"><div><div className="section-kicker left">{t.featuredEyebrow}</div><h2>{t.featuredTitle} <i>{t.featuredAccent}</i></h2></div><button className="text-action" onClick={()=>choose('All Guides')}>{t.featuredButton} <ArrowUpRight size={17}/></button></div><div className="guide-grid">{guides.filter(g=>g.featured).map(g=><GuideCard guide={g} key={g.slug} onClick={()=>go(g.slug)}/>)}</div></section>
+   <section className="mission section-wrap" aria-labelledby="mission-heading"><div className="mission-shell">
+     <div className="mission-copy"><div className="section-kicker left">{t.missionEyebrow}</div><h2 id="mission-heading">{t.missionTitle} <i>{t.missionAccent}</i></h2>
+       <p>{t.missionDescription}</p><button className="mission-button" onClick={()=>choose('All Guides')}>{t.missionButton}<ArrowUpRight size={17}/></button>
+     </div>
+     <div className="mission-points">{[
+       {icon:<BookOpen size={20}/>,title:t.missionOneTitle,description:t.missionOneDescription},
+       {icon:<Swords size={20}/>,title:t.missionTwoTitle,description:t.missionTwoDescription},
+       {icon:<Sparkles size={20}/>,title:t.missionThreeTitle,description:t.missionThreeDescription}
+     ].map(point=><div className="mission-point" key={point.title}><span className="mission-point-icon">{point.icon}</span><div><strong>{point.title}</strong><p>{point.description}</p></div></div>)}</div>
+   </div></section>
    <section className="join-banner"><span>{t.joinEyebrow}</span><h2>{t.joinTitle} <i>{t.joinAccent}</i></h2><p>{t.joinDescription}</p><button className="gold-button" onClick={()=>choose('All Guides')}>{t.joinButton} <ArrowUpRight size={16}/></button></section></>:
    page==='library'?<main className="inner-page section-wrap"><button className="back-link" onClick={()=>go('home')}><ArrowLeft size={16}/> BACK TO HOME</button><div className="section-kicker left">{t.libraryEyebrow}</div><h1>{t.libraryTitle} <i>{t.libraryAccent}</i></h1><p className="page-intro">{t.libraryDescription}</p><div className="library-controls"><label className="search-box"><Search size={20}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t.librarySearchPlaceholder} aria-label="Search guides"/></label><select value={category} onChange={e=>setCategory(e.target.value)} aria-label="Filter by category">{['All Guides',...new Set(guides.map(g=>g.category))].map(c=><option key={c}>{c}</option>)}</select></div>{guidesError&&<p role="status" className="studio-message">{guidesError}</p>}<div className="guide-grid">{filtered.map(g=><GuideCard key={g.slug} guide={g} onClick={()=>go(g.slug)}/>)}</div>{filtered.length===0&&<p>No matching guides. Try another search.</p>}</main>:
    page==='admin'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading Guide Studio...</p></main>}><AdminPanel onExit={()=>go('home')} onContentChanged={()=>{void refreshGuides();void refreshSiteContent();}}/></React.Suspense>:
