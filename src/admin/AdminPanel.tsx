@@ -369,7 +369,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
   </main>;
 
   return <main className="inner-page section-wrap studio-page">
-    <button className="back-link" onClick={onExit}><ArrowLeft size={16}/> BACK TO HOME</button>
+    {!siteEditing&&<button className="back-link" onClick={onExit}><ArrowLeft size={16}/> BACK TO HOME</button>}
     {checking ? <p>Checking staff access...</p> :
      !user ? <div className="studio-login">
        <div className="section-kicker left">GUILD STAFF ONLY</div><h1>Admin <i>Sanctum</i></h1>
