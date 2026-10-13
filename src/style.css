@@ -751,3 +751,119 @@
   .hero-sky::before{opacity:.7}
   .hero-sky::after{opacity:.48}
 }
+
+
+/* Admin website-copy editor. Matches the existing Guide Studio styling. */
+.studio-content-shortcut{
+  display:flex;justify-content:space-between;align-items:center;gap:22px;
+  margin:0 0 40px;padding:24px 27px;
+  border:1px solid #c7b58a66;background:linear-gradient(125deg,#1b2636,#131a2b);
+}
+.studio-content-shortcut strong{color:#ead5ae;font:600 19px Manrope,Inter,sans-serif}
+.studio-content-shortcut p{color:#abb4c3;font-size:12px;line-height:1.75;margin:7px 0 0;max-width:570px}
+.studio-content-shortcut .studio-quiet-button{flex-shrink:0}
+.site-copy-editor{padding-bottom:80px}
+.site-copy-editor h1{margin:14px 0}
+.site-copy-lead{max-width:760px;color:#adb8c8;font-size:14px;line-height:1.9;margin:0 0 26px}
+.site-copy-status{
+  display:flex;flex-wrap:wrap;gap:8px 25px;justify-content:space-between;
+  border-bottom:1px solid #cdb88745;padding:12px 0 17px;
+  font-size:11px;letter-spacing:.3px;color:#c5cddc;margin-bottom:24px
+}
+.site-copy-status span:first-child{color:#d9c193}
+.site-copy-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:23px;align-items:start}
+.site-copy-nav{display:flex;flex-direction:column;gap:4px;position:sticky;top:18px}
+.site-copy-nav button{
+  border:0;border-left:2px solid transparent;padding:14px 12px;
+  background:transparent;color:#aab5c5;text-align:left;cursor:pointer;
+  font:600 11px Inter,Arial,sans-serif;letter-spacing:.35px;
+}
+.site-copy-nav button:hover,.site-copy-nav button.active{
+  color:#f0d7a3;background:#c8b18b17;border-color:#d6bd8e
+}
+.site-copy-fields{border:1px solid #c9b99634;background:#101826;padding:25px 27px 30px;min-width:0}
+.site-copy-fields h2,.site-copy-history h2{margin:0 0 20px;font:600 23px Manrope,Inter,sans-serif;color:#e9dfcd}
+.site-copy-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.site-copy-field-grid label{display:flex;flex-direction:column;gap:8px;min-width:0}
+.site-copy-field-grid label.site-copy-wide{grid-column:1/-1}
+.site-copy-field-grid label span,.site-copy-history label{color:#d0c3a8;font-size:11px;font-weight:700}
+.site-copy-field-grid input,.site-copy-field-grid textarea,.site-copy-history select{
+  box-sizing:border-box;width:100%;border:1px solid #8c97aa62;
+  background:#0d1420;color:#f3f1ee;outline:0;
+  padding:12px 13px;font:400 13px/1.55 Inter,Arial,sans-serif;
+  border-radius:0;
+}
+.site-copy-field-grid input:focus,.site-copy-field-grid textarea:focus,.site-copy-history select:focus{
+  border-color:#e1c59b;box-shadow:0 0 0 2px #e1c59b1c;
+}
+.site-copy-field-grid textarea{resize:vertical;min-height:95px}
+.site-copy-field-grid label small{text-align:right;color:#8795ac;font-size:10px}
+.site-copy-history{
+  margin-top:32px;padding:24px;border:1px solid #b6a28047;
+  display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:22px
+}
+.site-copy-history h2{font-size:19px;margin-bottom:7px}
+.site-copy-history p{font-size:12px;color:#a1aebf;max-width:550px;line-height:1.8;margin:0}
+.site-copy-history-actions{display:flex;align-items:end;flex-wrap:wrap;gap:10px}
+.site-copy-history-actions label{display:grid;gap:8px;min-width:170px}
+.site-copy-history-actions select{font-size:11px}
+.site-copy-history-actions button{min-height:43px}
+.site-copy-bottom{
+  margin-top:30px;display:flex;gap:15px;align-items:center;
+  justify-content:space-between;color:#a6b0bd;font-size:12px;
+}
+.site-copy-preview-overlay{
+  position:fixed;inset:0;z-index:9999;background:#080d18;overflow:auto;color:#e9e9ef;
+}
+.site-copy-preview-toolbar{
+  position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;
+  gap:20px;padding:15px clamp(18px,5vw,60px);border-bottom:1px solid #cbb88c64;
+  background:#0c1423f8;color:#d8c196;font-size:10px;font-weight:700;letter-spacing:1.3px;
+}
+.site-copy-preview-toolbar span,.site-copy-preview-toolbar button{display:inline-flex;align-items:center;gap:10px}
+.site-copy-preview-toolbar button{border:1px solid #cbb88c64;background:#283247;color:#f3e2be;padding:10px 13px;cursor:pointer}
+.site-copy-preview-content{max-width:1220px;margin:auto}
+.site-copy-preview-brand{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:25px 30px;border-bottom:1px solid #baa67f44}
+.site-copy-preview-brand strong{font:700 18px Manrope,Inter,sans-serif}
+.site-copy-preview-brand em{font-style:normal;color:#d6bb90}
+.site-copy-preview-brand small{font:600 9px Inter,sans-serif;letter-spacing:1.2px;color:#9ea7b5}
+.site-copy-preview-hero{
+  padding:85px 40px 100px;
+  background:linear-gradient(90deg,#080d20f2,#090e1fb0),url('/assets/hero/aion-hero-purple.avif?v=hd2');
+  background-position:center;background-size:cover;
+}
+.site-copy-preview-hero .section-kicker{letter-spacing:2px}
+.site-copy-preview-hero h1{font:600 clamp(35px,6vw,72px)/1.12 Manrope,Inter,sans-serif;max-width:700px;margin:20px 0;color:#f7f2eb}
+.site-copy-preview-hero h1 i,.site-copy-preview-section h2 i{font-style:normal;color:#d3bb90}
+.site-copy-preview-hero p{max-width:570px;line-height:1.9;color:#d2d5df}
+.site-copy-preview-button{display:inline-block;background:#d2bc92;color:#181a20;font-weight:700;font-size:11px;letter-spacing:1.2px;padding:15px 22px;margin:12px 0 20px}
+.site-copy-preview-search{
+  border:1px solid #d2bd9366;padding:20px;max-width:530px;display:grid;gap:11px;
+  background:#111b30e6;font-size:12px;color:#d9c9ab
+}
+.site-copy-preview-search span{border:1px solid #a5b4c039;padding:13px;color:#a7b2c4}
+.site-copy-preview-search b{font-size:11px;color:#e0c796}
+.site-copy-preview-section{text-align:center;padding:65px 32px;border-top:1px solid #ffffff1c}
+.site-copy-preview-section h2{font:600 clamp(30px,4vw,44px) Manrope,Inter,sans-serif;margin:12px 0}
+.site-copy-preview-section p{max-width:730px;margin:15px auto 30px;color:#a9b5c6;line-height:1.9}
+.site-copy-preview-categories{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:30px}
+.site-copy-preview-categories div{background:#1b2637;border:1px solid #c6ac7b3d;padding:25px 14px;display:grid;gap:14px;align-content:center}
+.site-copy-preview-categories strong{font-size:11px;color:#e5d0a8}
+.site-copy-preview-categories span{font-size:11px;color:#9faabc}
+.site-copy-preview-note{display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;padding:22px;text-align:center;color:#cdb88f}
+@media(max-width:780px){
+  .studio-content-shortcut{align-items:stretch;flex-direction:column}
+  .site-copy-layout{grid-template-columns:1fr}
+  .site-copy-nav{position:static;flex-direction:row;overflow-x:auto;white-space:nowrap;padding-bottom:4px}
+  .site-copy-nav button{flex:0 0 auto}
+  .site-copy-field-grid{grid-template-columns:1fr}
+  .site-copy-preview-categories{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .site-copy-preview-hero{padding:65px 25px}
+  .site-copy-preview-brand{flex-wrap:wrap}
+}
+@media(max-width:450px){
+  .site-copy-editor .studio-topbar,.site-copy-bottom{flex-direction:column;align-items:stretch}
+  .site-copy-fields{padding:19px 15px}
+  .site-copy-preview-categories{grid-template-columns:1fr}
+  .site-copy-preview-toolbar{align-items:start}
+}
