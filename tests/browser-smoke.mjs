@@ -161,6 +161,28 @@ try {
     check((await page.locator('h1').innerText()).includes('Ranger'),'guide URL survives reload');
     await page.goto('http://127.0.0.1:'+port+'/#/library',{waitUntil:'domcontentloaded'});
     check((await page.locator('main h1').innerText()).includes('Guides'),'library deep link');
+    // Public player portal must be reachable without access to staff controls.
+    await page.goto('http://127.0.0.1:'+port+'/#/account',{waitUntil:'domcontentloaded'});
+    await page.locator('.player-page').waitFor({timeout:10000});
+    const playerPage=await page.locator('.player-page').innerText();
+    check(playerPage.includes('Player Accounts')||playerPage.includes('Make Atreia'),
+      'public player portal opens directly from account route');
+    check(await page.locator('.player-page .studio-login').count()===0,
+      'player registration does not use restricted admin sign-in');
+    const signup=page.getByRole('button',{name:'Create an account'});
+    if(await signup.count()){
+      await signup.click();
+      check(await page.getByRole('heading',{name:'Join the codex'}).count()===1 &&
+        await page.getByRole('textbox',{name:'Display name'}).count()===1,
+        'registration shows the public display-name and email form');
+      await page.getByRole('button',{name:'Back to sign in'}).click();
+      check(await page.getByRole('heading',{name:'Sign in',exact:true}).count()===1,
+        'public sign-up returns to sign-in without admin access');
+    }
+    await page.setViewportSize({width:390,height:844});
+    check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),
+      'public account screens fit a phone without horizontal overflow');
+    await page.setViewportSize({width:1280,height:900});
     await page.goto('http://127.0.0.1:'+port+'/#admin',{waitUntil:'domcontentloaded'});
     await page.waitForTimeout(2000);
     const text=await page.locator('main').innerText();
