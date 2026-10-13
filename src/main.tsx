@@ -1,6 +1,6 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {createRoot} from 'react-dom/client';
-import {Search, Menu, X, ChevronDown, ChevronRight, ArrowUpRight, BookOpen, Shield, Swords, Sparkles, Compass, Gem, ScrollText, LogIn, ArrowLeft} from 'lucide-react';
+import {Search, Menu, X, ChevronDown, ChevronRight, ArrowUpRight, BookOpen, Shield, Swords, Sparkles, Compass, Gem, ScrollText, LogIn, ArrowLeft, UserRound, Clock3} from 'lucide-react';
 import './style.css';
 const AdminPanel = React.lazy(() => import('./admin/AdminPanel'));
 const GuideArticle = React.lazy(() => import('./components/GuideArticle'));
@@ -119,6 +119,9 @@ function App(){
    body:[],featured:g.featured,content:g.content
  }));
  const guides:Guide[]=[...dynamicGuides,...starterGuides.filter(g=>!dynamicGuides.some(d=>d.slug===g.slug))];
+ // "Recently updated" deliberately uses real published articles, not the static example guides.
+ const recentGuides=[...publishedGuides].sort((left,right)=>
+   new Date(right.updated_at).getTime()-new Date(left.updated_at).getTime()).slice(0,3);
  const current=guides.find(g=>page==='guide:'+g.slug);const filtered=guides.filter(g=>(category==='All Guides'||g.category===category)&&(g.title+' '+g.summary+' '+g.category).toLowerCase().includes(search.toLowerCase()));
  const suggestions=finderQuery.trim()?guides.filter(g=>(g.title+' '+g.category+' '+g.summary).toLowerCase().includes(finderQuery.toLowerCase())).slice(0,4):[];
  const go=(slug:string)=>{
@@ -163,6 +166,34 @@ function App(){
    </div>
     </div>
    </div><div className="hero-bottom"><span>{t.heroScrollLeft}</span><span className="line"/><span>{t.heroScrollRight}</span></div></section>
+   <section className="about-creator section-wrap" aria-labelledby="creator-heading">
+     <div className="creator-panel">
+       <div className="creator-portrait">{t.aboutPortraitUrl
+         ? <img src={t.aboutPortraitUrl} alt={'Portrait of '+t.aboutName} loading="lazy"/>
+         : <div className="creator-portrait-placeholder" aria-label="Portrait coming soon"><UserRound size={76} strokeWidth={1}/><span>PORTRAIT COMING SOON</span></div>}
+       </div>
+       <div className="creator-story"><div className="section-kicker left">{t.aboutEyebrow}</div>
+         <h2 id="creator-heading">{t.aboutTitle} <i>{t.aboutAccent}</i></h2>
+         <div className="creator-identity"><strong>{t.aboutName}</strong><span>{t.aboutSubtitle}</span></div>
+         <p>{t.aboutBio}</p>
+       </div>
+     </div>
+   </section>
+   <section className="recent-guides section-wrap" aria-labelledby="recent-guides-heading">
+     <div className="section-top"><div><div className="section-kicker left">{t.recentEyebrow}</div>
+       <h2 id="recent-guides-heading">{t.recentTitle} <i>{t.recentAccent}</i></h2>
+       <p className="recent-description">{t.recentDescription}</p></div>
+       <button className="text-action" onClick={()=>choose('All Guides')}>{t.recentButton} <ArrowUpRight size={17}/></button>
+     </div>
+     {recentGuides.length>0?<div className="recent-guide-grid">{recentGuides.map((guide,index)=><button key={guide.id} className="recent-guide" onClick={()=>go(guide.slug)}>
+       <div className="recent-guide-meta"><span>{guide.category.toUpperCase()}</span><span className="recent-guide-date"><Clock3 size={13}/> UPDATED {new Date(guide.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}).toUpperCase()}</span></div>
+       <span className="recent-guide-index">0{index+1} / FIELD NOTES</span>
+       <strong>{guide.title}</strong><p>{guide.summary}</p><span className="recent-guide-link">READ GUIDE <ArrowUpRight size={16}/></span>
+     </button>)}</div>:<div className="recent-guide-empty">
+       <BookOpen size={28} strokeWidth={1.2}/><p role="status">{guidesLoading?'Checking the archives…':guidesError||t.recentEmpty}</p>
+       <button className="text-action" onClick={()=>choose('All Guides')}>{t.recentButton} <ArrowUpRight size={17}/></button>
+     </div>}
+   </section>
    <section className="journey section-wrap" aria-labelledby="journey-heading">
      <div className="journey-heading"><div><div className="section-kicker left">{t.journeyEyebrow}</div><h2 id="journey-heading">{t.journeyTitle} <i>{t.journeyAccent}</i></h2></div><p>{t.journeyDescription}</p></div>
      <div className="journey-grid">{[
