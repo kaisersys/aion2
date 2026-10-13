@@ -134,3 +134,62 @@ The public landing page is intentionally limited to four sections, followed imme
 The previous Start Here, Featured Guides, About the Codex, and final Join banner sections no longer appear on the homepage. Their old text remains in saved content and defaults for compatibility with the version history, but their inactive panels are hidden from **Admin → Site Content**. The Site Content unsaved preview now follows the public homepage order.
 
 The full **Guide Library**, individual article routes, category navigation, and Guide Studio are unchanged and still accessible. These sections were removed from homepage presentation only; guide content was not deleted.
+
+
+## Player accounts and personal dashboard (public beta)
+
+The website includes a separate, public **Log in / Join** entry point at `/#/account`.
+Players can register with email/password, sign in, request a password-reset email,
+choose a display name/class/faction, complete personal daily and weekly tasks,
+bookmark guides, and receive simple **class/category-based** reading recommendations.
+Recommendations are rule-based (not AI) and activity completion is **manual**:
+Atreia Street does not access game characters or the AION 2 API.
+
+### REQUIRED activation before inviting testers
+
+**The website deploy does not automatically create Supabase database tables or
+change Supabase Auth settings.** Complete these steps once before a friend's test:
+
+1. Open your existing Supabase project at https://supabase.com/dashboard.
+   Navigate to **SQL Editor → New query**. Copy and run the entire
+   [player accounts migration](supabase/migrations/20261013_player_accounts.sql).
+   It adds `public.player_profiles`, `public.player_task_completions` and
+   `public.player_saved_guides`, all with **row-level security**. Never run
+   it as a browser/API query or expose secret/database credentials.
+2. In Supabase **Authentication → Providers → Email**, ensure the email provider
+   is enabled and user sign-ups are allowed (the setting may be under Auth settings).
+   **Keep email verification enabled** for publicly created accounts.
+3. In **Authentication → URL Configuration**, set Site URL to
+   `https://atreiastreet.com/` and allow redirects to:
+   `https://atreiastreet.com/**`. Email verification returns to
+   `/?welcome=1` and password recovery to `/?password-reset=1`.
+   If you serve both `www` and bare domain, configure allowed URLs accordingly.
+4. Confirm existing GitHub Actions build secrets `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY` still point to **the same** Supabase project as
+   the SQL migration. Do not use a service-role key.
+5. Test in a private browser window:
+   - Open `https://atreiastreet.com/#/account`, choose **Create an account**.
+   - Submit a *new* email/password/display name; check email confirmation.
+   - Sign in, save character details, tick a checklist item and bookmark a guide.
+   - Refresh and log in again; your progress should persist.
+   - Try accessing `/#admin` as the test player: **Access Restricted** should
+     display because only explicit `admin_users` members can publish.
+   - As another test account, verify you cannot see the first user's progress.
+
+The UI shows a setup warning instead of pretending to save if the player
+database tables are missing. Sign-up may work before the migration, but
+checklists, bookmarks, and profiles cannot persist until it is applied.
+Auth emails depend on Supabase's configured mail delivery and rate limits.
+For broader public use, set up proper SMTP and abuse protection in Supabase.
+
+**Privacy:** only signed-in users can read/write their own profile, task
+completion, and bookmarks. No public access policies, and no admin privilege
+is granted by sign-up. User-created records are removed by foreign-key cascade
+if their Supabase Auth user is deleted. Avoid using a game-account password for
+this independent guide website.
+
+**Tracking cadence:** daily items refresh at midnight in
+`America/Los_Angeles`, and weekly items refresh Monday at midnight Pacific.
+These are **Atreia Street tracking periods**, *not* claims about AION 2's
+official game reset time. Tasks are friendly sample prompts and will be
+customizable in a future iteration.
