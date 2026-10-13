@@ -91,3 +91,12 @@ Open `https://atreiastreet.com/#admin` and log in with a confirmed Supabase Auth
 ### Quality and deployment safety
 
 Production build checks both Supabase configuration values, validates the project URL, and asks the project's Auth API to accept the publishable/anon key before FTP upload. Invalid configuration stops a new deployment instead of replacing the working site. The public website also tolerates an unavailable or malformed Supabase client without blanking the homepage.
+
+
+## Editing website text (without deploying)
+
+After signing in at `https://atreiastreet.com/#admin`, choose **Site Content → Edit website text**. Edit the relevant text fields (homepage, hero buttons, guide finder, category tiles, navigation, library, featured section, guild banner, footer), choose **Preview changes**, then select **Publish changes**. The live site picks up the new text on refresh. Your own admin session refreshes when you publish.
+
+Under **History & reset**, select **Restore version** for an earlier saved version, or **Reset to defaults** for the initial website wording. Both load values into the editor; neither changes the public site until you publish again. Up to 12 previous saved versions are retained.
+
+**No new Supabase migration or service-role secret is necessary.** Website copy lives in a single reserved published `guides` row with slug `site-content-settings`, using the existing `admin_users` permission/RLS policies. The reserved row is excluded from the guide directory and hidden from the guide management list, and cannot be created as a guide from the editor. On a new setup, the site's current hardcoded wording remains the default until the first Site Content publish. The version history also uses the existing row's JSONB `content` field.
