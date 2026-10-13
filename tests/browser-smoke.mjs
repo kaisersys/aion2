@@ -25,6 +25,15 @@ try {
       'private preview renders unsaved homepage headline');
     await page.keyboard.press('Escape');
     check(await preview.count()===0,'Escape closes website text preview');
+    await page.getByRole('button',{name:'Homepage · Upcoming news'}).click();
+    check(await page.locator('.site-copy-news-editor .site-news-editor-card').count()===3,
+      'upcoming news editor shows three sourced starter announcements');
+    await page.getByRole('button',{name:'Add announcement'}).click();
+    check(await page.locator('.site-copy-news-editor .site-news-editor-card').count()===4,
+      'adding an announcement creates an editable calendar entry');
+    await page.locator('.site-news-editor-card').last().getByRole('button',{name:'Remove'}).click();
+    check(await page.locator('.site-copy-news-editor .site-news-editor-card').count()===3,
+      'announcement removal is reversible before publishing');
     await page.getByRole('button',{name:'Footer'}).click();
     await page.getByRole('textbox',{name:'Description',exact:true}).fill('Independent community guide project. Test footer.');
     await page.getByRole('button',{name:'Preview changes'}).click();
@@ -145,6 +154,14 @@ try {
     });
     check(fontCheck.heroFont.includes('Manrope') && fontCheck.bodyFont.includes('Inter'),'hero uses Manrope while reading copy stays Inter');
     check(!fontCheck.overflows,'updated headings do not overflow desktop');
+    check(await page.locator('.upcoming-news').count()===1 &&
+      await page.locator('.intro .category-grid').count()===0,
+      'upcoming AION 2 news replaces the old destination category tiles');
+    const newsLinks=await page.locator('.upcoming-card-source').evaluateAll(links=>
+      links.every(link=>link.getAttribute('href')?.startsWith('https://')&&link.getAttribute('rel')?.includes('noopener')));
+    const activeCards=await page.locator('.upcoming-card').count();
+    check((activeCards>0 && newsLinks) || (activeCards===0 && await page.locator('.upcoming-empty a[href^="https://"]').count()===1),
+      'news cards have safe official sources, or a dated-out calendar shows the official empty state');
     const depth=()=>page.evaluate(()=>{
       const transform=(selector)=>getComputedStyle(document.querySelector(selector)).transform;
       return {art:transform('.hero-art'),sky:transform('.hero-sky'),foreground:transform('.hero-foreground')};

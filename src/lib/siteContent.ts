@@ -57,6 +57,13 @@ export const DEFAULT_SITE_CONTENT = {
   journeyStepThreeTitle: 'Prepare for challenges',
   journeyStepThreeDescription: 'Step into dungeons with the mechanics, roles, and preparation in mind.',
   journeyCardButton: 'EXPLORE GUIDES',
+  newsEyebrow: 'THE NEXT CHAPTER',
+  newsTitle: 'Upcoming',
+  newsAccent: 'AION 2 News',
+  newsDescription: 'Confirmed global events, maintenance milestones, and important dates, with links to official announcements.',
+  newsSourceLabel: 'OFFICIAL ANNOUNCEMENT',
+  newsEmpty: 'No upcoming announcements are listed right now. Check the official AION 2 news page for the latest updates.',
+  newsItemsJson: "[{\"id\":\"ea-transfers\",\"date\":\"2026-10-13\",\"through\":\"2026-10-20\",\"category\":\"SERVER TRANSFERS\",\"title\":\"Early Access server transfers\",\"summary\":\"Eligible Early Access characters can transfer after October 13 maintenance. This window closes before October 20 maintenance.\",\"sourceUrl\":\"https://lounge.plaync.com/feed/83614?country=US&locale=en-US\"},{\"id\":\"launch-transfers\",\"date\":\"2026-10-20\",\"through\":\"2026-10-27\",\"category\":\"SERVER TRANSFERS\",\"title\":\"Launch server transfers\",\"summary\":\"The separate launch-server transfer window begins after October 20 maintenance and ends before October 27 maintenance.\",\"sourceUrl\":\"https://lounge.plaync.com/feed/83614?country=US&locale=en-US\"},{\"id\":\"attendance-end\",\"date\":\"2026-12-15\",\"through\":\"2026-12-15\",\"category\":\"EVENT DEADLINE\",\"title\":\"Launch attendance rewards conclude\",\"summary\":\"The global launch attendance events run through December 15. Claim your available check-in rewards while the event is active.\",\"sourceUrl\":\"https://lounge.plaync.com/feed/83066?country=US&locale=en-US\"}]",
   introEyebrow: 'THE GUILD ARCHIVES',
   introTitle: 'Discover Your',
   introAccent: 'Destiny',
@@ -114,7 +121,7 @@ export const SITE_CONTENT_GROUPS: { title: string; keys: SiteContentKey[] }[] = 
   {title:'Homepage · Guide topics', keys:['topicClasses','topicGear','topicDungeons','topicAbyss','topicCrafting','topicAll']},
   {title:'Homepage · About me', keys:['profileEyebrow','profileTitle','profileAccent','profileName','profileRole','profileBio','profilePhotoUrl']},
   {title:'Homepage · Start here', keys:['journeyEyebrow','journeyTitle','journeyAccent','journeyDescription','journeyStepOneLabel','journeyStepOneTitle','journeyStepOneDescription','journeyStepTwoLabel','journeyStepTwoTitle','journeyStepTwoDescription','journeyStepThreeLabel','journeyStepThreeTitle','journeyStepThreeDescription','journeyCardButton']},
-  {title:'Homepage · Categories', keys:['introEyebrow','introTitle','introAccent','introDescription','categoryClassesTitle','categoryClassesDescription','categoryGearTitle','categoryGearDescription','categoryDungeonsTitle','categoryDungeonsDescription','categoryAbyssTitle','categoryAbyssDescription']},
+  {title:'Homepage · Upcoming news', keys:['newsEyebrow','newsTitle','newsAccent','newsDescription','newsSourceLabel','newsEmpty','newsItemsJson']},
   {title:'Homepage · Featured & banner', keys:['featuredEyebrow','featuredTitle','featuredAccent','featuredButton','joinEyebrow','joinTitle','joinAccent','joinDescription','joinButton']},
   {title:'Homepage · Recently updated', keys:['latestEyebrow','latestTitle','latestAccent','latestDescription','latestButton','latestEmpty']},
   {title:'Homepage · About the codex', keys:['missionEyebrow','missionTitle','missionAccent','missionDescription','missionOneTitle','missionOneDescription','missionTwoTitle','missionTwoDescription','missionThreeTitle','missionThreeDescription','missionButton']},
@@ -133,7 +140,7 @@ export type SiteSnapshot = {
 
 const keys = Object.keys(DEFAULT_SITE_CONTENT) as SiteContentKey[];
 export const siteContentLimit = (key: SiteContentKey): number =>
-  key === 'profilePhotoUrl' ? 1024 : key === 'profileBio' ? 1600 :
+  key === 'newsItemsJson' ? 10000 : key === 'profilePhotoUrl' ? 1024 : key === 'profileBio' ? 1600 :
   key.toLowerCase().includes('description') || key === 'latestEmpty' ? 400 : 120;
 
 /** The portrait is optional and must come from our admin-managed public image bucket. */
@@ -145,11 +152,60 @@ export const validProfilePhotoUrl = (value:string):boolean => {
   }catch{return false;}
 };
 
+/** Editor-curated announcement calendar, stored with website text under existing admin RLS. */
+export type UpcomingNewsItem = {id:string;date:string;through:string;category:string;title:string;summary:string;sourceUrl:string};
+export const NEWS_LIMIT=8;
+const isCalendarDate=(value:string):boolean=>{
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+  const date=new Date(value+'T00:00:00Z');
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0,10)===value;
+};
+const safeNewsUrl=(value:string):boolean=>{
+  try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password;}catch{return false;}
+};
+export const validNewsItems=(value:string):boolean=>{
+  try{
+    const rows:unknown=JSON.parse(value);
+    return Array.isArray(rows)&&rows.length<=NEWS_LIMIT&&rows.every((entry:unknown)=>{
+      if(!entry||typeof entry!=='object'||Array.isArray(entry))return false;
+      const item=entry as Record<string,unknown>;
+      return typeof item.id==='string'&&item.id.length>0&&item.id.length<=90&&
+        typeof item.date==='string'&&isCalendarDate(item.date)&&
+        typeof item.through==='string'&&isCalendarDate(item.through)&&item.through>=item.date&&
+        typeof item.category==='string'&&item.category.trim().length>0&&item.category.length<=55&&
+        typeof item.title==='string'&&item.title.trim().length>0&&item.title.length<=130&&
+        typeof item.summary==='string'&&item.summary.trim().length>0&&item.summary.length<=380&&
+        typeof item.sourceUrl==='string'&&item.sourceUrl.length<=600&&safeNewsUrl(item.sourceUrl);
+    })&&new Set(rows.map((row:UpcomingNewsItem)=>row.id)).size===rows.length;
+  }catch{return false;}
+};
+/** Parse incomplete editor drafts too. Only fully validated entries reach published site settings. */
+export const parseNewsItems=(value:string):UpcomingNewsItem[]=>{
+  try{
+    const rows:unknown=JSON.parse(value);
+    if(!Array.isArray(rows))return [];
+    return rows.slice(0,NEWS_LIMIT).filter((item:unknown)=>{
+      if(!item||typeof item!=='object'||Array.isArray(item))return false;
+      const row=item as Record<string,unknown>;
+      return ['id','date','through','category','title','summary','sourceUrl'].every(key=>typeof row[key]==='string');
+    }) as UpcomingNewsItem[];
+  }catch{return [];}
+};
+/** Compare event dates using the region of official Pacific-time announcements. */
+export const activeNewsItems=(items:UpcomingNewsItem[],now:Date=new Date()):UpcomingNewsItem[]=>{
+  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  return items.filter(item=>item.through>=today).sort((a,b)=>a.date.localeCompare(b.date));
+};
+
 export function normalizeSiteContent(raw: unknown): SiteContent {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
   const result = {...DEFAULT_SITE_CONTENT} as SiteContent;
   for(const key of keys) {
     const value = source[key];
+    if(key==='newsItemsJson'){
+      if(typeof value==='string'&&value.length<=siteContentLimit(key)&&validNewsItems(value))result[key]=value;
+      continue;
+    }
     if(typeof value === 'string' && (value.trim() || key==='profilePhotoUrl') && value.length <= siteContentLimit(key) && (key!=='profilePhotoUrl'||validProfilePhotoUrl(value))) result[key] = value;
   }
   return result;
@@ -191,6 +247,7 @@ export async function saveSiteContent(values:SiteContent,old:SiteSnapshot,userId
   if(!supabase)throw new Error('Supabase is not configured.');
   if(!userId)throw new Error('Sign in as a staff member before saving.');
   for(const key of keys){
+    if(key==='newsItemsJson'&&!validNewsItems(values[key]))throw new Error('Review the upcoming news dates and official source links before publishing.');
     if(!values[key].trim() && key!=='profilePhotoUrl')throw new Error('Every site text field must contain some text.');
     if(values[key].length > siteContentLimit(key))throw new Error('Text is too long: '+key);
     if(key==='profilePhotoUrl' && !validProfilePhotoUrl(values[key]))throw new Error('Profile photo must be an image uploaded through Guide Studio.');
