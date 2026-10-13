@@ -166,7 +166,11 @@ function App(){
    </div>
     </div>
    </div><div className="hero-bottom"><span>{t.heroScrollLeft}</span><span className="line"/><span>{t.heroScrollRight}</span></div></section>
-   <section className="creator section-wrap" aria-labelledby="creator-heading">
+   <section className="creator creator-bleed" aria-labelledby="creator-heading">
+     <div className="creator-backdrop" aria-hidden="true">
+       <img src={t.profileBackdropUrl || '/assets/hero/aion-hero-purple.avif?v=hd2'} loading="lazy" alt=""/>
+     </div>
+     <div className="creator-backdrop-wash" aria-hidden="true"/>
      <div className="creator-shell">
        <div className="creator-portrait">
          {t.profilePhotoUrl

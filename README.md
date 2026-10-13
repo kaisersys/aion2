@@ -111,3 +111,12 @@ The news calendar starts with **officially sourced Global announcements**: Octob
 From `https://atreiastreet.com/#admin`, open **Site Content → Homepage · Upcoming news** to edit heading text and manage up to eight scheduled announcements. For each, enter the start date, last day it should appear, category, headline, short summary, and an HTTPS official source link. Use **Add announcement** or **Remove**, choose **Preview changes**, then **Publish changes**. This uses the existing admin-protected site settings row and version history: no extra Supabase migration or build is required to publish news changes.
 
 Only items whose last visible date has not passed (in **Pacific time**) appear to visitors. An empty state and a link to the official AION 2 site appear once no scheduled items remain. Check dates and source links when adding new notices. The calendar is not an automated news scraper or push-notification service.
+
+
+## Full-bleed About Me background and separate portrait
+
+The homepage **About Me** section now has two independent image layers: a full-bleed atmospheric backdrop and a smaller 4:5 portrait alongside the bio. The bio sits on a dark translucent panel with silver edging for readability. The layout remains responsive on mobile. The current hero painting is used only as a **default background** until the owner uploads another landscape; it is not a second uploaded picture.
+
+Edit at **Admin → Site Content → Homepage · About me**. Use **Upload background** for an optional wide 16:9 or 21:9 JPG/PNG/WebP/AVIF up to 8 MB, and **Upload photo** for a separate portrait/avatar up to 5 MB. You may replace either independently, preview both together, or reset the background to the default artwork without removing the portrait. The existing portrait remains saved; no migration or new storage bucket is needed. Choose **Publish changes** to update the public homepage.
+
+Both uploads use the existing admin-protected public `guide-images` bucket. **Uploaded images are publicly accessible immediately**, even before publishing the new site content; unused files are not removed automatically. The saved settings contain only public image URLs and reuse the existing Supabase RLS and version history.

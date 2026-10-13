@@ -43,6 +43,7 @@ export const DEFAULT_SITE_CONTENT = {
   profileRole: 'CREATOR OF ATREIA STREET',
   profileBio: "I started Atreia Street as a place for clear AION 2 guides, practical discoveries, and shared knowledge. This space is where I'll tell you a little more about myself and the journey behind the codex.",
   profilePhotoUrl: '',
+  profileBackdropUrl: '',
   journeyEyebrow: 'YOUR ADVENTURE STARTS HERE',
   journeyTitle: 'Every path has',
   journeyAccent: 'a beginning',
@@ -119,7 +120,7 @@ export type SiteContentKey = keyof SiteContent;
 export const SITE_CONTENT_GROUPS: { title: string; keys: SiteContentKey[] }[] = [
   {title:'Homepage · Hero', keys:['heroEyebrow','heroTitle','heroAccent','heroDescription','heroButton','heroFinderTitle','heroSearchPlaceholder','heroSearchButton','heroTopicTitle','heroScrollLeft','heroScrollRight']},
   {title:'Homepage · Guide topics', keys:['topicClasses','topicGear','topicDungeons','topicAbyss','topicCrafting','topicAll']},
-  {title:'Homepage · About me', keys:['profileEyebrow','profileTitle','profileAccent','profileName','profileRole','profileBio','profilePhotoUrl']},
+  {title:'Homepage · About me', keys:['profileEyebrow','profileTitle','profileAccent','profileName','profileRole','profileBio','profileBackdropUrl','profilePhotoUrl']},
   {title:'Homepage · Start here', keys:['journeyEyebrow','journeyTitle','journeyAccent','journeyDescription','journeyStepOneLabel','journeyStepOneTitle','journeyStepOneDescription','journeyStepTwoLabel','journeyStepTwoTitle','journeyStepTwoDescription','journeyStepThreeLabel','journeyStepThreeTitle','journeyStepThreeDescription','journeyCardButton']},
   {title:'Homepage · Upcoming news', keys:['newsEyebrow','newsTitle','newsAccent','newsDescription','newsSourceLabel','newsEmpty','newsItemsJson']},
   {title:'Homepage · Featured & banner', keys:['featuredEyebrow','featuredTitle','featuredAccent','featuredButton','joinEyebrow','joinTitle','joinAccent','joinDescription','joinButton']},
@@ -140,7 +141,7 @@ export type SiteSnapshot = {
 
 const keys = Object.keys(DEFAULT_SITE_CONTENT) as SiteContentKey[];
 export const siteContentLimit = (key: SiteContentKey): number =>
-  key === 'newsItemsJson' ? 10000 : key === 'profilePhotoUrl' ? 1024 : key === 'profileBio' ? 1600 :
+  key === 'newsItemsJson' ? 10000 : (key === 'profilePhotoUrl' || key === 'profileBackdropUrl') ? 1024 : key === 'profileBio' ? 1600 :
   key.toLowerCase().includes('description') || key === 'latestEmpty' ? 400 : 120;
 
 /** The portrait is optional and must come from our admin-managed public image bucket. */
@@ -206,7 +207,7 @@ export function normalizeSiteContent(raw: unknown): SiteContent {
       if(typeof value==='string'&&value.length<=siteContentLimit(key)&&validNewsItems(value))result[key]=value;
       continue;
     }
-    if(typeof value === 'string' && (value.trim() || key==='profilePhotoUrl') && value.length <= siteContentLimit(key) && (key!=='profilePhotoUrl'||validProfilePhotoUrl(value))) result[key] = value;
+    if(typeof value === 'string' && (value.trim() || key==='profilePhotoUrl' || key==='profileBackdropUrl') && value.length <= siteContentLimit(key) && ((key!=='profilePhotoUrl' && key!=='profileBackdropUrl')||validProfilePhotoUrl(value))) result[key] = value;
   }
   return result;
 }
@@ -248,9 +249,9 @@ export async function saveSiteContent(values:SiteContent,old:SiteSnapshot,userId
   if(!userId)throw new Error('Sign in as a staff member before saving.');
   for(const key of keys){
     if(key==='newsItemsJson'&&!validNewsItems(values[key]))throw new Error('Review the upcoming news dates and official source links before publishing.');
-    if(!values[key].trim() && key!=='profilePhotoUrl')throw new Error('Every site text field must contain some text.');
+    if(!values[key].trim() && key!=='profilePhotoUrl' && key!=='profileBackdropUrl')throw new Error('Every site text field must contain some text.');
     if(values[key].length > siteContentLimit(key))throw new Error('Text is too long: '+key);
-    if(key==='profilePhotoUrl' && !validProfilePhotoUrl(values[key]))throw new Error('Profile photo must be an image uploaded through Guide Studio.');
+    if((key==='profilePhotoUrl'||key==='profileBackdropUrl') && !validProfilePhotoUrl(values[key]))throw new Error('Profile images must be uploaded through Site Content.');
   }
   const cleaned=normalizeSiteContent(values);
   const history=[{at:new Date().toISOString(),values:old.values},...old.revisions].slice(0,12);
