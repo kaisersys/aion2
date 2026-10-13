@@ -159,8 +159,9 @@ try {
       'upcoming AION 2 news replaces the old destination category tiles');
     const newsLinks=await page.locator('.upcoming-card-source').evaluateAll(links=>
       links.every(link=>link.getAttribute('href')?.startsWith('https://')&&link.getAttribute('rel')?.includes('noopener')));
-    check(await page.locator('.upcoming-card').count()>0 && newsLinks,
-      'news cards provide externally sourced official announcements');
+    const activeCards=await page.locator('.upcoming-card').count();
+    check((activeCards>0 && newsLinks) || (activeCards===0 && await page.locator('.upcoming-empty a[href^="https://"]').count()===1),
+      'news cards have safe official sources, or a dated-out calendar shows the official empty state');
     const depth=()=>page.evaluate(()=>{
       const transform=(selector)=>getComputedStyle(document.querySelector(selector)).transform;
       return {art:transform('.hero-art'),sky:transform('.hero-sky'),foreground:transform('.hero-foreground')};
