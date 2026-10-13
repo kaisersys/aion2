@@ -6,7 +6,7 @@ const AdminPanel = React.lazy(() => import('./admin/AdminPanel'));
 const GuideArticle = React.lazy(() => import('./components/GuideArticle'));
 import { getPublishedGuides, type GuideRecord } from './lib/guides';
 import { isSupabaseConfigured } from './lib/supabase';
-import { DEFAULT_SITE_CONTENT, getSiteContent, type SiteContent } from './lib/siteContent';
+import { DEFAULT_SITE_CONTENT, getSiteContent, activeNewsItems, parseNewsItems, type SiteContent } from './lib/siteContent';
 import type { JSONContent } from '@tiptap/core';
 
 type Guide={slug:string;title:string;category:string;summary:string;read:string;accent:string;body:string[];featured?:boolean;content?:JSONContent};
@@ -120,6 +120,8 @@ function App(){
  }));
  const guides:Guide[]=[...dynamicGuides,...starterGuides.filter(g=>!dynamicGuides.some(d=>d.slug===g.slug))];
  const recentGuides=publishedGuides.slice().sort((a,b)=>Date.parse(b.updated_at)-Date.parse(a.updated_at)).slice(0,3);
+ const upcomingNews=activeNewsItems(parseNewsItems(t.newsItemsJson));
+ const pacificToday=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const current=guides.find(g=>page==='guide:'+g.slug);const filtered=guides.filter(g=>(category==='All Guides'||g.category===category)&&(g.title+' '+g.summary+' '+g.category).toLowerCase().includes(search.toLowerCase()));
  const suggestions=finderQuery.trim()?guides.filter(g=>(g.title+' '+g.category+' '+g.summary).toLowerCase().includes(finderQuery.toLowerCase())).slice(0,4):[];
  const go=(slug:string)=>{
@@ -191,7 +193,26 @@ function App(){
        <span className="journey-link">{t.journeyCardButton}<ArrowUpRight size={17}/></span>
      </button>)}</div>
    </section>
-   <section className="intro section-wrap"><div className="section-kicker">✦ &nbsp; {t.introEyebrow} &nbsp; ✦</div><h2>{t.introTitle} <i>{t.introAccent}</i></h2><p className="section-description">{t.introDescription}</p><div className="category-grid">{[{title:t.categoryClassesTitle,sub:t.categoryClassesDescription,icon:<Swords size={30}/>,cat:'Classes',style:'gold'},{title:t.categoryGearTitle,sub:t.categoryGearDescription,icon:<Gem size={30}/>,cat:'Progression',style:'violet'},{title:t.categoryDungeonsTitle,sub:t.categoryDungeonsDescription,icon:<Shield size={30}/>,cat:'Dungeons & Raids',style:'ice'},{title:t.categoryAbyssTitle,sub:t.categoryAbyssDescription,icon:<Compass size={30}/>,cat:'PvP & Abyss',style:'red'}].map(c=><button className={'category-tile '+c.style} key={c.title} onClick={()=>choose(c.cat)}><span className="tile-icon">{c.icon}</span><div><strong>{c.title}</strong><small>{c.sub}</small></div><ArrowUpRight className="tile-arrow" size={19}/></button>)}</div></section>
+   <section className="upcoming-news section-wrap" aria-labelledby="upcoming-heading">
+     <div className="section-top upcoming-top">
+       <div><div className="section-kicker left">{t.newsEyebrow}</div>
+         <h2 id="upcoming-heading">{t.newsTitle} <i>{t.newsAccent}</i></h2>
+         <p className="upcoming-description">{t.newsDescription}</p>
+       </div>
+       <a className="upcoming-official-index" href="https://aion2.plaync.com/en-us/" target="_blank" rel="noopener noreferrer">OFFICIAL AION 2 NEWS <ArrowUpRight size={16}/></a>
+     </div>
+     {upcomingNews.length>0?<div className="upcoming-grid">{upcomingNews.map(item=><article className="upcoming-card" key={item.id}>
+       <div className="upcoming-card-top"><time dateTime={item.date}>{new Date(item.date+'T12:00:00Z').toLocaleDateString('en-US',{timeZone:'UTC',month:'short',day:'numeric',year:'numeric'}).toUpperCase()}</time>
+         <span className="upcoming-status">{item.date<=pacificToday?'UNDERWAY':'UPCOMING'}</span>
+       </div>
+       <div className="upcoming-card-main"><span className="upcoming-category">{item.category}</span>
+         <h3>{item.title}</h3><p>{item.summary}</p>
+       </div>
+       <a className="upcoming-card-source" href={item.sourceUrl} target="_blank" rel="noopener noreferrer">{t.newsSourceLabel}<ArrowUpRight size={16}/></a>
+     </article>)}</div>:<div className="upcoming-empty"><BookOpen size={29}/>
+       <p>{t.newsEmpty}</p><a href="https://aion2.plaync.com/en-us/" target="_blank" rel="noopener noreferrer">OFFICIAL AION 2 NEWS <ArrowUpRight size={16}/></a>
+     </div>}
+   </section>
    <section className="featured section-wrap"><div className="section-top"><div><div className="section-kicker left">{t.featuredEyebrow}</div><h2>{t.featuredTitle} <i>{t.featuredAccent}</i></h2></div><button className="text-action" onClick={()=>choose('All Guides')}>{t.featuredButton} <ArrowUpRight size={17}/></button></div><div className="guide-grid">{guides.filter(g=>g.featured).map(g=><GuideCard guide={g} key={g.slug} onClick={()=>go(g.slug)}/>)}</div></section>
    <section className="recent section-wrap" aria-labelledby="recent-heading">
      <div className="section-top"><div><div className="section-kicker left">{t.latestEyebrow}</div><h2 id="recent-heading">{t.latestTitle} <i>{t.latestAccent}</i></h2><p className="recent-description">{t.latestDescription}</p></div>
