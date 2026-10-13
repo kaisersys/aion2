@@ -1,5 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import { supabase } from './supabase';
+import { SITE_CONTENT_SLUG } from './siteContent';
 
 export const CATEGORIES = ['Getting Started', 'Classes', 'Progression', 'Dungeons & Raids', 'PvP & Abyss', 'Professions'] as const;
 
@@ -33,6 +34,7 @@ export async function getPublishedGuides(): Promise<GuideRecord[]> {
   const { data, error } = await supabase.from('guides')
     .select('id, slug, title, category, summary, content, featured, status, author_id, created_at, updated_at, published_at')
     .eq('status', 'published')
+    .neq('slug', SITE_CONTENT_SLUG)
     .order('published_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as GuideRecord[];
