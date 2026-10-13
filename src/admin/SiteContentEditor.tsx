@@ -7,14 +7,19 @@ import {
   type SiteContent, type SiteContentKey, type SiteSnapshot
 } from '../lib/siteContent';
 
-type Props = { userId: string; onBack: () => void; onPublished: () => void };
+type Props = {
+  userId: string; onBack: () => void; onPublished: () => void;
+  /** Optional adapters allow isolated browser tests without changing live Supabase data. */
+  loadSnapshot?: typeof getSiteSnapshot;
+  publishContent?: typeof saveSiteContent;
+};
 const labelFor=(key:SiteContentKey)=>key
   .replace(/([a-z])([A-Z])/g,'$1 $2')
   .replace(/^(Hero|Intro|Navigation|Featured|Join|Library|Footer|Brand|Topic|Category) /,'')
   .replace(/^([a-z])/,(c)=>c.toUpperCase());
 const isLong=(key:SiteContentKey)=>key.toLowerCase().includes('description');
 
-export default function SiteContentEditor({userId,onBack,onPublished}:Props){
+export default function SiteContentEditor({userId,onBack,onPublished,loadSnapshot=getSiteSnapshot,publishContent=saveSiteContent}:Props){
   const [snapshot,setSnapshot]=useState<SiteSnapshot|null>(null);
   const [draft,setDraft]=useState<SiteContent>(()=>normalizeSiteContent({}));
   const [loading,setLoading]=useState(true);
@@ -27,13 +32,13 @@ export default function SiteContentEditor({userId,onBack,onPublished}:Props){
   const dirty=useMemo(()=>snapshot!==null && JSON.stringify(draft)!==JSON.stringify(snapshot.values),[draft,snapshot]);
   useEffect(()=>{
     let mounted=true;
-    void getSiteSnapshot().then(result=>{
+    void loadSnapshot().then(result=>{
       if(!mounted)return;
       setSnapshot(result);setDraft(result.values);
     }).catch(err=>{if(mounted)setError('Could not load site copy: '+String(err?.message||err));})
       .finally(()=>{if(mounted)setLoading(false);});
     return ()=>{mounted=false;};
-  },[]);
+  },[loadSnapshot]);
   useEffect(()=>{
     if(!preview)return;
     const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setPreview(false);};
@@ -52,7 +57,7 @@ export default function SiteContentEditor({userId,onBack,onPublished}:Props){
     if(!snapshot||saving)return;
     setSaving(true);setError('');setNotice('');
     try{
-      const next=await saveSiteContent(draft,snapshot,userId);
+      const next=await publishContent(draft,snapshot,userId);
       setSnapshot(next);setDraft(next.values);setRevisionIndex('0');
       setNotice('Published! Your updated website text is live.');onPublished();
     }catch(err){setError('Could not publish: '+String((err as Error)?.message||err));}
