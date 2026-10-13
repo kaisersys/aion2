@@ -675,3 +675,79 @@
   .hero-aura::after{opacity:.22;transform:none}
   .hero-motes span{opacity:0}
 }
+
+
+/* Starlight v3 · 5/10: brighter, fuller, and more legible without losing the art.
+   Two CSS-only star fields sit above the dark scrim and below text/buttons. */
+.hero-sky{
+  z-index:2;
+  opacity:.53;
+  filter:brightness(1.19) saturate(1.08);
+}
+.hero-sky::before,.hero-sky::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background-repeat:no-repeat;
+  will-change:opacity,transform;
+}
+.hero-sky::before{
+  background-image:
+    radial-gradient(circle at 58% 9%,#fff9edfa 0 1.2px,transparent 2.8px),
+    radial-gradient(circle at 65% 17%,#d9cbffec 0 1.3px,transparent 3px),
+    radial-gradient(circle at 73% 12%,#fff9f4ef 0 1.1px,transparent 2.7px),
+    radial-gradient(circle at 81% 20%,#e7d8ffee 0 1.5px,transparent 3.2px),
+    radial-gradient(circle at 89% 13%,#fff8ebf0 0 1.3px,transparent 3px),
+    radial-gradient(circle at 95% 25%,#cfb7ffe9 0 1.2px,transparent 2.8px),
+    radial-gradient(circle at 62% 29%,#fff8f0ed 0 1.3px,transparent 2.9px),
+    radial-gradient(circle at 72% 33%,#dfd1ffed 0 1.1px,transparent 2.7px),
+    radial-gradient(circle at 84% 32%,#fff9eff0 0 1.3px,transparent 3px),
+    radial-gradient(circle at 92% 39%,#e0cdffee 0 1.2px,transparent 2.9px),
+    radial-gradient(circle at 55% 43%,#f6efffeb 0 1.1px,transparent 2.5px),
+    radial-gradient(circle at 68% 47%,#fff9f0f1 0 1.4px,transparent 3px),
+    radial-gradient(circle at 78% 49%,#cbb9ffed 0 1.3px,transparent 3px),
+    radial-gradient(circle at 89% 54%,#fff9f5f1 0 1.2px,transparent 2.9px),
+    radial-gradient(circle at 60% 61%,#e3d5ffee 0 1.4px,transparent 3.2px),
+    radial-gradient(circle at 72% 66%,#fff6edf0 0 1.2px,transparent 2.9px),
+    radial-gradient(circle at 83% 62%,#d4c2ffed 0 1.1px,transparent 2.7px),
+    radial-gradient(circle at 94% 70%,#fff7eafa 0 1.3px,transparent 3px),
+    radial-gradient(circle at 57% 75%,#d9c8ffed 0 1.2px,transparent 2.8px),
+    radial-gradient(circle at 68% 81%,#fff7edf0 0 1.3px,transparent 3px),
+    radial-gradient(circle at 80% 79%,#dac7ffee 0 1.1px,transparent 2.8px),
+    radial-gradient(circle at 91% 88%,#fff8f2ed 0 1.4px,transparent 3px),
+    radial-gradient(circle at 76% 92%,#d4bcffed 0 1.1px,transparent 2.8px),
+    radial-gradient(circle at 97% 56%,#fff6e9ed 0 1.1px,transparent 2.6px);
+  filter:drop-shadow(0 0 4px #e4d5ff81) drop-shadow(0 0 9px #fff3d854);
+  animation:atreia-starlight-twinkle 9s ease-in-out -2s infinite alternate;
+}
+.hero-sky::after{
+  background-image:
+    radial-gradient(circle at 75% 16%,#fffaf2ff 0 2px,transparent 4.3px),
+    radial-gradient(circle at 90% 27%,#e5cfffed 0 2.2px,transparent 4.7px),
+    radial-gradient(circle at 64% 38%,#fff7effa 0 1.8px,transparent 4px),
+    radial-gradient(circle at 82% 44%,#d8c3fff5 0 2.1px,transparent 4.5px),
+    radial-gradient(circle at 93% 62%,#fff7eafb 0 2px,transparent 4.4px),
+    radial-gradient(circle at 73% 77%,#e4cdfffa 0 2.2px,transparent 4.6px);
+  filter:drop-shadow(0 0 6px #dcc4ff87) drop-shadow(0 0 12px #e3d7ff56);
+  opacity:.58;
+  animation:atreia-starlight-twinkle 13s ease-in-out -6s infinite alternate-reverse;
+}
+@keyframes atreia-starlight-twinkle{
+  from{opacity:.4;transform:translate3d(0,1px,0)}
+  to{opacity:.95;transform:translate3d(0,-3px,0)}
+}
+@media(max-width:760px){
+  .hero-sky{opacity:.45;filter:brightness(1.1)}
+  .hero-sky::before{opacity:.62}
+  .hero-sky::after{opacity:.38}
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-sky::before,.hero-sky::after{
+    animation:none;
+    will-change:auto;
+    transform:none;
+  }
+  .hero-sky::before{opacity:.7}
+  .hero-sky::after{opacity:.48}
+}
