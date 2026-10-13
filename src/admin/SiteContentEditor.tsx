@@ -28,6 +28,7 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
   const [saving,setSaving]=useState(false);
   const [uploadingPhoto,setUploadingPhoto]=useState(false);
   const photoInputRef=useRef<HTMLInputElement>(null);
+  const backdropInputRef=useRef<HTMLInputElement>(null);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [preview,setPreview]=useState(false);
@@ -67,21 +68,22 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
   const setNewsField=(id:string,key:Exclude<keyof UpcomingNewsItem,'id'>,value:string)=>
     editNews(parseNewsItems(draft.newsItemsJson).map(item=>item.id===id?{...item,[key]:value}:item));
   const removeNews=(id:string)=>editNews(parseNewsItems(draft.newsItemsJson).filter(item=>item.id!==id));
-  const uploadPhoto=async(file?:File)=>{
+  const uploadPhoto=async(file?:File,kind:'portrait'|'backdrop'='portrait')=>{
     if(!file || uploadingPhoto)return;
     const extensions:Record<string,string>={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/avif':'avif'};
     const suffix=extensions[file.type];
-    if(!suffix || file.size>5*1024*1024){setError('Choose a JPG, PNG, WebP or AVIF portrait smaller than 5 MB.');return;}
+    const maxBytes=kind==='backdrop'?8*1024*1024:5*1024*1024;
+    if(!suffix || file.size===0 || file.size>maxBytes){setError('Choose a JPG, PNG, WebP or AVIF image under '+(kind==='backdrop'?'8':'5')+' MB.');return;}
     if(!supabase || !userId){setError('Guide Studio must be configured and you must be signed in to upload a portrait.');return;}
     setUploadingPhoto(true);setError('');setNotice('');
     try{
-      const filename='profiles/'+userId+'/'+crypto.randomUUID()+'.'+suffix;
+      const filename='profiles/'+userId+'/'+(kind==='backdrop'?'backdrops/':'portraits/')+crypto.randomUUID()+'.'+suffix;
       const {error:uploadError}=await supabase.storage.from('guide-images').upload(filename,file,{contentType:file.type,upsert:false});
       if(uploadError)throw uploadError;
       const {data}=supabase.storage.from('guide-images').getPublicUrl(filename);
       if(!validProfilePhotoUrl(data.publicUrl))throw new Error('Could not verify the uploaded image URL.');
-      setDraft(prev=>({...prev,profilePhotoUrl:data.publicUrl}));
-      setNotice('Portrait uploaded. Select Publish changes to display it on the website. Uploaded images are publicly accessible even before publishing.');
+      setDraft(prev=>({...prev,[kind==='backdrop'?'profileBackdropUrl':'profilePhotoUrl']:data.publicUrl}));
+      setNotice((kind==='backdrop'?'Background':'Portrait')+' uploaded. Select Publish changes to display it on the website. Uploaded images are publicly accessible even before publishing.');
     }catch(err){setError('Portrait upload failed: '+String((err as Error)?.message||err));}
     finally{setUploadingPhoto(false);}
   };
@@ -148,17 +150,38 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
                   </div>)}
                   <small>Maximum {NEWS_LIMIT} announcements. Dates use Pacific time. Only HTTPS source links are accepted.</small>
                 </div>
+              : key==='profileBackdropUrl'
+              ? <div key={key} className="site-copy-photo-field site-copy-wide site-copy-backdrop-field">
+                  <span className="site-copy-photo-label">Full-width About Me background</span>
+                  <div className="site-copy-photo-layout site-copy-backdrop-layout">
+                    <div className="site-copy-backdrop-preview">
+                      <img src={draft.profileBackdropUrl || '/assets/hero/aion-hero-purple.avif?v=hd2'} alt="Background banner preview"/>
+                      {!draft.profileBackdropUrl&&<span>DEFAULT ARTWORK</span>}
+                    </div>
+                    <div className="site-copy-photo-actions">
+                      <p>Upload the full-bleed scene behind your About Me section. Use a wide image (ideally 16:9 or 21:9), JPG, PNG, WebP, or AVIF, up to 8 MB. The existing hero painting is the fallback until you upload one.</p>
+                      <input ref={backdropInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif"
+                        aria-label="Select About Me background image" hidden
+                        onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void uploadPhoto(file,'backdrop');}}/>
+                      <div className="site-copy-photo-buttons">
+                        <button type="button" className="studio-quiet-button" disabled={uploadingPhoto||saving} onClick={()=>backdropInputRef.current?.click()}><ImagePlus size={16}/>{uploadingPhoto?'Uploading...':draft.profileBackdropUrl?'Replace background':'Upload background'}</button>
+                        {draft.profileBackdropUrl&&<button type="button" className="studio-quiet-button" disabled={uploadingPhoto||saving} onClick={()=>update('profileBackdropUrl','')}>Use default artwork</button>}
+                      </div>
+                      <small>Background and portrait are two separate uploads. Image files become public immediately; click Publish changes to update the homepage.</small>
+                    </div>
+                  </div>
+                </div>
               : key==='profilePhotoUrl'
               ? <div key={key} className="site-copy-photo-field site-copy-wide">
-                  <span className="site-copy-photo-label">Your landscape photo</span>
+                  <span className="site-copy-photo-label">Your smaller portrait</span>
                   <div className="site-copy-photo-layout">
                     <div className="site-copy-photo-preview">{draft.profilePhotoUrl
-                      ? <img src={draft.profilePhotoUrl} alt="Your landscape profile photo preview"/>
+                      ? <img src={draft.profilePhotoUrl} alt="Your personal portrait preview"/>
                       : <div className="site-copy-photo-placeholder"><ImagePlus size={28}/><span>No photo uploaded</span></div>}</div>
                     <div className="site-copy-photo-actions">
-                      <p>Upload a landscape photo for the About Me section. JPG, PNG, WebP or AVIF, up to 5 MB. A 16:10 or 3:2 image works best; other shapes are cropped to fit.</p>
+                      <p>Upload your smaller portrait or character avatar in front of the background. JPG, PNG, WebP, or AVIF, up to 5 MB. A 4:5 or square image works best.</p>
                       <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" hidden
-                        onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void uploadPhoto(file);}}/>
+                        onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void uploadPhoto(file,'portrait');}}/>
                       <div className="site-copy-photo-buttons">
                         <button type="button" className="studio-quiet-button" disabled={uploadingPhoto||saving} onClick={()=>photoInputRef.current?.click()}><ImagePlus size={16}/>{uploadingPhoto?'Uploading...':draft.profilePhotoUrl?'Replace photo':'Upload photo'}</button>
                         {draft.profilePhotoUrl&&<button type="button" className="studio-quiet-button" disabled={uploadingPhoto||saving} onClick={()=>update('profilePhotoUrl','')}>Remove photo</button>}
@@ -219,9 +242,12 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
             <div className="site-copy-preview-search"><strong>{draft.heroFinderTitle}</strong><span>{draft.heroSearchPlaceholder}</span><b>{draft.heroSearchButton}</b></div>
           </section>
           <section className="site-copy-preview-profile">
+            <div className="site-copy-preview-profile-backdrop" aria-hidden="true">
+              <img src={draft.profileBackdropUrl || '/assets/hero/aion-hero-purple.avif?v=hd2'} alt=""/>
+            </div>
             <div className="site-copy-preview-portrait">{draft.profilePhotoUrl
               ? <img src={draft.profilePhotoUrl} alt={'Photo of '+draft.profileName}/>
-              : <div className="site-copy-photo-placeholder"><ImagePlus size={28}/><span>Landscape photo placeholder</span></div>}</div>
+              : <div className="site-copy-photo-placeholder"><ImagePlus size={28}/><span>Portrait placeholder</span></div>}</div>
             <div><div className="section-kicker">{draft.profileEyebrow}</div>
               <h2>{draft.profileTitle} <i>{draft.profileAccent}</i></h2>
               <strong>{draft.profileName}</strong><small>{draft.profileRole}</small>
