@@ -121,11 +121,8 @@ export const SITE_CONTENT_GROUPS: { title: string; keys: SiteContentKey[] }[] = 
   {title:'Homepage · Hero', keys:['heroEyebrow','heroTitle','heroAccent','heroDescription','heroButton','heroFinderTitle','heroSearchPlaceholder','heroSearchButton','heroTopicTitle','heroScrollLeft','heroScrollRight']},
   {title:'Homepage · Guide topics', keys:['topicClasses','topicGear','topicDungeons','topicAbyss','topicCrafting','topicAll']},
   {title:'Homepage · About me', keys:['profileEyebrow','profileTitle','profileAccent','profileName','profileRole','profileBio','profileBackdropUrl','profilePhotoUrl']},
-  {title:'Homepage · Start here', keys:['journeyEyebrow','journeyTitle','journeyAccent','journeyDescription','journeyStepOneLabel','journeyStepOneTitle','journeyStepOneDescription','journeyStepTwoLabel','journeyStepTwoTitle','journeyStepTwoDescription','journeyStepThreeLabel','journeyStepThreeTitle','journeyStepThreeDescription','journeyCardButton']},
   {title:'Homepage · Upcoming news', keys:['newsEyebrow','newsTitle','newsAccent','newsDescription','newsSourceLabel','newsEmpty','newsItemsJson']},
-  {title:'Homepage · Featured & banner', keys:['featuredEyebrow','featuredTitle','featuredAccent','featuredButton','joinEyebrow','joinTitle','joinAccent','joinDescription','joinButton']},
   {title:'Homepage · Recently updated', keys:['latestEyebrow','latestTitle','latestAccent','latestDescription','latestButton','latestEmpty']},
-  {title:'Homepage · About the codex', keys:['missionEyebrow','missionTitle','missionAccent','missionDescription','missionOneTitle','missionOneDescription','missionTwoTitle','missionTwoDescription','missionThreeTitle','missionThreeDescription','missionButton']},
   {title:'Navigation & branding', keys:['brandTitle','brandAccent','brandSubtitle','navigationHome','navigationFinder','navigationDiscover','navigationClasses','navigationChallenges','navigationAllGuides','navigationAdmin']},
   {title:'Guide library', keys:['libraryEyebrow','libraryTitle','libraryAccent','libraryDescription','librarySearchPlaceholder']},
   {title:'Footer', keys:['footerBrand','footerTag','footerDescription','footerClosing']}
