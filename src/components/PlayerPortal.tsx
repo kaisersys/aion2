@@ -1,6 +1,6 @@
 import React, {useEffect,useMemo,useState} from 'react';
 import type {User} from '@supabase/supabase-js';
-import {ArrowLeft,ArrowUpRight,Bookmark,BookOpen,CalendarCheck,Check,LockKeyhole,LogOut,Save,ShieldCheck,Sparkles,UserRound} from 'lucide-react';
+import {ArrowLeft,ArrowUpRight,Bookmark,BookOpen,CalendarCheck,Check,LogOut,Save,ShieldCheck,Sparkles,UserRound} from 'lucide-react';
 import {supabase,isSupabaseConfigured} from '../lib/supabase';
 import {
   DAILY_TASKS,WEEKLY_TASKS,PLAYER_CLASSES,pacificPeriod,taskPeriod,recommendedGuides,
@@ -94,7 +94,7 @@ export default function PlayerPortal({user,guides,onBack,onGuide,onLibrary}:Prop
         if(password.length<8)throw new Error('Password must contain at least 8 characters.');
         const {data,error:authError}=await supabase.auth.signUp({
           email:email.trim(),password,
-          options:{data:{display_name:displayName},emailRedirectTo:window.location.origin+'/#/account'}
+          options:{data:{display_name:displayName},emailRedirectTo:window.location.origin+'/?welcome=1'}
         });
         if(authError)throw authError;
         setNotice(data.session?'Account created! Loading your dashboard.':'Check your inbox for a confirmation link, then return here to sign in. Your account does not grant editing privileges.');
@@ -139,7 +139,7 @@ export default function PlayerPortal({user,guides,onBack,onGuide,onLibrary}:Prop
     setActiveTask(key);setError('');setNotice('');
     const request=wasDone
       ? supabase.from('player_task_completions').delete().eq('user_id',user.id).eq('task_key',task.key).eq('period_start',periodStart)
-      : supabase.from('player_task_completions').upsert({user_id:user.id,task_key:task.key,period_start:periodStart},{onConflict:'user_id,task_key,period_start'});
+      : supabase.from('player_task_completions').insert({user_id:user.id,task_key:task.key,period_start:periodStart});
     const {error:taskError}=await request;
     if(taskError)setError(friendlyError(taskError));
     else setCompleted(current=>wasDone?current.filter(k=>k!==key):[...current,key]);
@@ -151,7 +151,7 @@ export default function PlayerPortal({user,guides,onBack,onGuide,onLibrary}:Prop
     const wasSaved=saved.includes(slug);
     const request=wasSaved
       ? supabase.from('player_saved_guides').delete().eq('user_id',user.id).eq('guide_slug',slug)
-      : supabase.from('player_saved_guides').upsert({user_id:user.id,guide_slug:slug},{onConflict:'user_id,guide_slug'});
+      : supabase.from('player_saved_guides').insert({user_id:user.id,guide_slug:slug});
     const {error:saveError}=await request;
     if(saveError)setError(friendlyError(saveError));
     else setSaved(current=>wasSaved?current.filter(s=>s!==slug):[...current,slug]);
@@ -169,7 +169,7 @@ export default function PlayerPortal({user,guides,onBack,onGuide,onLibrary}:Prop
     <p className="player-note">Player accounts are not connected to the site's authentication provider yet. The site owner must configure Supabase to enable sign-ups.</p>
   </main>;
 
-  if(!user)return <main className="player-page inner-page section-wrap">
+  if(!user||mode==='password')return <main className="player-page inner-page section-wrap">
     <button className="back-link" onClick={onBack}><ArrowLeft size={16}/> BACK TO HOME</button>
     <div className="player-auth-grid">
       <div className="player-auth-intro">
