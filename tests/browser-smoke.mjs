@@ -154,6 +154,12 @@ try {
     });
     check(fontCheck.heroFont.includes('Manrope') && fontCheck.bodyFont.includes('Inter'),'hero uses Manrope while reading copy stays Inter');
     check(!fontCheck.overflows,'updated headings do not overflow desktop');
+    const creatorDesktop=await page.locator('.creator-portrait').evaluate(node=>{
+      const rect=node.getBoundingClientRect();
+      return {width:rect.width,ratio:rect.width/rect.height};
+    });
+    check(creatorDesktop.width>=310 && creatorDesktop.ratio>1.5 && creatorDesktop.ratio<1.7,
+      'About Me image is a larger 16:10 landscape frame on desktop');
     check(await page.locator('.upcoming-news').count()===1 &&
       await page.locator('.intro .category-grid').count()===0,
       'upcoming AION 2 news replaces the old destination category tiles');
@@ -225,6 +231,13 @@ try {
     await page.waitForTimeout(120);
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),
       'mobile hero does not cause horizontal overflow');
+    const creatorMobile=await page.locator('.creator-portrait').evaluate(node=>{
+      const rect=node.getBoundingClientRect();
+      return {width:rect.width,ratio:rect.width/rect.height,overflow:rect.right>innerWidth+1};
+    });
+    check(creatorMobile.width>=280 && creatorMobile.ratio>1.5 &&
+      creatorMobile.ratio<1.7 && !creatorMobile.overflow,
+      'landscape About Me image remains wide and fits narrow mobile screens');
     const mobileAtmosphere=await page.evaluate(()=>({
       fewerParticles:getComputedStyle(document.querySelector('.hero-motes span:nth-child(12)')).display==='none',
       softerAura:Number(getComputedStyle(document.querySelector('.hero-aura')).opacity)<.5,
