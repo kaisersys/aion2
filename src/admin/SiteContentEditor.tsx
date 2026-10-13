@@ -99,8 +99,8 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
             {SITE_CONTENT_GROUPS[section].keys.map(key=><label key={key} className={isLong(key)?'site-copy-wide':''}>
               <span>{labelFor(key)}</span>
               {isLong(key)
-                ? <textarea rows={3} maxLength={siteContentLimit(key)} value={draft[key]} onChange={e=>update(key,e.target.value)} />
-                : <input value={draft[key]} maxLength={siteContentLimit(key)} onChange={e=>update(key,e.target.value)}/>}
+                ? <textarea aria-label={labelFor(key)} rows={3} maxLength={siteContentLimit(key)} value={draft[key]} onChange={e=>update(key,e.target.value)} />
+                : <input aria-label={labelFor(key)} value={draft[key]} maxLength={siteContentLimit(key)} onChange={e=>update(key,e.target.value)}/>}
               <small aria-hidden="true">{draft[key].length} / {siteContentLimit(key)} characters</small>
             </label>)}
           </div>
