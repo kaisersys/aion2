@@ -6,6 +6,7 @@ const AdminPanel = React.lazy(() => import('./admin/AdminPanel'));
 const GuideArticle = React.lazy(() => import('./components/GuideArticle'));
 import { getPublishedGuides, type GuideRecord } from './lib/guides';
 import { isSupabaseConfigured } from './lib/supabase';
+import { DEFAULT_SITE_CONTENT, getSiteContent, type SiteContent } from './lib/siteContent';
 import type { JSONContent } from '@tiptap/core';
 
 type Guide={slug:string;title:string;category:string;summary:string;read:string;accent:string;body:string[];featured?:boolean;content?:JSONContent};
@@ -27,11 +28,20 @@ function routeFromHash():string {
   }
   return 'home';
 }
-const navigation=[{title:'DISCOVER',items:['Getting Started','Progression','Professions']},{title:'CLASSES',items:['Classes']},{title:'CHALLENGES',items:['Dungeons & Raids','PvP & Abyss']}];
 function App(){
  const [page,setPage]=useState(routeFromHash);const [category,setCategory]=useState('All Guides');const [search,setSearch]=useState('');const [finderQuery,setFinderQuery]=useState('');const [finderFocused,setFinderFocused]=useState(false);const [menu,setMenu]=useState(false);const [openMenu,setOpenMenu]=useState<string|null>(null);
  const heroRef=useRef<HTMLElement|null>(null);
  const [publishedGuides,setPublishedGuides]=useState<GuideRecord[]>([]);
+ const [siteContent,setSiteContent]=useState<SiteContent>({...DEFAULT_SITE_CONTENT});
+ const t=siteContent;
+ const navigation=[{title:t.navigationDiscover,items:['Getting Started','Progression','Professions']},
+   {title:t.navigationClasses,items:['Classes']},
+   {title:t.navigationChallenges,items:['Dungeons & Raids','PvP & Abyss']}];
+ const refreshSiteContent=useCallback(async()=>{
+   try{setSiteContent(await getSiteContent());}
+   catch(error){console.error('Unable to load site text; using defaults.',error);}
+ },[]);
+ useEffect(()=>{void refreshSiteContent();},[refreshSiteContent]);
  const [guidesError,setGuidesError]=useState('');
  const [guidesLoading,setGuidesLoading]=useState(isSupabaseConfigured);
  const refreshGuides=useCallback(async()=>{
@@ -125,39 +135,39 @@ function App(){
  },[page,publishedGuides.length]);
  const choose=(cat:string)=>{setSearch('');setFinderQuery('');setFinderFocused(false);setCategory(cat);go('library');};
  const openSuggestion=(slug:string)=>{setFinderQuery('');setFinderFocused(false);go(slug)};
- const quickTopics=[{label:'CLASSES',category:'Classes',icon:<Swords size={19}/>},{label:'GEAR',category:'Progression',icon:<Gem size={19}/>},{label:'DUNGEONS',category:'Dungeons & Raids',icon:<Shield size={19}/>},{label:'ABYSS',category:'PvP & Abyss',icon:<Compass size={19}/>},{label:'CRAFTING',category:'Professions',icon:<ScrollText size={19}/>},{label:'ALL GUIDES',category:'All Guides',icon:<BookOpen size={19}/>}];
+ const quickTopics=[{label:t.topicClasses,category:'Classes',icon:<Swords size={19}/>},{label:t.topicGear,category:'Progression',icon:<Gem size={19}/>},{label:t.topicDungeons,category:'Dungeons & Raids',icon:<Shield size={19}/>},{label:t.topicAbyss,category:'PvP & Abyss',icon:<Compass size={19}/>},{label:t.topicCrafting,category:'Professions',icon:<ScrollText size={19}/>},{label:t.topicAll,category:'All Guides',icon:<BookOpen size={19}/>}];
  return <div className="site">
-   <header className="header"><button className="brand" onClick={()=>go('home')} aria-label="Home"><img className="brand-logo" src="/assets/branding/aion-logo.avif" alt="Aion" width="110" height="74"/><span className="brand-lines"><strong>ATREIA <em>STREET</em></strong><small>INDEPENDENT GUILD CODEX</small></span></button>
+   <header className="header"><button className="brand" onClick={()=>go('home')} aria-label="Home"><img className="brand-logo" src="/assets/branding/aion-logo.avif" alt="Aion" width="110" height="74"/><span className="brand-lines"><strong>{t.brandTitle} <em>{t.brandAccent}</em></strong><small>{t.brandSubtitle}</small></span></button>
    <nav className={'nav '+(menu?'nav-open':'')} aria-label="Main navigation">
-   <button className="nav-link" onClick={()=>go('home')}>HOME</button><button className="nav-link nav-emphasis" onClick={()=>choose('All Guides')}>GUIDE FINDER <ArrowUpRight size={13}/></button>
+   <button className="nav-link" onClick={()=>go('home')}>{t.navigationHome}</button><button className="nav-link nav-emphasis" onClick={()=>choose('All Guides')}>{t.navigationFinder} <ArrowUpRight size={13}/></button>
    {navigation.map(n=><div className="nav-group" key={n.title} onMouseEnter={()=>setOpenMenu(n.title)} onMouseLeave={()=>setOpenMenu(null)}>
     <button className="nav-link" aria-expanded={openMenu===n.title} onClick={()=>setOpenMenu(openMenu===n.title?null:n.title)}>{n.title}<ChevronDown size={13}/></button>
     <div className={'dropdown '+(openMenu===n.title?'show':'')}>{n.items.map(item=><button key={item} onClick={()=>choose(item)}><span>{item}</span><ChevronRight size={14}/></button>)}</div>
    </div>)}
-   <button className="nav-link" onClick={()=>choose('All Guides')}>ALL GUIDES</button><button className="nav-link mobile-admin-link" onClick={()=>go('admin')}>ADMIN AREA</button>
-   </nav><div className="header-actions"><button className="header-search" onClick={()=>go('library')} aria-label="Search guides"><Search size={19}/></button><button className="outline-button" onClick={()=>go('admin')}>ADMIN <ArrowUpRight size={14}/></button><button className="mobile-toggle" onClick={()=>setMenu(!menu)} aria-label="Toggle menu">{menu?<X/>:<Menu/>}</button></div></header>
+   <button className="nav-link" onClick={()=>choose('All Guides')}>{t.navigationAllGuides}</button><button className="nav-link mobile-admin-link" onClick={()=>go('admin')}>{t.navigationAdmin}</button>
+   </nav><div className="header-actions"><button className="header-search" onClick={()=>go('library')} aria-label="Search guides"><Search size={19}/></button><button className="outline-button" onClick={()=>go('admin')}>{t.navigationAdmin} <ArrowUpRight size={14}/></button><button className="mobile-toggle" onClick={()=>setMenu(!menu)} aria-label="Toggle menu">{menu?<X/>:<Menu/>}</button></div></header>
    {page==='home'? <><section className="hero" ref={heroRef}><div className="hero-art" aria-hidden="true"/><div className="hero-sky" aria-hidden="true"/><div className="hero-foreground" aria-hidden="true"/><div className="hero-aura" aria-hidden="true"/><div className="hero-motes" aria-hidden="true">{Array.from({length:18},(_,index)=><span key={index}/>)}</div>
    <div className="hero-content">
     <div className="hero-copy">
-     <div className="eyebrow"><span/>A SANCTUARY OF KNOWLEDGE<span/></div><h1>THE PATH OF<br/><i>THE DAEVA</i></h1><div className="ornament">✧ ─── ✦ ─── ✧</div><p>Knowledge is our greatest weapon. Explore battle-tested guides, discoveries, and wisdom from your fellow guild members.</p><button className="gold-button" onClick={()=>choose('All Guides')}>EXPLORE THE CODEX <ArrowUpRight size={16}/></button>
+     <div className="eyebrow"><span/>{t.heroEyebrow}<span/></div><h1>{t.heroTitle}<br/><i>{t.heroAccent}</i></h1><div className="ornament">✧ ─── ✦ ─── ✧</div><p>{t.heroDescription}</p><button className="gold-button" onClick={()=>choose('All Guides')}>{t.heroButton} <ArrowUpRight size={16}/></button>
      <div className="hero-finder">
     <form className="finder-form" role="search" onSubmit={e=>{e.preventDefault();setSearch(finderQuery.trim());setCategory('All Guides');setFinderFocused(false);go('library')}}>
-     <div className="finder-label"><Search size={15}/> FIND YOUR GUIDE</div>
+     <div className="finder-label"><Search size={15}/> {t.heroFinderTitle}</div>
      <div className="finder-field-wrap">
-      <label className="finder-field"><Search size={20}/><input type="search" value={finderQuery} onChange={e=>setFinderQuery(e.target.value)} onFocus={()=>setFinderFocused(true)} placeholder="Search builds, classes, dungeons..." aria-label="Search guides"/></label>
-      <button type="submit" className="finder-submit">SEARCH <ArrowUpRight size={15}/></button>
+      <label className="finder-field"><Search size={20}/><input type="search" value={finderQuery} onChange={e=>setFinderQuery(e.target.value)} onFocus={()=>setFinderFocused(true)} placeholder={t.heroSearchPlaceholder} aria-label="Search guides"/></label>
+      <button type="submit" className="finder-submit">{t.heroSearchButton} <ArrowUpRight size={15}/></button>
       {finderFocused&&finderQuery.trim()&&<div className="finder-suggestions" aria-label="Matching guides">{suggestions.length? suggestions.map(g=><button type="button" key={g.slug} onClick={()=>openSuggestion(g.slug)}><span><strong>{g.title}</strong><small>{g.category}</small></span><ArrowUpRight size={16}/></button>):<div className="finder-empty">No exact matches. Press Search to explore the full library.</div>}</div>}
      </div>
     </form>
-    <div className="finder-topics"><div className="finder-label"><Sparkles size={15}/> BROWSE BY TOPIC</div><div className="finder-topic-grid">{quickTopics.map(topic=><button key={topic.label} type="button" onClick={()=>choose(topic.category)} className="finder-topic">{topic.icon}<span>{topic.label}</span></button>)}</div></div>
+    <div className="finder-topics"><div className="finder-label"><Sparkles size={15}/> {t.heroTopicTitle}</div><div className="finder-topic-grid">{quickTopics.map(topic=><button key={topic.label} type="button" onClick={()=>choose(topic.category)} className="finder-topic">{topic.icon}<span>{topic.label}</span></button>)}</div></div>
    </div>
     </div>
-   </div><div className="hero-bottom"><span>SCROLL TO DISCOVER</span><span className="line"/><span>THE GUILD ARCHIVES</span></div></section>
-   <section className="intro section-wrap"><div className="section-kicker">✦ &nbsp; THE GUILD ARCHIVES &nbsp; ✦</div><h2>Discover Your <i>Destiny</i></h2><p className="section-description">From your first steps in Atreia to the fiercest battles, every journey begins with knowledge.</p><div className="category-grid">{[{title:'CLASS GUIDES',sub:'Master your calling',icon:<Swords size={30}/>,cat:'Classes',style:'gold'},{title:'GEAR & PROGRESSION',sub:'Forge your strength',icon:<Gem size={30}/>,cat:'Progression',style:'violet'},{title:'DUNGEONS & RAIDS',sub:'Face the unknown',icon:<Shield size={30}/>,cat:'Dungeons & Raids',style:'ice'},{title:'THE ABYSS',sub:'Conquer the skies',icon:<Compass size={30}/>,cat:'PvP & Abyss',style:'red'}].map(c=><button className={'category-tile '+c.style} key={c.title} onClick={()=>choose(c.cat)}><span className="tile-icon">{c.icon}</span><div><strong>{c.title}</strong><small>{c.sub}</small></div><ArrowUpRight className="tile-arrow" size={19}/></button>)}</div></section>
-   <section className="featured section-wrap"><div className="section-top"><div><div className="section-kicker left">CURATED BY THE GUILD</div><h2>Featured <i>Guides</i></h2></div><button className="text-action" onClick={()=>choose('All Guides')}>VIEW ALL GUIDES <ArrowUpRight size={17}/></button></div><div className="guide-grid">{guides.filter(g=>g.featured).map(g=><GuideCard guide={g} key={g.slug} onClick={()=>go(g.slug)}/>)}</div></section>
-   <section className="join-banner"><span>THE JOURNEY IS BETTER TOGETHER</span><h2>United by <i>Purpose</i></h2><p>Built for our guild. Written by our adventurers. Shared with everyone.</p><button className="gold-button" onClick={()=>choose('All Guides')}>ENTER THE ARCHIVES <ArrowUpRight size={16}/></button></section></>:
-   page==='library'?<main className="inner-page section-wrap"><button className="back-link" onClick={()=>go('home')}><ArrowLeft size={16}/> BACK TO HOME</button><div className="section-kicker left">THE KNOWLEDGE ARCHIVE</div><h1>Guild <i>Guides</i></h1><p className="page-intro">Explore field manuals, class builds, progression paths, and guild strategies.</p><div className="library-controls"><label className="search-box"><Search size={20}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search guides..." aria-label="Search guides"/></label><select value={category} onChange={e=>setCategory(e.target.value)} aria-label="Filter by category">{['All Guides',...new Set(guides.map(g=>g.category))].map(c=><option key={c}>{c}</option>)}</select></div>{guidesError&&<p role="status" className="studio-message">{guidesError}</p>}<div className="guide-grid">{filtered.map(g=><GuideCard key={g.slug} guide={g} onClick={()=>go(g.slug)}/>)}</div>{filtered.length===0&&<p>No matching guides. Try another search.</p>}</main>:
-   page==='admin'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading Guide Studio...</p></main>}><AdminPanel onExit={()=>go('home')} onContentChanged={()=>{void refreshGuides()}}/></React.Suspense>:
+   </div><div className="hero-bottom"><span>{t.heroScrollLeft}</span><span className="line"/><span>{t.heroScrollRight}</span></div></section>
+   <section className="intro section-wrap"><div className="section-kicker">✦ &nbsp; {t.introEyebrow} &nbsp; ✦</div><h2>{t.introTitle} <i>{t.introAccent}</i></h2><p className="section-description">{t.introDescription}</p><div className="category-grid">{[{title:t.categoryClassesTitle,sub:t.categoryClassesDescription,icon:<Swords size={30}/>,cat:'Classes',style:'gold'},{title:t.categoryGearTitle,sub:t.categoryGearDescription,icon:<Gem size={30}/>,cat:'Progression',style:'violet'},{title:t.categoryDungeonsTitle,sub:t.categoryDungeonsDescription,icon:<Shield size={30}/>,cat:'Dungeons & Raids',style:'ice'},{title:t.categoryAbyssTitle,sub:t.categoryAbyssDescription,icon:<Compass size={30}/>,cat:'PvP & Abyss',style:'red'}].map(c=><button className={'category-tile '+c.style} key={c.title} onClick={()=>choose(c.cat)}><span className="tile-icon">{c.icon}</span><div><strong>{c.title}</strong><small>{c.sub}</small></div><ArrowUpRight className="tile-arrow" size={19}/></button>)}</div></section>
+   <section className="featured section-wrap"><div className="section-top"><div><div className="section-kicker left">{t.featuredEyebrow}</div><h2>{t.featuredTitle} <i>{t.featuredAccent}</i></h2></div><button className="text-action" onClick={()=>choose('All Guides')}>{t.featuredButton} <ArrowUpRight size={17}/></button></div><div className="guide-grid">{guides.filter(g=>g.featured).map(g=><GuideCard guide={g} key={g.slug} onClick={()=>go(g.slug)}/>)}</div></section>
+   <section className="join-banner"><span>{t.joinEyebrow}</span><h2>{t.joinTitle} <i>{t.joinAccent}</i></h2><p>{t.joinDescription}</p><button className="gold-button" onClick={()=>choose('All Guides')}>{t.joinButton} <ArrowUpRight size={16}/></button></section></>:
+   page==='library'?<main className="inner-page section-wrap"><button className="back-link" onClick={()=>go('home')}><ArrowLeft size={16}/> BACK TO HOME</button><div className="section-kicker left">{t.libraryEyebrow}</div><h1>{t.libraryTitle} <i>{t.libraryAccent}</i></h1><p className="page-intro">{t.libraryDescription}</p><div className="library-controls"><label className="search-box"><Search size={20}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t.librarySearchPlaceholder} aria-label="Search guides"/></label><select value={category} onChange={e=>setCategory(e.target.value)} aria-label="Filter by category">{['All Guides',...new Set(guides.map(g=>g.category))].map(c=><option key={c}>{c}</option>)}</select></div>{guidesError&&<p role="status" className="studio-message">{guidesError}</p>}<div className="guide-grid">{filtered.map(g=><GuideCard key={g.slug} guide={g} onClick={()=>go(g.slug)}/>)}</div>{filtered.length===0&&<p>No matching guides. Try another search.</p>}</main>:
+   page==='admin'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading Guide Studio...</p></main>}><AdminPanel onExit={()=>go('home')} onContentChanged={()=>{void refreshGuides();void refreshSiteContent();}}/></React.Suspense>:
    current?<React.Suspense fallback={<main className="inner-page article-wrap"><p>Loading guide...</p></main>}>
      <GuideArticle key={current.slug} guide={current} onBack={()=>go('library')}/>
    </React.Suspense>:page.startsWith('guide:')?<main className="inner-page section-wrap">
@@ -167,7 +177,7 @@ function App(){
      {!guidesLoading&&<p className="page-intro">This guide may not exist yet, or it has not been published. Only published posts are visible to visitors.</p>}
    </main>:null}
 
-   <footer><div className="footer-brand">✦ &nbsp; AION II <span>GUILD CODEX</span></div><p>An independent fan-made community guide project. Not affiliated with or endorsed by NCSOFT.</p><div>FORGED IN KNOWLEDGE · UNITED IN PURPOSE</div></footer>
+   <footer><div className="footer-brand">✦ &nbsp; {t.footerBrand} <span>{t.footerTag}</span></div><p>{t.footerDescription}</p><div>{t.footerClosing}</div></footer>
  </div>
 }
 function GuideCard({guide,onClick}:{guide:Guide;onClick:()=>void}){return <button className={'guide-card '+guide.accent} onClick={onClick}><div className="card-visual"><span className="card-glyph">{guide.accent==='gold'?'⌁':guide.accent==='violet'?'✧':guide.accent==='red'?'✦':'◇'}</span></div><div className="card-content"><span className="card-category">{guide.category.toUpperCase()} <span>• {guide.read}</span></span><h3>{guide.title}</h3><p>{guide.summary}</p><span className="card-action">READ GUIDE <ArrowUpRight size={15}/></span></div></button>}
