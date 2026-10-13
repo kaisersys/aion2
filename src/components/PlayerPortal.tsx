@@ -2,6 +2,7 @@ import React, {useEffect,useMemo,useState} from 'react';
 import type {User} from '@supabase/supabase-js';
 import {ArrowLeft,ArrowUpRight,Bookmark,BookOpen,CalendarCheck,Check,LogOut,Save,ShieldCheck,Sparkles,UserRound} from 'lucide-react';
 import {supabase,isSupabaseConfigured} from '../lib/supabase';
+import {ensurePlayerProfile} from '../lib/playerProfile';
 import {
   DAILY_TASKS,WEEKLY_TASKS,PLAYER_CLASSES,pacificPeriod,taskPeriod,recommendedGuides,
   type PlayerProfile,type PlayerTask,type SuggestedGuide
@@ -62,16 +63,7 @@ export default function PlayerPortal({user,guides,onBack,onGuide,onLibrary}:Prop
           client.from('player_saved_guides').select('guide_slug').eq('user_id',user.id)
         ]);
         if(p.error||t.error||g.error)throw p.error||t.error||g.error;
-        let record=p.data as PlayerProfile|null;
-        if(!record){
-          const rawName=String(user.user_metadata?.display_name||user.email?.split('@')[0]||'Daeva');
-          const safeName=rawName.trim().slice(0,40)||'Daeva';
-          const created=await client.from('player_profiles')
-            .insert({user_id:user.id,display_name:safeName})
-            .select('user_id,display_name,class_name,faction').single();
-          if(created.error)throw created.error;
-          record=created.data as PlayerProfile;
-        }
+        const record=await ensurePlayerProfile(client,user,p.data as PlayerProfile|null);
         if(!valid)return;
         setProfile(record);
         setProfileDraft({display_name:record.display_name,class_name:record.class_name,faction:record.faction});
