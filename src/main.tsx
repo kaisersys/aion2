@@ -119,6 +119,7 @@ function App(){
    body:[],featured:g.featured,content:g.content
  }));
  const guides:Guide[]=[...dynamicGuides,...starterGuides.filter(g=>!dynamicGuides.some(d=>d.slug===g.slug))];
+ const recentGuides=publishedGuides.slice().sort((a,b)=>Date.parse(b.updated_at)-Date.parse(a.updated_at)).slice(0,3);
  const current=guides.find(g=>page==='guide:'+g.slug);const filtered=guides.filter(g=>(category==='All Guides'||g.category===category)&&(g.title+' '+g.summary+' '+g.category).toLowerCase().includes(search.toLowerCase()));
  const suggestions=finderQuery.trim()?guides.filter(g=>(g.title+' '+g.category+' '+g.summary).toLowerCase().includes(finderQuery.toLowerCase())).slice(0,4):[];
  const go=(slug:string)=>{
@@ -163,6 +164,21 @@ function App(){
    </div>
     </div>
    </div><div className="hero-bottom"><span>{t.heroScrollLeft}</span><span className="line"/><span>{t.heroScrollRight}</span></div></section>
+   <section className="creator section-wrap" aria-labelledby="creator-heading">
+     <div className="creator-shell">
+       <div className="creator-portrait">
+         {t.profilePhotoUrl
+           ? <img src={t.profilePhotoUrl} alt={'Portrait of '+t.profileName} loading="lazy"/>
+           : <div className="creator-portrait-placeholder"><Compass size={58} strokeWidth={1}/><span>ATREIA STREET</span></div>}
+       </div>
+       <div className="creator-copy">
+         <div className="section-kicker left">{t.profileEyebrow}</div>
+         <h2 id="creator-heading">{t.profileTitle} <i>{t.profileAccent}</i></h2>
+         <div className="creator-byline"><span>{t.profileName}</span><span className="creator-dot" aria-hidden="true"/><small>{t.profileRole}</small></div>
+         <div className="creator-bio">{t.profileBio.split(/\n+/).map((paragraph,index)=><p key={index}>{paragraph}</p>)}</div>
+       </div>
+     </div>
+   </section>
    <section className="journey section-wrap" aria-labelledby="journey-heading">
      <div className="journey-heading"><div><div className="section-kicker left">{t.journeyEyebrow}</div><h2 id="journey-heading">{t.journeyTitle} <i>{t.journeyAccent}</i></h2></div><p>{t.journeyDescription}</p></div>
      <div className="journey-grid">{[
@@ -177,6 +193,19 @@ function App(){
    </section>
    <section className="intro section-wrap"><div className="section-kicker">✦ &nbsp; {t.introEyebrow} &nbsp; ✦</div><h2>{t.introTitle} <i>{t.introAccent}</i></h2><p className="section-description">{t.introDescription}</p><div className="category-grid">{[{title:t.categoryClassesTitle,sub:t.categoryClassesDescription,icon:<Swords size={30}/>,cat:'Classes',style:'gold'},{title:t.categoryGearTitle,sub:t.categoryGearDescription,icon:<Gem size={30}/>,cat:'Progression',style:'violet'},{title:t.categoryDungeonsTitle,sub:t.categoryDungeonsDescription,icon:<Shield size={30}/>,cat:'Dungeons & Raids',style:'ice'},{title:t.categoryAbyssTitle,sub:t.categoryAbyssDescription,icon:<Compass size={30}/>,cat:'PvP & Abyss',style:'red'}].map(c=><button className={'category-tile '+c.style} key={c.title} onClick={()=>choose(c.cat)}><span className="tile-icon">{c.icon}</span><div><strong>{c.title}</strong><small>{c.sub}</small></div><ArrowUpRight className="tile-arrow" size={19}/></button>)}</div></section>
    <section className="featured section-wrap"><div className="section-top"><div><div className="section-kicker left">{t.featuredEyebrow}</div><h2>{t.featuredTitle} <i>{t.featuredAccent}</i></h2></div><button className="text-action" onClick={()=>choose('All Guides')}>{t.featuredButton} <ArrowUpRight size={17}/></button></div><div className="guide-grid">{guides.filter(g=>g.featured).map(g=><GuideCard guide={g} key={g.slug} onClick={()=>go(g.slug)}/>)}</div></section>
+   <section className="recent section-wrap" aria-labelledby="recent-heading">
+     <div className="section-top"><div><div className="section-kicker left">{t.latestEyebrow}</div><h2 id="recent-heading">{t.latestTitle} <i>{t.latestAccent}</i></h2><p className="recent-description">{t.latestDescription}</p></div>
+       <button className="text-action" onClick={()=>choose('All Guides')}>{t.latestButton}<ArrowUpRight size={17}/></button>
+     </div>
+     {recentGuides.length ? <div className="recent-list">{recentGuides.map((g,index)=>
+       <button className="recent-guide" key={g.id} onClick={()=>go(g.slug)}>
+         <span className="recent-index">{String(index+1).padStart(2,'0')}</span>
+         <span className="recent-detail"><span className="recent-meta"><span>{g.category}</span><time dateTime={g.updated_at}>UPDATED {new Date(g.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</time></span>
+         <strong>{g.title}</strong><span className="recent-summary">{g.summary}</span></span>
+         <span className="recent-arrow"><ArrowUpRight size={22}/></span>
+       </button>)}</div>
+       : <div className="recent-empty"><BookOpen size={26}/><span>{guidesLoading?'Loading the latest guides...':t.latestEmpty}</span><button onClick={()=>choose('All Guides')}>{t.latestButton}<ArrowUpRight size={16}/></button></div>}
+   </section>
    <section className="mission section-wrap" aria-labelledby="mission-heading"><div className="mission-shell">
      <div className="mission-copy"><div className="section-kicker left">{t.missionEyebrow}</div><h2 id="mission-heading">{t.missionTitle} <i>{t.missionAccent}</i></h2>
        <p>{t.missionDescription}</p><button className="mission-button" onClick={()=>choose('All Guides')}>{t.missionButton}<ArrowUpRight size={17}/></button>
