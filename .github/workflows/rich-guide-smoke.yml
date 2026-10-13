@@ -48,3 +48,13 @@ jobs:
           sleep 3
           export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           node tests/browser-smoke.mjs editor
+      - name: Build isolated site content editor fixture
+        run: |
+          cp tests/site-content-fixture.tsx src/main.tsx
+          npm run build
+      - name: Test website text editing and version restoration in Chrome
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4176 > /tmp/atreia-site-copy.log 2>&1 &
+          sleep 3
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          node tests/browser-smoke.mjs site

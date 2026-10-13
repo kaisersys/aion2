@@ -13,6 +13,8 @@ import GuideArticle, { guideHref } from '../components/GuideArticle';
 import { safeGuideHref, safeGuideImage, type GalleryImage } from '../components/GuideBlocks';
 import { CATEGORIES, emptyDocument, guideSlug, type GuideRecord, type GuideStatus } from '../lib/guides';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { SITE_CONTENT_SLUG } from '../lib/siteContent';
+import SiteContentEditor from './SiteContentEditor';
 
 type Props = { onExit: () => void; onContentChanged: () => void };
 
@@ -207,6 +209,7 @@ export function StudioEditor({ record, user, onSaved, onCancel }: {
     if (!supabase || saving) return;
     const normalizedSlug = guideSlug(slug);
     if (!title.trim() || !normalizedSlug) { setMessage('Enter a title and a valid URL slug first.'); return; }
+    if (normalizedSlug===SITE_CONTENT_SLUG) { setMessage('This URL is reserved for website settings. Choose another slug.'); return; }
     setSaving(true); setMessage('');
     const guide = {
       title: title.trim(), slug: normalizedSlug, summary: summary.trim(), category,
@@ -291,6 +294,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
   const [records, setRecords] = useState<GuideRecord[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [editing, setEditing] = useState<GuideRecord | null | undefined>(undefined);
+  const [siteEditing,setSiteEditing] = useState(false);
   const [listError, setListError] = useState('');
 
   useEffect(() => {
@@ -328,7 +332,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
     setLoadingRecords(true); setListError('');
     const {data,error}=await supabase.from('guides').select('*').order('updated_at',{ascending:false});
     if(error) setListError('Could not retrieve guides: '+error.message);
-    else setRecords((data??[]) as GuideRecord[]);
+    else setRecords(((data??[]) as GuideRecord[]).filter(record=>record.slug!==SITE_CONTENT_SLUG));
     setLoadingRecords(false);
   };
   useEffect(()=>{ if(isAdmin) void reload(); },[isAdmin]);
@@ -343,7 +347,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
   };
   const signOut = async () => {
     await supabase?.auth.signOut();
-    setUser(null);setIsAdmin(false);setEditing(undefined);
+    setUser(null);setIsAdmin(false);setEditing(undefined);setSiteEditing(false);
   };
   const remove = async (record: GuideRecord) => {
     if(!supabase || !window.confirm(`Permanently delete "${record.title}"? This cannot be undone.`)) return;
@@ -365,7 +369,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
   </main>;
 
   return <main className="inner-page section-wrap studio-page">
-    <button className="back-link" onClick={onExit}><ArrowLeft size={16}/> BACK TO HOME</button>
+    {!siteEditing&&<button className="back-link" onClick={onExit}><ArrowLeft size={16}/> BACK TO HOME</button>}
     {checking ? <p>Checking staff access...</p> :
      !user ? <div className="studio-login">
        <div className="section-kicker left">GUILD STAFF ONLY</div><h1>Admin <i>Sanctum</i></h1>
@@ -383,6 +387,9 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
        {authError && <p className="studio-message">{authError}</p>}
        <button className="studio-quiet-button" onClick={()=>void signOut()}><LogOut size={16}/> Sign out</button>
      </div> :
+     siteEditing ?
+       <SiteContentEditor userId={user.id} onBack={()=>setSiteEditing(false)}
+         onPublished={onContentChanged}/> :
      editing !== undefined ?
        <StudioEditor key={editing?.id ?? 'create-new'} record={editing ?? null} user={user}
          onCancel={()=>setEditing(undefined)}
@@ -393,6 +400,13 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
           <button className="studio-quiet-button" onClick={()=>void signOut()}><LogOut size={16}/> Sign out</button>
         </div>
         <p className="page-intro">Write, preview, and publish guides without rebuilding your website.</p>
+        <div className="studio-content-shortcut">
+          <div>
+            <strong>Site Content</strong>
+            <p>Edit homepage titles, category descriptions, navigation, buttons and footer text. No deployment needed.</p>
+          </div>
+          <button type="button" className="studio-quiet-button" onClick={()=>setSiteEditing(true)}><Pencil size={16}/> Edit website text</button>
+        </div>
         <div className="studio-topbar">
           <h2>Manage guides <span className="studio-count">{records.length}</span></h2>
           <button className="gold-button" onClick={()=>setEditing(null)}><Plus size={17}/> New Guide</button>

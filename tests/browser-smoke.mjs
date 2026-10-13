@@ -1,13 +1,53 @@
 import { chromium } from 'playwright-core';
 const mode=process.argv[2]||'app';
-const port=mode==='fixture'?4174:mode==='editor'?4175:4173;
+const port=mode==='fixture'?4174:mode==='editor'?4175:mode==='site'?4176:4173;
 const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const failures=[];
 page.on('pageerror',e=>failures.push('Uncaught JavaScript: '+e.message));
 const check=(ok,label)=>{console.log((ok?'PASS':'FAIL')+' '+label);if(!ok)failures.push(label);};
 try {
-  if(mode==='editor') {
+  if(mode==='site') {
+    await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
+    const editor=page.locator('.site-copy-editor');
+    await editor.getByRole('heading',{name:'Site Content'}).waitFor({timeout:10000});
+    check(await editor.getByRole('button',{name:'Preview changes'}).count()===1,
+      'site content editor exposes a preview action');
+    check(await page.getByRole('textbox',{name:'Title',exact:true}).inputValue()==='THE PATH OF',
+      'site content fields initialize with published text');
+    await page.getByRole('textbox',{name:'Title',exact:true}).fill('A NEW PATH');
+    check((await editor.innerText()).includes('Unsaved changes'),
+      'edited site text is tracked as unpublished');
+    await page.getByRole('button',{name:'Preview changes'}).click();
+    const preview=page.getByRole('dialog',{name:'Preview site text'});
+    await preview.waitFor({timeout:5000});
+    check((await preview.locator('h1').first().innerText()).includes('A NEW PATH'),
+      'private preview renders unsaved homepage headline');
+    await page.keyboard.press('Escape');
+    check(await preview.count()===0,'Escape closes website text preview');
+    await page.getByRole('button',{name:'Footer'}).click();
+    await page.getByRole('textbox',{name:'Description',exact:true}).fill('Independent community guide project. Test footer.');
+    await page.getByRole('button',{name:'Preview changes'}).click();
+    check((await page.getByRole('dialog',{name:'Preview site text'}).locator('footer').innerText())
+      .includes('Test footer.'),'preview shows unsaved footer copy');
+    await page.getByRole('button',{name:'Back to editor'}).click();
+    await page.getByRole('button',{name:'Publish changes'}).first().click();
+    await page.getByRole('status').filter({hasText:'Published!'}).waitFor({timeout:5000});
+    check(await page.getByTestId('site-publish-count').innerText()==='1',
+      'publishing sends edited values to the storage adapter');
+    check((await editor.innerText()).includes('All changes saved'),
+      'published changes clear dirty state');
+    await page.getByRole('button',{name:'Restore version'}).click();
+    await page.getByRole('button',{name:'Homepage · Hero'}).click();
+    check(await page.getByRole('textbox',{name:'Title',exact:true}).inputValue()==='THE PATH OF',
+      'version history restores prior homepage text into the editor');
+    check((await editor.innerText()).includes('Unsaved changes'),
+      'restoring a version does not publish without confirmation');
+    await page.getByRole('button',{name:'Publish changes'}).first().click();
+    await page.getByTestId('site-publish-count').filter({hasText:'2'}).waitFor({timeout:5000});
+    check(await page.getByTestId('site-publish-count').innerText()==='2',
+      'restored site copy can be republished');
+  } else if(mode==='editor') {
     await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
     await page.getByRole('textbox',{name:'Guide title'}).fill('Ranger Combat Rotation');
     await page.getByRole('textbox',{name:'Short summary'}).fill('Test summary for private preview');
