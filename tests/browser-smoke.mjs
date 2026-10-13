@@ -13,6 +13,15 @@ try {
     await editor.getByRole('heading',{name:'Site Content'}).waitFor({timeout:10000});
     check(await editor.getByRole('button',{name:'Preview changes'}).count()===1,
       'site content editor exposes a preview action');
+    const copyNav=await page.locator('.site-copy-nav button').allInnerTexts();
+    check(copyNav.includes('Homepage · Hero') &&
+      copyNav.includes('Homepage · About me') &&
+      copyNav.includes('Homepage · Upcoming news') &&
+      copyNav.includes('Homepage · Recently updated') &&
+      !copyNav.includes('Homepage · Start here') &&
+      !copyNav.includes('Homepage · Featured & banner') &&
+      !copyNav.includes('Homepage · About the codex'),
+      'site editor only offers content sections that remain on the homepage');
     check(await page.getByRole('textbox',{name:'Title',exact:true}).inputValue()==='THE PATH OF',
       'site content fields initialize with published text');
     await page.getByRole('textbox',{name:'Title',exact:true}).fill('A NEW PATH');
@@ -23,6 +32,10 @@ try {
     await preview.waitFor({timeout:5000});
     check((await preview.locator('h1').first().innerText()).includes('A NEW PATH'),
       'private preview renders unsaved homepage headline');
+    const previewSections=await preview.locator('.site-copy-preview-content > section').count();
+    check(previewSections===4 && await preview.locator('.site-copy-preview-section').count()===2 &&
+      await preview.locator('.site-copy-preview-content > footer').count()===1,
+      'private homepage preview ends after game news and recently updated');
     await page.keyboard.press('Escape');
     check(await preview.count()===0,'Escape closes website text preview');
     await page.getByRole('button',{name:'Homepage · Upcoming news'}).click();
@@ -164,6 +177,10 @@ try {
     });
     check(fontCheck.heroFont.includes('Manrope') && fontCheck.bodyFont.includes('Inter'),'hero uses Manrope while reading copy stays Inter');
     check(!fontCheck.overflows,'updated headings do not overflow desktop');
+    const homeLayout=await page.locator('.site > section').evaluateAll(nodes=>nodes.map(node=>node.classList[0]));
+    check(JSON.stringify(homeLayout)===JSON.stringify(['hero','creator','upcoming-news','recent']) &&
+      await page.locator('.site > footer').count()===1,
+      'homepage contains exactly hero, About Me, game news, recently updated, then footer');
     const creatorDesktop=await page.locator('.creator-portrait').evaluate(node=>{
       const rect=node.getBoundingClientRect();
       const section=document.querySelector('.creator.creator-bleed')?.getBoundingClientRect();
@@ -192,6 +209,14 @@ try {
     check(await page.locator('.upcoming-news').count()===1 &&
       await page.locator('.intro .category-grid').count()===0,
       'upcoming AION 2 news replaces the old destination category tiles');
+    const endSpacing=await page.evaluate(()=>{
+      const recent=document.querySelector('.recent');
+      const footer=document.querySelector('.site > footer');
+      return recent&&footer?{gap:footer.getBoundingClientRect().top-recent.getBoundingClientRect().bottom,
+        margin:getComputedStyle(footer).marginTop}:null;
+    });
+    check(Boolean(endSpacing&&Math.abs(endSpacing.gap)<2 && parseFloat(endSpacing.margin)===0),
+      'Recently Updated flows directly into footer without an extra empty section');
     const newsLinks=await page.locator('.upcoming-card-source').evaluateAll(links=>
       links.every(link=>link.getAttribute('href')?.startsWith('https://')&&link.getAttribute('rel')?.includes('noopener')));
     const activeCards=await page.locator('.upcoming-card').count();

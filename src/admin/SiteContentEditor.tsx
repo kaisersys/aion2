@@ -255,14 +255,6 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
             </div>
           </section>
           <section className="site-copy-preview-section">
-            <div className="section-kicker">{draft.journeyEyebrow}</div><h2>{draft.journeyTitle} <i>{draft.journeyAccent}</i></h2><p>{draft.journeyDescription}</p>
-            <div className="site-copy-preview-steps">{[
-              [draft.journeyStepOneLabel,draft.journeyStepOneTitle,draft.journeyStepOneDescription],
-              [draft.journeyStepTwoLabel,draft.journeyStepTwoTitle,draft.journeyStepTwoDescription],
-              [draft.journeyStepThreeLabel,draft.journeyStepThreeTitle,draft.journeyStepThreeDescription]
-            ].map(([label,title,description])=><div key={title}><small>{label}</small><strong>{title}</strong><span>{description}</span></div>)}</div>
-          </section>
-          <section className="site-copy-preview-section">
             <div className="section-kicker">{draft.newsEyebrow}</div>
             <h2>{draft.newsTitle} <i>{draft.newsAccent}</i></h2><p>{draft.newsDescription}</p>
             {activeNewsItems(parseNewsItems(draft.newsItemsJson)).length>0
@@ -272,16 +264,10 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
               : <p>{draft.newsEmpty}</p>}
           </section>
           <section className="site-copy-preview-section">
-            <div className="section-kicker">{draft.featuredEyebrow}</div><h2>{draft.featuredTitle} <i>{draft.featuredAccent}</i></h2><p>{draft.featuredButton}</p>
-            <div className="section-kicker">{draft.latestEyebrow}</div><h2>{draft.latestTitle} <i>{draft.latestAccent}</i></h2><p>{draft.latestDescription}</p><p>{draft.latestEmpty}</p>
-            <div className="section-kicker">{draft.missionEyebrow}</div><h2>{draft.missionTitle} <i>{draft.missionAccent}</i></h2><p>{draft.missionDescription}</p>
-            <div className="site-copy-preview-steps">{[[draft.missionOneTitle,draft.missionOneDescription],[draft.missionTwoTitle,draft.missionTwoDescription],[draft.missionThreeTitle,draft.missionThreeDescription]].map(([title,description])=><div key={title}><strong>{title}</strong><span>{description}</span></div>)}</div>
-            <div className="section-kicker">{draft.joinEyebrow}</div><h2>{draft.joinTitle} <i>{draft.joinAccent}</i></h2>
-            <p>{draft.joinDescription}</p><span className="site-copy-preview-button">{draft.joinButton}</span>
-          </section>
-          <section className="site-copy-preview-section">
-            <div className="section-kicker">{draft.libraryEyebrow}</div>
-            <h2>{draft.libraryTitle} <i>{draft.libraryAccent}</i></h2><p>{draft.libraryDescription}</p>
+            <div className="section-kicker">{draft.latestEyebrow}</div>
+            <h2>{draft.latestTitle} <i>{draft.latestAccent}</i></h2>
+            <p>{draft.latestDescription}</p>
+            <p>{draft.latestEmpty}</p>
           </section>
           <footer><div className="footer-brand">✦ &nbsp; {draft.footerBrand} <span>{draft.footerTag}</span></div><p>{draft.footerDescription}</p><div>{draft.footerClosing}</div></footer>
           <p className="site-copy-preview-note"><Check size={15}/> Preview uses your unsaved text. Only Publish changes updates the live website.</p>
