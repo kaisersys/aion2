@@ -100,3 +100,14 @@ After signing in at `https://atreiastreet.com/#admin`, choose **Site Content →
 Under **History & reset**, select **Restore version** for an earlier saved version, or **Reset to defaults** for the initial website wording. Both load values into the editor; neither changes the public site until you publish again. Up to 12 previous saved versions are retained.
 
 **No new Supabase migration or service-role secret is necessary.** Website copy lives in a single reserved published `guides` row with slug `site-content-settings`, using the existing `admin_users` permission/RLS policies. The reserved row is excluded from the guide directory and hidden from the guide management list, and cannot be created as a guide from the editor. On a new setup, the site's current hardcoded wording remains the default until the first Site Content publish. The version history also uses the existing row's JSONB `content` field.
+
+
+## Upcoming AION 2 news on the homepage
+
+The former **Discover Your Destiny** four-tile category section has been replaced with **Upcoming AION 2 News**. The old guide categories remain accessible from the hero topic finder, site navigation, and full Guide Library.
+
+The news calendar starts with **officially sourced Global announcements**: October 13–20 Early Access server transfers, October 20–27 launch-server transfers, and the December 15 attendance deadline. All use links to NC official announcements. Headlines and summaries are curated and **do not automatically fetch or claim to represent live news**.
+
+From `https://atreiastreet.com/#admin`, open **Site Content → Homepage · Upcoming news** to edit heading text and manage up to eight scheduled announcements. For each, enter the start date, last day it should appear, category, headline, short summary, and an HTTPS official source link. Use **Add announcement** or **Remove**, choose **Preview changes**, then **Publish changes**. This uses the existing admin-protected site settings row and version history: no extra Supabase migration or build is required to publish news changes.
+
+Only items whose last visible date has not passed (in **Pacific time**) appear to visitors. An empty state and a link to the official AION 2 site appear once no scheduled items remain. Check dates and source links when adding new notices. The calendar is not an automated news scraper or push-notification service.
