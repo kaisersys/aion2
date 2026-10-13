@@ -101,7 +101,7 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
               {isLong(key)
                 ? <textarea rows={3} maxLength={siteContentLimit(key)} value={draft[key]} onChange={e=>update(key,e.target.value)} />
                 : <input value={draft[key]} maxLength={siteContentLimit(key)} onChange={e=>update(key,e.target.value)}/>}
-              <small>{draft[key].length} / {siteContentLimit(key)} characters</small>
+              <small aria-hidden="true">{draft[key].length} / {siteContentLimit(key)} characters</small>
             </label>)}
           </div>
         </section>
