@@ -156,7 +156,7 @@ export const validProfilePhotoUrl = (value:string):boolean => {
 export type UpcomingNewsItem = {id:string;date:string;through:string;category:string;title:string;summary:string;sourceUrl:string};
 export const NEWS_LIMIT=8;
 const isCalendarDate=(value:string):boolean=>{
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(value))return false;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
   const date=new Date(value+'T00:00:00Z');
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0,10)===value;
 };
