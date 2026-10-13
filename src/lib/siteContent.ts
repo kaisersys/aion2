@@ -68,7 +68,7 @@ export const DEFAULT_SITE_CONTENT = {
   footerClosing: 'FORGED IN KNOWLEDGE · UNITED IN PURPOSE'
 } as const;
 
-export type SiteContent = { [K in keyof typeof DEFAULT_SITE_CONTENT]: string };
+export type SiteContent = { -readonly [K in keyof typeof DEFAULT_SITE_CONTENT]: string };
 export type SiteContentKey = keyof SiteContent;
 
 export const SITE_CONTENT_GROUPS: { title: string; keys: SiteContentKey[] }[] = [
