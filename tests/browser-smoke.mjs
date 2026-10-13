@@ -127,6 +127,26 @@ try {
     check(ambient.active===18 && ambient.visible>=2 &&
       ambient.aura!=='none' && ambient.light!=='none' && !ambient.blocksPointer,
       'ambient motes and soft light are animated without intercepting clicks');
+    const stars=await page.evaluate(()=>{
+      const sky=document.querySelector('.hero-sky');
+      const base=getComputedStyle(sky);
+      const near=getComputedStyle(sky,'::before');
+      const bright=getComputedStyle(sky,'::after');
+      return {
+        density:(near.backgroundImage.match(/radial-gradient/g)||[]).length,
+        highlights:(bright.backgroundImage.match(/radial-gradient/g)||[]).length,
+        opacity:Number(base.opacity),
+        brightened:base.filter!=='none',
+        layer:base.zIndex,
+        twinkle:near.animationName,
+        glow:bright.animationName,
+        blocksClicks:base.pointerEvents!=='none'
+      };
+    });
+    check(stars.density>=24 && stars.highlights>=6 && stars.opacity>=.5 &&
+      stars.brightened && stars.layer==='2' && stars.twinkle!=='none' &&
+      stars.glow!=='none' && !stars.blocksClicks,
+      'denser visible star field has six bright highlights and twinkles behind content');
     const artSource=await page.evaluate(()=>getComputedStyle(document.querySelector('.hero-art'),'::before').backgroundImage);
     check(artSource.includes('aion-hero-purple.avif'),'hero backdrop retains the original artwork');
     await page.mouse.move(140,450);
@@ -155,6 +175,12 @@ try {
     }));
     check(mobileAtmosphere.fewerParticles && mobileAtmosphere.softerAura && mobileAtmosphere.staticFinder,
       'mobile magic is restrained and guide finder remains interactive');
+    const mobileStars=await page.evaluate(()=>({
+      opacity:Number(getComputedStyle(document.querySelector('.hero-sky')).opacity),
+      brightOpacity:Number(getComputedStyle(document.querySelector('.hero-sky'),'::after').opacity)
+    }));
+    check(mobileStars.opacity<stars.opacity && mobileStars.brightOpacity<.6,
+      'mobile stars are gentler than desktop');
     const reduce=await browser.newContext({reducedMotion:'reduce'});
     const reducePage=await reduce.newPage();
     await reducePage.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
@@ -180,6 +206,12 @@ try {
     check(reducedAmbient.mote==='none' && reducedAmbient.moteOpacity==='0' &&
       reducedAmbient.aura==='none' && reducedAmbient.sweep==='none',
       'reduced-motion mode disables floating motes and glow animations');
+    const reducedStars=await reducePage.evaluate(()=>({
+      near:getComputedStyle(document.querySelector('.hero-sky'),'::before').animationName,
+      bright:getComputedStyle(document.querySelector('.hero-sky'),'::after').animationName
+    }));
+    check(reducedStars.near==='none' && reducedStars.bright==='none',
+      'reduced-motion mode also disables star twinkling');
     await reduce.close();
   }
 } catch(e) {failures.push(String(e));}
