@@ -1110,3 +1110,34 @@
   .site-copy-preview-profile{grid-template-columns:1fr;gap:20px}
   .site-copy-preview-profile .site-copy-preview-portrait{width:160px}
 }
+
+
+/* Hero → About Me: a true image dissolve, not a hard strip between two artworks.
+   The section overlaps the last portion of the hero while its scenic layers
+   fade in gradually. Content stays in its original reading position. */
+.creator.creator-bleed{
+  --creator-overlap:clamp(135px,14vw,185px);
+  z-index:2;
+  margin-top:calc(-1 * var(--creator-overlap));
+  padding-top:calc(90px + var(--creator-overlap));
+  background:transparent;
+}
+.creator.creator-bleed .creator-backdrop,
+.creator.creator-bleed .creator-backdrop-wash{
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0px,#00000026 90px,#0000008c 190px,#000 335px);
+  mask-image:linear-gradient(to bottom,transparent 0px,#00000026 90px,#0000008c 190px,#000 335px);
+}
+.creator.creator-bleed .creator-backdrop{
+  background:transparent;
+}
+@media(max-width:760px){
+  .creator.creator-bleed{
+    --creator-overlap:130px;
+    padding-top:calc(65px + var(--creator-overlap));
+  }
+  .creator.creator-bleed .creator-backdrop,
+  .creator.creator-bleed .creator-backdrop-wash{
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0px,#00000033 65px,#000000a6 145px,#000 260px);
+    mask-image:linear-gradient(to bottom,transparent 0px,#00000033 65px,#000000a6 145px,#000 260px);
+  }
+}
