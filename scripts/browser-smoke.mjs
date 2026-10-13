@@ -94,7 +94,15 @@ for (const [label,url,expected] of [
       parallaxOK=parallaxOK && starsOK;
       console.log(JSON.stringify({label:'live-starlight-5of10',ok:starsOK,...stars}));
     }
-    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && fontOK && parallaxOK && pageErrors.length===0;
+    const publicCopy=label==='live-home'?await page.evaluate(()=>{
+      const hero=document.querySelector('.hero h1')?.textContent?.trim()||'';
+      const intro=document.querySelector('.intro .section-description')?.textContent?.trim()||'';
+      const footer=document.querySelector('footer p')?.textContent?.trim()||'';
+      return {hero,hasIntro:intro.length>10,hasFooter:footer.length>10};
+    }):null;
+    const copyOK=!publicCopy || (publicCopy.hero.length>8 && publicCopy.hasIntro && publicCopy.hasFooter);
+    if(publicCopy)console.log(JSON.stringify({label:'live-site-copy-rendering',ok:copyOK,...publicCopy}));
+    const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && fontOK && parallaxOK && copyOK && pageErrors.length===0;
     if (!ok) failed = true;
     console.log(JSON.stringify({label,ok,status:response?.status(),headline,rootTextLength:text.length,adminLoginVisible:label==='live-admin'?adminLoaded:undefined,pageErrors:pageErrors.slice(0,5)}));
   } catch (e) {
