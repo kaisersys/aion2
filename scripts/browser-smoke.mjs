@@ -77,6 +77,22 @@ for (const [label,url,expected] of [
       const magicOK=magic.motes===18 && magic.active===18 && magic.glowing>=2 && magic.aura!=='none' && magic.sweep!=='none' && magic.clickSafe;
       parallaxOK=parallaxOK && magicOK;
       console.log(JSON.stringify({label:'live-magical-atmosphere',ok:magicOK,...magic}));
+      const stars=await page.evaluate(()=>{
+        const sky=document.querySelector('.hero-sky');
+        const field=getComputedStyle(sky,'::before');
+        const highlights=getComputedStyle(sky,'::after');
+        return {
+          opacity:Number(getComputedStyle(sky).opacity),
+          density:(field.backgroundImage.match(/radial-gradient/g)||[]).length,
+          highlights:(highlights.backgroundImage.match(/radial-gradient/g)||[]).length,
+          twinkle:field.animationName,
+          interactive:getComputedStyle(sky).pointerEvents
+        };
+      });
+      const starsOK=stars.opacity>=.5 && stars.density>=24 && stars.highlights>=6
+        && stars.twinkle!=='none' && stars.interactive==='none';
+      parallaxOK=parallaxOK && starsOK;
+      console.log(JSON.stringify({label:'live-starlight-5of10',ok:starsOK,...stars}));
     }
     const ok=response?.status()===200 && text.includes(expected) && adminLoaded && guideLoaded && guttersOK && fontOK && parallaxOK && pageErrors.length===0;
     if (!ok) failed = true;
