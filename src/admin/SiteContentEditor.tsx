@@ -150,13 +150,13 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
                 </div>
               : key==='profilePhotoUrl'
               ? <div key={key} className="site-copy-photo-field site-copy-wide">
-                  <span className="site-copy-photo-label">Your portrait</span>
+                  <span className="site-copy-photo-label">Your landscape photo</span>
                   <div className="site-copy-photo-layout">
                     <div className="site-copy-photo-preview">{draft.profilePhotoUrl
-                      ? <img src={draft.profilePhotoUrl} alt="Profile portrait preview"/>
+                      ? <img src={draft.profilePhotoUrl} alt="Your landscape profile photo preview"/>
                       : <div className="site-copy-photo-placeholder"><ImagePlus size={28}/><span>No photo uploaded</span></div>}</div>
                     <div className="site-copy-photo-actions">
-                      <p>Upload a portrait for the About Me section. JPG, PNG, WebP or AVIF, up to 5 MB. Square or vertical images work best.</p>
+                      <p>Upload a landscape photo for the About Me section. JPG, PNG, WebP or AVIF, up to 5 MB. A 16:10 or 3:2 image works best; other shapes are cropped to fit.</p>
                       <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" hidden
                         onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value='';void uploadPhoto(file);}}/>
                       <div className="site-copy-photo-buttons">
@@ -220,8 +220,8 @@ export default function SiteContentEditor({userId,onBack,onPublished,loadSnapsho
           </section>
           <section className="site-copy-preview-profile">
             <div className="site-copy-preview-portrait">{draft.profilePhotoUrl
-              ? <img src={draft.profilePhotoUrl} alt={'Portrait of '+draft.profileName}/>
-              : <div className="site-copy-photo-placeholder"><ImagePlus size={28}/><span>Portrait placeholder</span></div>}</div>
+              ? <img src={draft.profilePhotoUrl} alt={'Photo of '+draft.profileName}/>
+              : <div className="site-copy-photo-placeholder"><ImagePlus size={28}/><span>Landscape photo placeholder</span></div>}</div>
             <div><div className="section-kicker">{draft.profileEyebrow}</div>
               <h2>{draft.profileTitle} <i>{draft.profileAccent}</i></h2>
               <strong>{draft.profileName}</strong><small>{draft.profileRole}</small>

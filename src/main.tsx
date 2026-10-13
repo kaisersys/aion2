@@ -170,7 +170,7 @@ function App(){
      <div className="creator-shell">
        <div className="creator-portrait">
          {t.profilePhotoUrl
-           ? <img src={t.profilePhotoUrl} alt={'Portrait of '+t.profileName} loading="lazy"/>
+           ? <img src={t.profilePhotoUrl} alt={'Photo of '+t.profileName} loading="lazy"/>
            : <div className="creator-portrait-placeholder"><Compass size={58} strokeWidth={1}/><span>ATREIA STREET</span></div>}
        </div>
        <div className="creator-copy">
