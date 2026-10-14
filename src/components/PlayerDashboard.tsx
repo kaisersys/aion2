@@ -4,6 +4,9 @@ import {ArrowUpRight,Bookmark,BookOpen,CalendarClock,Check,ChevronDown,ChevronUp
 import {supabase} from '../lib/supabase';
 import {ensurePlayerProfile} from '../lib/playerProfile';
 import WeeklyTaskRow from './WeeklyTaskRow';
+import DailyTaskRow from './DailyTaskRow';
+import TicketBalanceDialog from './TicketBalanceDialog';
+import {Wallet} from 'lucide-react';
 import {PLAYER_CLASSES,recommendedGuides,type PlayerProfile,type SuggestedGuide} from '../lib/playerData';
 import {globalResetSnapshot,countdown,completionKey,visibleTasks,
   type PlayerCharacter,type GameTask} from '../lib/globalReset';
@@ -37,7 +40,7 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
  const [saved,setSaved]=useState<string[]>([]);
  const [checks,setChecks]=useState<string[]>([]);
  const [ticketRows,setTicketRows]=useState<TicketBalance[]>([]);
- const [ticketDrafts,setTicketDrafts]=useState<Record<string,string>>({});
+ const [balanceTaskKey,setBalanceTaskKey]=useState<string|null>(null);
  const [ticketSetupRequired,setTicketSetupRequired]=useState(false);
  const catalog=useMemo(()=>parseChecklistTasks(checklistItemsJson),[checklistItemsJson]);
  const [guideTab,setGuideTab]=useState<'recommended'|'saved'>('recommended');
@@ -92,7 +95,7 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
        setSaved((b.data||[]).map(r=>r.guide_slug));
        setTicketSetupRequired(missingBank);
        setTicketRows((bank.data||[]) as TicketBalance[]);
-       setTicketDrafts({});
+       setBalanceTaskKey(null);
        setChecks([
          ...(ct.data||[]).map(r=>'character:'+r.character_id+':'+r.task_key+':'+r.period_start),
          ...(st.data||[]).map(r=>'server:'+r.server_name+':'+r.task_key+':'+r.period_start)
@@ -209,6 +212,7 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
  const weeklyDone=characterWeekly.filter(taskDone).length;
  const recommend=useMemo(()=>recommendedGuides(guides,profile&&selected?{...profile,class_name:selected.class_name}:profile,saved),[guides,profile,selected?.class_name,saved]);
  const displayed=guideTab==='saved'?guides.filter(g=>saved.includes(g.slug)):recommend;
+ const activeBalanceTask=catalog.find(t=>t.key===balanceTaskKey && Boolean(t.recharge))??null;
 
  const bankEntry=(task:ChecklistTask)=>{
    if(!selected||!task.recharge)return null;
@@ -219,25 +223,28 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
    const current=row?projectedTickets(row,resetKey,task.recharge,task.type):null;
    return {owner,id,row,current,resetKey};
  };
- const saveBalance=async(task:ChecklistTask,explicit?:number)=>{
-   if(!supabase||!user||savingKey||ticketSetupRequired||!task.recharge)return;
-   const state=bankEntry(task);if(!state)return;
-   const input=explicit??(ticketDrafts[state.id]===undefined?state.current:Number(ticketDrafts[state.id]));
-   if(input===null||!Number.isInteger(input)||input<0||input>task.recharge.cap){
-     setError('Enter a whole number of tickets between 0 and '+task.recharge.cap+'.');return;
+ const saveBalance=async(task:ChecklistTask,amount:number):Promise<string|null>=>{
+   if(!supabase||!user||savingKey)return 'Another save is in progress. Please try again.';
+   if(ticketSetupRequired)return 'Ticket saving needs the new Supabase migration.';
+   if(!task.recharge)return 'This activity does not have a configured ticket balance.';
+   const state=bankEntry(task);
+   if(!state)return 'Select a character before saving a balance.';
+   if(!Number.isInteger(amount)||amount<0||amount>task.recharge.cap){
+     return 'Enter a whole number of tickets between 0 and '+task.recharge.cap+'.';
    }
    setSavingKey('ticket:'+state.id);setError('');setNotice('');
-   const {error:err}=await supabase.from('player_ticket_balances').upsert({
-     user_id:user.id,...state.owner,task_key:task.key,
-     balance:input,anchor_reset:state.resetKey,updated_at:new Date().toISOString()
-   },{onConflict:'user_id,owner_scope,owner_key,task_key'}).select('owner_scope,owner_key,task_key,balance,anchor_reset').single();
-   if(err)setError(fail(err));
-   else {
+   try{
+     const {error:err}=await supabase.from('player_ticket_balances').upsert({
+       user_id:user.id,...state.owner,task_key:task.key,
+       balance:amount,anchor_reset:state.resetKey,updated_at:new Date().toISOString()
+     },{onConflict:'user_id,owner_scope,owner_key,task_key'})
+       .select('owner_scope,owner_key,task_key,balance,anchor_reset').single();
+     if(err)return fail(err);
      setTicketRows(old=>[...old.filter(r=>ticketId(r,r.task_key)!==state.id),
-       {...state.owner,task_key:task.key,balance:input,anchor_reset:state.resetKey}]);
-     setTicketDrafts(old=>{const next={...old};delete next[state.id];return next;});
-   }
-   setSavingKey('');
+       {...state.owner,task_key:task.key,balance:amount,anchor_reset:state.resetKey}]);
+     return null;
+   }catch(e){return fail(e);}
+   finally{setSavingKey('');}
  };
 
  const fmtDate=(time:number)=>new Intl.DateTimeFormat(undefined,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(time));
@@ -267,32 +274,15 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
                {period==='weekly'?
                  <WeeklyTaskRow task={task} checked={completed}
                    disabled={loading||Boolean(savingKey)||Boolean(error&&error.includes('migration'))}
-                   saving={savingKey===key} onToggle={()=>void toggleTask(task)}/> :
-                 <label className={'player-task'+(completed?' done':'')}>
-                   <input type="checkbox" checked={completed} disabled={loading||Boolean(savingKey)||Boolean(error&&error.includes('migration'))}
-                     onChange={()=>void toggleTask(task)}/>
-                   <span className="player-task-check"><Check size={15}/></span>
-                   <span><strong>{task.label}</strong><small>{task.hint}</small></span>
-                   {task.scope==='server'&&<span className="player-shared-tag" title="Shared across characters on this server">SERVER</span>}
-                   {savingKey===key&&<span className="player-saving-indicator">Saving…</span>}
-                 </label>}
-               {bank&&<div className="player-ticket-tracker">
-                 <span className="player-ticket-title">{bank.current===null?'Optional ticket tracker':bank.current+' / '+task.recharge!.cap+' tickets estimated'}</span>
-                 <span className="player-ticket-rate">+{task.recharge!.amount} / {task.type==='daily'?'day':'week'} · cap {task.recharge!.cap}</span>
-                 {ticketSetupRequired?<small className="player-ticket-error">Ticket saving needs the new Supabase migration.</small>:
-                 <form className="player-ticket-controls" onSubmit={e=>{e.preventDefault();void saveBalance(task);}}>
-                   <label>
-                     <span className="sr-only">{task.label} current tickets</span>
-                     <input aria-label={task.label+' current tickets'} type="number" min={0} max={task.recharge!.cap} step={1}
-                       value={ticketDrafts[bank.id]??(bank.current===null?'':String(bank.current))}
-                       placeholder="Current tickets" disabled={Boolean(savingKey)}
-                       onChange={e=>setTicketDrafts(old=>({...old,[bank.id]:e.target.value}))}/>
-                   </label>
-                   <button type="submit" disabled={Boolean(savingKey)||bank.current===null&&ticketDrafts[bank.id]===undefined}>Save balance</button>
-                   {bank.current!==null&&<button type="button" disabled={Boolean(savingKey)||bank.current===0}
-                     onClick={()=>void saveBalance(task,Math.max(0,bank.current!-1))}>− 1 used</button>}
-                 </form>}
-               </div>}
+                   saving={savingKey===key} onToggle={()=>void toggleTask(task)}
+                   balanceAction={bank?<button type="button" className="player-balance-button player-balance-button-weekly"
+                     aria-label={'Balance for '+task.label} onClick={()=>setBalanceTaskKey(task.key)}>
+                     <Wallet size={13}/> Balance
+                   </button>:undefined}/> :
+                 <DailyTaskRow task={task} checked={completed}
+                   disabled={loading||Boolean(savingKey)||Boolean(error&&error.includes('migration'))}
+                   saving={savingKey===key} onToggle={()=>void toggleTask(task)}
+                   current={bank?.current??null} onBalance={()=>setBalanceTaskKey(task.key)}/>}
              </div>;
            })}
          </div>
@@ -325,7 +315,7 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
      <div className="player-character-tabs" role="tablist" aria-label="Your characters">
        {characters.map(c=><button role="tab" type="button" aria-selected={c.id===selected.id}
          className={'player-character-tab'+(c.id===selected.id?' selected':'')}
-         key={c.id} onClick={()=>{setActiveId(c.id);setNotice('');setError('');setAdding(false);}}>
+         key={c.id} onClick={()=>{setActiveId(c.id);setBalanceTaskKey(null);setNotice('');setError('');setAdding(false);}}>
          <span>{c.name}</span><small>{c.class_name||'Adventurer'}{c.is_main?' · MAIN':''}</small>
        </button>)}
      </div>
@@ -363,6 +353,12 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
        <p className="player-reset-note"><CalendarClock size={15}/> Community-reported Global schedule. At each reset, this character’s checkmarks roll over automatically.
          Verify official in-game timers after patches or maintenance.</p>
      </section>
+     {activeBalanceTask&&<TicketBalanceDialog key={selected.id+':'+activeBalanceTask.key}
+       task={activeBalanceTask} characterName={selected.name}
+       current={bankEntry(activeBalanceTask)?.current??null}
+       pending={Boolean(savingKey)} setupRequired={ticketSetupRequired}
+       onClose={()=>setBalanceTaskKey(null)}
+       onSave={count=>saveBalance(activeBalanceTask,count)}/>}
      <div className="player-main-checklists">
        {renderList('Daily cooldowns',characterDaily,dailyDone,'daily')}
        {renderList('Weekly cooldowns',characterWeekly,weeklyDone,'weekly')}
