@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import {DEFAULT_CHECKLIST_TASKS,CHECKLIST_JSON_LIMIT,validChecklistTasks} from './checklistConfig';
 
 /**
  * Reuses the existing admin-protected guides JSONB storage, so no manual
@@ -111,6 +112,7 @@ export const DEFAULT_SITE_CONTENT = {
   footerBrand: 'AION II',
   footerTag: 'GUILD CODEX',
   footerDescription: 'An independent fan-made community guide project. Not affiliated with or endorsed by NCSOFT.',
+  checklistItemsJson: JSON.stringify(DEFAULT_CHECKLIST_TASKS),
   footerClosing: 'FORGED IN KNOWLEDGE · UNITED IN PURPOSE'
 } as const;
 
@@ -138,7 +140,7 @@ export type SiteSnapshot = {
 
 const keys = Object.keys(DEFAULT_SITE_CONTENT) as SiteContentKey[];
 export const siteContentLimit = (key: SiteContentKey): number =>
-  key === 'newsItemsJson' ? 10000 : (key === 'profilePhotoUrl' || key === 'profileBackdropUrl') ? 1024 : key === 'profileBio' ? 1600 :
+  key === 'checklistItemsJson' ? CHECKLIST_JSON_LIMIT : key === 'newsItemsJson' ? 10000 : (key === 'profilePhotoUrl' || key === 'profileBackdropUrl') ? 1024 : key === 'profileBio' ? 1600 :
   key.toLowerCase().includes('description') || key === 'latestEmpty' ? 400 : 120;
 
 /** The portrait is optional and must come from our admin-managed public image bucket. */
@@ -200,6 +202,12 @@ export function normalizeSiteContent(raw: unknown): SiteContent {
   const result = {...DEFAULT_SITE_CONTENT} as SiteContent;
   for(const key of keys) {
     const value = source[key];
+    if(key==='checklistItemsJson'){
+      if(typeof value==='string'&&value.length<=CHECKLIST_JSON_LIMIT){
+        try{if(validChecklistTasks(JSON.parse(value)))result[key]=value;}catch{/* Use catalog defaults. */}
+      }
+      continue;
+    }
     if(key==='newsItemsJson'){
       if(typeof value==='string'&&value.length<=siteContentLimit(key)&&validNewsItems(value))result[key]=value;
       continue;
@@ -246,6 +254,10 @@ export async function saveSiteContent(values:SiteContent,old:SiteSnapshot,userId
   if(!userId)throw new Error('Sign in as a staff member before saving.');
   for(const key of keys){
     if(key==='newsItemsJson'&&!validNewsItems(values[key]))throw new Error('Review the upcoming news dates and official source links before publishing.');
+    if(key==='checklistItemsJson'){
+      try{if(!validChecklistTasks(JSON.parse(values[key])))throw new Error('Invalid checklist configuration.');}
+      catch{throw new Error('The checklist includes invalid items, duplicate IDs, or recharge rates.');}
+    }
     if(!values[key].trim() && key!=='profilePhotoUrl' && key!=='profileBackdropUrl')throw new Error('Every site text field must contain some text.');
     if(values[key].length > siteContentLimit(key))throw new Error('Text is too long: '+key);
     if((key==='profilePhotoUrl'||key==='profileBackdropUrl') && !validProfilePhotoUrl(values[key]))throw new Error('Profile images must be uploaded through Site Content.');
