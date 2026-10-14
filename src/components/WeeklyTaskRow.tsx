@@ -9,6 +9,7 @@ type Props={
   disabled:boolean;
   saving:boolean;
   onToggle:()=>void;
+  balanceAction?:React.ReactNode;
 };
 
 /**
@@ -16,7 +17,7 @@ type Props={
  * in a viewport-positioned tooltip. The tooltip is portaled to document.body
  * so it is never clipped by the scenic checklist's overflow mask.
  */
-export default function WeeklyTaskRow({task,checked,disabled,saving,onToggle}:Props){
+export default function WeeklyTaskRow({task,checked,disabled,saving,onToggle,balanceAction}:Props){
   const rowRef=useRef<HTMLDivElement>(null);
   const tooltipRef=useRef<HTMLDivElement>(null);
   const [visible,setVisible]=useState(false);
@@ -73,6 +74,7 @@ export default function WeeklyTaskRow({task,checked,disabled,saving,onToggle}:Pr
         <span className="player-task-check"><Check size={15}/></span>
         <strong className="player-weekly-name">{task.label}</strong>
       </label>
+      {balanceAction}
       <button type="button" className="player-weekly-info" onClick={show}
         aria-label={'About '+task.label} aria-describedby={visible?tooltipId:undefined}
         title={'More about '+task.label}>
