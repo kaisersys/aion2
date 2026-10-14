@@ -29,6 +29,8 @@ jobs:
         run: node tests/player-profile-race.mjs
       - name: Validate Global reset schedule and character isolation
         run: node tests/global-reset.mjs
+      - name: Validate editable checklists and ticket recharge projections
+        run: node tests/ticket-recharge.mjs
       - name: Verify Supabase Guide Studio configuration
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
