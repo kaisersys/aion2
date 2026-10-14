@@ -5,7 +5,7 @@ import type {ChecklistTask} from './lib/checklistConfig';
 import './style.css';
 
 const tasks:ChecklistTask[]=[
- {key:'weekly-dungeon',label:'Dungeon Weekly Entry',hint:'Complete your dungeon entry before the weekly reset. Some activities have separate reward caps.',type:'weekly',group:'Dungeons',scope:'character'},
+ {key:'weekly-dungeon',label:'Dungeon Weekly Entry',hint:'Complete your dungeon entry before the weekly reset. Some activities have separate reward caps.\\n\\n'+('This is extended Global dungeon guidance, including recommended steps and reward reminders. '.repeat(17)),type:'weekly',group:'Dungeons',scope:'character'},
  {key:'weekly-pvp',label:'Abyss Participation and Weekly PvP Objectives',hint:'Participation and reward limits may differ by game mode and your progression.',type:'weekly',group:'PvP & Abyss',scope:'character'},
  {key:'weekly-server',label:'Shared Weekly Server Mission',hint:'This objective is shared by all alts playing on the same server.',type:'weekly',group:'Quests',scope:'server'}
 ];
