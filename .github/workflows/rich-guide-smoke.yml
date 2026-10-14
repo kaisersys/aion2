@@ -68,3 +68,13 @@ jobs:
           sleep 3
           export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           node tests/browser-smoke.mjs weekly
+      - name: Build ticket balance dialog fixture
+        run: |
+          cp tests/balance-dialog-fixture.tsx src/main.tsx
+          npm run build
+      - name: Test daily Balance actions and responsive dialog
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4178 > /tmp/atreia-balance.log 2>&1 &
+          sleep 3
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          node tests/browser-smoke.mjs balance
