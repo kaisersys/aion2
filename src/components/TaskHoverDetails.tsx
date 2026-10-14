@@ -13,7 +13,7 @@ type Props={
  * Portal outside scenic artwork overflow; allow scrolling longer blurbs.
  */
 export default function TaskHoverDetails({task,children}:Props){
-  const anchorRef=useRef<HTMLDivElement>(null);
+  const infoRef=useRef<HTMLButtonElement>(null);
   const tooltipRef=useRef<HTMLDivElement>(null);
   const hideTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const [visible,setVisible]=useState(false);
@@ -32,7 +32,7 @@ export default function TaskHoverDetails({task,children}:Props){
 
   useLayoutEffect(()=>{
     if(!visible)return;
-    const anchor=anchorRef.current?.getBoundingClientRect();
+    const anchor=infoRef.current?.getBoundingClientRect();
     if(!anchor)return;
     const width=Math.min(430,window.innerWidth-32);
     const measuredHeight=tooltipRef.current?.getBoundingClientRect().height??160;
@@ -49,7 +49,7 @@ export default function TaskHoverDetails({task,children}:Props){
     if(!visible)return;
     const onPointer=(e:PointerEvent)=>{
       const target=e.target as Node;
-      if(!anchorRef.current?.contains(target)&&!tooltipRef.current?.contains(target))hide();
+      if(!infoRef.current?.contains(target)&&!tooltipRef.current?.contains(target))hide();
     };
     const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape')hide();};
     const onScroll=(e:Event)=>{
@@ -70,18 +70,16 @@ export default function TaskHoverDetails({task,children}:Props){
   },[visible]);
   useEffect(()=>()=>clearHide(),[]);
 
-  const infoButton=<button type="button"
+  const infoButton=<button ref={infoRef} type="button"
     className={'player-weekly-info player-task-info'+(task.type==='daily'?' player-daily-info':'')}
+    onMouseEnter={show} onMouseLeave={delayHide}
+    onFocus={show} onBlur={delayHide}
     onClick={show}
     aria-label={'About '+task.label} aria-expanded={visible} aria-describedby={visible?tooltipId:undefined}
     title={'More about '+task.label}><Info size={15}/></button>;
 
   return <>
-    <div ref={anchorRef} className="player-task-hover-anchor"
-      onMouseEnter={show} onMouseLeave={delayHide} onFocusCapture={show}
-      onBlurCapture={event=>{
-        if(!event.currentTarget.contains(event.relatedTarget as Node|null))delayHide();
-      }}>
+    <div className="player-task-hover-anchor">
       {children(infoButton)}
     </div>
     {visible&&createPortal(
