@@ -15,6 +15,7 @@ import { CATEGORIES, emptyDocument, guideSlug, type GuideRecord, type GuideStatu
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { SITE_CONTENT_SLUG } from '../lib/siteContent';
 import SiteContentEditor from './SiteContentEditor';
+import ChecklistEditor from './ChecklistEditor';
 
 type Props = { onExit: () => void; onContentChanged: () => void };
 
@@ -295,6 +296,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [editing, setEditing] = useState<GuideRecord | null | undefined>(undefined);
   const [siteEditing,setSiteEditing] = useState(false);
+  const [checklistEditing,setChecklistEditing] = useState(false);
   const [listError, setListError] = useState('');
 
   useEffect(() => {
@@ -347,7 +349,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
   };
   const signOut = async () => {
     await supabase?.auth.signOut();
-    setUser(null);setIsAdmin(false);setEditing(undefined);setSiteEditing(false);
+    setUser(null);setIsAdmin(false);setEditing(undefined);setSiteEditing(false);setChecklistEditing(false);
   };
   const remove = async (record: GuideRecord) => {
     if(!supabase || !window.confirm(`Permanently delete "${record.title}"? This cannot be undone.`)) return;
@@ -369,7 +371,7 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
   </main>;
 
   return <main className="inner-page section-wrap studio-page">
-    {!siteEditing&&<button className="back-link" onClick={onExit}><ArrowLeft size={16}/> BACK TO HOME</button>}
+    {!siteEditing&&!checklistEditing&&<button className="back-link" onClick={onExit}><ArrowLeft size={16}/> BACK TO HOME</button>}
     {checking ? <p>Checking staff access...</p> :
      !user ? <div className="studio-login">
        <div className="section-kicker left">GUILD STAFF ONLY</div><h1>Admin <i>Sanctum</i></h1>
@@ -387,6 +389,8 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
        {authError && <p className="studio-message">{authError}</p>}
        <button className="studio-quiet-button" onClick={()=>void signOut()}><LogOut size={16}/> Sign out</button>
      </div> :
+     checklistEditing ?
+       <ChecklistEditor userId={user.id} onBack={()=>setChecklistEditing(false)} onPublished={onContentChanged}/> :
      siteEditing ?
        <SiteContentEditor userId={user.id} onBack={()=>setSiteEditing(false)}
          onPublished={onContentChanged}/> :
@@ -406,6 +410,13 @@ export default function AdminPanel({ onExit, onContentChanged }: Props) {
             <p>Edit homepage titles, category descriptions, navigation, buttons and footer text. No deployment needed.</p>
           </div>
           <button type="button" className="studio-quiet-button" onClick={()=>setSiteEditing(true)}><Pencil size={16}/> Edit website text</button>
+        </div>
+        <div className="studio-content-shortcut">
+          <div>
+            <strong>Player Checklist Editor</strong>
+            <p>Choose which Global activities players see, remove Korea-only entries, change daily or weekly limits, and configure automatic ticket recharge amounts and caps.</p>
+          </div>
+          <button type="button" className="studio-quiet-button" onClick={()=>setChecklistEditing(true)}><Pencil size={16}/> Edit player checklists</button>
         </div>
         <div className="studio-topbar">
           <h2>Manage guides <span className="studio-count">{records.length}</span></h2>

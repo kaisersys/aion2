@@ -5,14 +5,14 @@ import {supabase,isSupabaseConfigured} from '../lib/supabase';
 import PlayerDashboard from './PlayerDashboard';
 import type {SuggestedGuide} from '../lib/playerData';
 
-type Props={user:User|null;guides:SuggestedGuide[];onBack:()=>void;onGuide:(slug:string)=>void;onLibrary:()=>void};
+type Props={user:User|null;checklistItemsJson:string;guides:SuggestedGuide[];onBack:()=>void;onGuide:(slug:string)=>void;onLibrary:()=>void};
 type FormMode='signin'|'signup'|'forgot'|'password';
 const friendlyError=(error:{message?:string;code?:string}|null)=>error?.code==='42P01' ||
   /relation .* does not exist|could not find the table/i.test(error?.message||'')
     ? 'Player tracking tables have not been activated yet. The site owner must apply the player-accounts SQL migration in Supabase before progress can be saved.'
     : error?.message||'An unexpected error occurred. Please try again.';
 
-export default function PlayerPortal({user,guides,onBack,onGuide,onLibrary}:Props){
+export default function PlayerPortal({user,checklistItemsJson,guides,onBack,onGuide,onLibrary}:Props){
   const [mode,setMode]=useState<FormMode>('signin');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
@@ -112,6 +112,6 @@ export default function PlayerPortal({user,guides,onBack,onGuide,onLibrary}:Prop
         <p className="page-intro">Your characters, reset timers, and guides — all in one place.</p></div>
       <button className="player-signout" onClick={()=>void supabase?.auth.signOut()}>Sign out</button>
     </div>
-    <PlayerDashboard user={user} guides={guides} onGuide={onGuide} onLibrary={onLibrary}/>
+    <PlayerDashboard user={user} checklistItemsJson={checklistItemsJson} guides={guides} onGuide={onGuide} onLibrary={onLibrary}/>
   </main>;
 }

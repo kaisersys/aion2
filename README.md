@@ -260,3 +260,66 @@ storage bucket or publicly accessible user photo files.
    to your own zone; checkmarks reset on the next matching UTC boundary.
 7. Open `/#admin` as an ordinary player and confirm Guide Studio is
    still restricted.
+
+
+## Editable player checklists and ticket tracker
+
+**Admin:** Sign into `https://atreiastreet.com/#admin`, then choose
+**Player Checklist Editor → Edit player checklists**. You can add, delete,
+reorder, regroup and rename daily or weekly tasks, choose per-character or
+per-server sharing, restrict an entry to Elyos or Asmodian, and optionally
+turn on **Track rechargeable tickets** with an admin-defined recharge
+amount (per daily/weekly reset) and maximum cap. Click **Publish checklist**
+to make the curated catalog live for visitors without a new GitHub build.
+
+Checklist configuration is stored in the existing admin-only Site Content
+record using the original `admin_users` RLS rules and version history.
+Regular users cannot publish checklists, and they see published changes
+when reloading their dashboard. Task IDs stay constant across renames;
+removing tasks does not purge unrelated progress. A new task gets a stable
+random ID. The default catalog is editable, so the owner can remove
+entries based on Korea data that do not apply to AION 2 Global.
+
+**One extra Supabase SQL setup for player ticket saving:** Open the existing
+Supabase project SQL Editor and run
+[`supabase/migrations/20261013_player_ticket_balances.sql`](supabase/migrations/20261013_player_ticket_balances.sql).
+This creates an additive `player_ticket_balances` table with RLS.
+Neither accounts nor existing checkmarks nor saved guides are reset.
+If the migration is missing, the normal checklists still work; the
+optional ticket tracker displays a setup warning rather than claiming
+ticket counts were saved.
+
+**Player:** Under a rechargeable activity (initially Nightmare), optionally
+enter your in-game current ticket count and click **Save balance**. The
+account stores that exact user-reported number and the last reset key.
+The tracker projects +N tickets per matching reset up to the published cap,
+whether the player was online or offline. It updates across dates and
+across devices using an anchored snapshot and never wipes banked tickets
+just because a checkbox cleared. Press **− 1 used** after spending a
+ticket, or enter a fresh in-game count to correct any discrepancies.
+An activity shared by server uses the same count across alts on the
+same server; character-scoped resources remain independent.
+
+This is a **manual projection**, not an integration with NCSoft or a live
+read of in-game inventory. It assumes the configured rate/cap remains
+unchanged and the player records ticket spending; official game counters
+take priority. Global sources disagree about certain other dungeon
+refill rules, so recharge is opt-in per activity instead of assigning
+unverified values globally. Nightmare's starter rate is +2 per daily
+reset, cap 14.
+
+### Test checklist
+
+1. As admin, open Checklist Editor, rename a task, save, refresh the
+   player dashboard, and verify the new title appears. Remove any
+   non-Global rows and verify they disappear for all players.
+2. Add a test task, reorder it, enable recharge, adjust rate/cap,
+   publish, and check the player portal.
+3. As a player, enter Nightmare = 4, save, refresh, and confirm 4
+   persists. Adjust by −1, refresh, and verify 3 persists.
+4. After the next daily reset the projection should increase by 2,
+   never above 14; daily checkmarks should reset *without* resetting
+   banked tickets. The weekly recharge mode works similarly on Wednesday.
+5. Switch main and alt. Character-scoped balances must be independent;
+   server-scoped balances must be shared when server names match.
+6. Confirm a regular player still cannot access Guide Studio.
