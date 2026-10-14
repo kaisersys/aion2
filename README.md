@@ -193,3 +193,70 @@ this independent guide website.
 These are **Atreia Street tracking periods**, *not* claims about AION 2's
 official game reset time. Tasks are friendly sample prompts and will be
 customizable in a future iteration.
+
+
+## Multi-character dashboard (character tabs and Global reset timers)
+
+**One-time database setup after deployment:** since the player-accounts migration
+was already run for the previous dashboard, open your existing Supabase project
+**SQL Editor** and run the new, additive migration
+[`supabase/migrations/20261013_character_dashboard.sql`](supabase/migrations/20261013_character_dashboard.sql).
+It creates three player-owned RLS tables: `player_characters`,
+`player_character_task_completions`, and `player_server_task_completions`.
+It creates an initial main character from each player's existing profile,
+backfills old checklist rows, and **does not remove previous tables, change
+guide permissions, or require a new account**. Re-running the migration is
+idempotent. Until the new tables exist, players get a setup notice rather
+than silently storing checkmarks on the wrong character.
+
+The signed-in `/#/account` dashboard flows top to bottom: account details,
+character tabs (up to eight, with editable name/class/faction/server and
+scenic theme), **live daily and weekly countdowns**, large two-column
+checklist canvases, and tabbed **Recommended / Saved** guides.
+
+### Reset logic
+
+Current AION 2 **Global community-reported** schedule:
+- **Daily**: every day at **07:00 UTC** (16:00 on the UTC+9 Global server clock).
+- **Weekly**: **Wednesday at 07:00 UTC**.
+- The browser presents a one-second countdown and the next reset in the
+  user's local time. Changing between daylight/summer and standard time
+  does **not** alter the UTC boundary.
+- Every checkmark is keyed to the most recent reset. When the window changes,
+  the old period's checkmarks automatically disappear from the live checklist,
+  without erasing historical database records or affecting other characters.
+- **Some activity limits are server-shared**, such as Duty Missions, while
+  others are per character. Players must enter the **same server name**
+  for main and alt to share server-wide marks. Server names are editable.
+- Checklist marks indicate the user's manual tracking only. Some in-game
+  reward tickets **accumulate** rather than disappear at reset; a cleared
+  checklist does not mean unused in-game items are wiped.
+- The extensive categories are guided by [Aion2Data's Global checklist](https://aion2data.com/checklist),
+  checked against the October 9, 2026 client data; the game may revise
+  caps after patches. In-game timers take priority.
+
+### Checklist background images
+
+Daily and weekly trackers use separate cropped compositions of the locally
+hosted AION hero artwork (no external image downloads). Each character can
+choose **Twilight, Moonlit, or Dusk** visual treatments. This is an artwork
+preset selector, **not** a user-upload feature yet; it requires no player
+storage bucket or publicly accessible user photo files.
+
+### Smoke-testing a main and an alt
+
+1. After applying the migration, sign in using an existing player account.
+   The previously stored display name/class/faction should appear as
+   the initial **MAIN** character.
+2. Add an alt, select it, mark a character-specific task, then switch
+   back to MAIN. The main's item should remain unchecked.
+3. Ensure both characters use the same server name. Check Duty Missions
+   on one, switch to the other; Duty Missions should also be checked.
+4. Select another server for the alt and save. Shared progress must
+   no longer carry over to that alt.
+5. Refresh. Tabs, character properties, guide bookmarks, and current-period
+   checkmarks must persist.
+6. Verify the daily/weekly countdown shows the fixed UTC schedule translated
+   to your own zone; checkmarks reset on the next matching UTC boundary.
+7. Open `/#admin` as an ordinary player and confirm Guide Studio is
+   still restricted.
