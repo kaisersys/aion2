@@ -1,13 +1,84 @@
 import { chromium } from 'playwright-core';
 const mode=process.argv[2]||'app';
-const port=mode==='fixture'?4174:mode==='editor'?4175:mode==='site'?4176:mode==='weekly'?4177:4173;
+const port=mode==='fixture'?4174:mode==='editor'?4175:mode==='site'?4176:mode==='weekly'?4177:mode==='balance'?4178:4173;
 const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const failures=[];
 page.on('pageerror',e=>failures.push('Uncaught JavaScript: '+e.message));
 const check=(ok,label)=>{console.log((ok?'PASS':'FAIL')+' '+label);if(!ok)failures.push(label);};
 try {
-  if(mode==='weekly') {
+  if(mode==='balance') {
+    await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
+    const daily=page.locator('.player-scenic-daily');
+    await daily.waitFor({timeout:10000});
+    check(await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).count()===1,
+      'rechargeable daily activity has a Balance button');
+    check(await daily.getByRole('button',{name:'Balance for Conquest Dungeon'}).count()===1 &&
+      await daily.getByRole('button',{name:'Balance for Attendance check-in'}).count()===0,
+      'Balance action appears only for configured ticket activities');
+    check(await page.locator('.player-ticket-tracker').count()===0 &&
+      await page.getByRole('dialog').count()===0,
+      'ticket fields no longer occupy space inside daily rows');
+    const alignment=await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).evaluate(el=>{
+      const row=el.closest('.player-daily-row')?.getBoundingClientRect();
+      const b=el.getBoundingClientRect();
+      return row?{rightMargin:row.right-b.right,sameRow:b.top>=row.top&&b.bottom<=row.bottom}:null;
+    });
+    check(Boolean(alignment&&alignment.rightMargin<=6&&alignment.sameRow),
+      'Balance button is right-aligned within the daily activity row');
+    await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).click();
+    const dialog=page.getByRole('dialog');
+    await dialog.waitFor({timeout:3000});
+    check((await dialog.getByRole('heading').innerText()).includes('Nightmare attempts') &&
+      (await dialog.innerText()).includes('Ranger Test'), 'Balance dialog names the activity and character');
+    const gutters=await dialog.evaluate(el=>{
+      const label=el.querySelector('.player-balance-form>label')?.getBoundingClientRect();
+      const help=el.querySelector('.player-balance-field-help')?.getBoundingClientRect();
+      const input=el.querySelector('.player-balance-form>input')?.getBoundingClientRect();
+      const title=el.querySelector('h2')?.getBoundingClientRect();
+      return {titleToForm:label.top-title.bottom,labelToHelp:help.top-label.bottom,
+        helpToInput:input.top-help.bottom};
+    });
+    check(gutters.titleToForm>=35 && gutters.labelToHelp>=9 && gutters.helpToInput>=12,
+      'dialogue has visible gutters between title, ticket label, help and input');
+    const ticketInput=dialog.getByRole('spinbutton',{name:'Nightmare attempts current tickets'});
+    check(await ticketInput.inputValue()==='5','dialog reads saved ticket balance');
+    await ticketInput.fill('8');
+    await dialog.getByRole('button',{name:'Save balance'}).click();
+    check((await dialog.getByRole('status').innerText()).includes('saved') &&
+      (await dialog.innerText()).includes('8 / 14'),'saving shows confirmation and updated count');
+    await dialog.getByRole('button',{name:'1 ticket used'}).click();
+    check(await ticketInput.inputValue()==='7','one-ticket-used control updates count');
+    await page.keyboard.press('Escape');
+    check(await page.getByRole('dialog').count()===0 &&
+      await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).evaluate(el=>document.activeElement===el),
+      'Escape closes dialog and returns focus to Balance button');
+    await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).click();
+    check(await page.getByRole('spinbutton',{name:'Nightmare attempts current tickets'}).inputValue()==='7',
+      'ticket number remains available after reopening');
+    await page.getByRole('button',{name:'Close balance dialog'}).click();
+    await page.locator('.player-scenic-weekly .player-balance-button').click();
+    check((await page.getByRole('dialog').innerText()).includes('Weekly ticket mission'),
+      'rechargeable weekly activity can also use the dialog');
+    await page.getByRole('button',{name:'Done'}).click();
+    const phone=await browser.newPage({viewport:{width:390,height:844},hasTouch:true});
+    await phone.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
+    await phone.getByRole('button',{name:'Balance for Nightmare attempts'}).tap();
+    const mobileDialog=phone.getByRole('dialog');
+    await mobileDialog.waitFor({timeout:3000});
+    const fit=await mobileDialog.evaluate(el=>{
+      const r=el.getBoundingClientRect();
+      const i=el.querySelector('.player-balance-form>input')?.getBoundingClientRect();
+      return {left:r.left,right:r.right,height:r.height,inputLeft:i.left,inputRight:i.right,
+        windowWidth:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth+1};
+    });
+    check(fit.left>=0&&fit.right<=fit.windowWidth+1&&
+      fit.inputLeft>=fit.left&&fit.inputRight<=fit.right&&
+      fit.height<=844&&!fit.overflow,'mobile ticket dialog fits without horizontal overflow');
+    await mobileDialog.getByRole('button',{name:'Done'}).tap();
+    check(await phone.getByRole('dialog').count()===0,'mobile Done button closes dialog');
+    await phone.close();
+  } else if(mode==='weekly') {
     await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
     const items=page.locator('.player-scenic-weekly .player-task-entry-weekly');
     await items.first().waitFor({timeout:10000});
