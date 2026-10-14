@@ -1599,3 +1599,54 @@
   .player-balance-save{grid-column:1/-1}
   .player-balance-done{margin-left:0}
 }
+
+
+/* Shared daily/weekly help: accessible longer blurbs outside scenic clipping. */
+.player-task-hover-anchor{width:100%;min-width:0}
+.player-task-entry .player-task-hover-anchor .player-daily-row{margin:0}
+.player-daily-row .player-daily-details{gap:0}
+.player-task-entry .player-daily-info{
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 29px;min-width:29px;width:29px;height:29px;
+  border:1px solid transparent;border-radius:50%;background:#1b2d4380;
+  color:#a7c1df;cursor:pointer;padding:0;margin-left:auto
+}
+.player-daily-row .player-balance-button{margin-left:0}
+.player-task-entry .player-daily-info:hover,
+.player-task-entry .player-daily-info:focus-visible{
+  border-color:#afc6e2;background:#2c435f;color:#f1f6fc
+}
+.player-task-tooltip{
+  z-index:11000;pointer-events:auto;
+  max-width:calc(100vw - 32px);
+  max-height:min(68dvh,540px);overflow-x:hidden;overflow-y:auto;
+  overscroll-behavior:contain;scrollbar-width:thin;
+  padding:20px 23px;border-radius:8px;
+  box-shadow:0 23px 65px #000c,0 0 26px #152942af
+}
+.player-task-tooltip .player-weekly-tooltip-kicker{margin-bottom:11px}
+.player-task-tooltip strong{font-size:15px;line-height:1.55}
+.player-task-tooltip .player-task-tooltip-description{
+  margin:13px 0 0;font:400 12px/1.85 Inter,Arial,sans-serif;
+  color:#d2e0f0;white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.player-task-tooltip small{line-height:1.75}
+.checklist-editor .checklist-description-field{display:grid;gap:10px}
+.checklist-description-field textarea{
+  width:100%;min-height:114px;resize:vertical;padding:14px 15px;
+  color:#e8f2fe;font:400 13px/1.8 Inter,Arial,sans-serif;
+  background:#0b1424;border:1px solid #7d91b273;border-radius:4px;
+  white-space:pre-wrap
+}
+.checklist-description-field textarea:focus-visible{outline:2px solid #c0d6f0;outline-offset:2px}
+.checklist-description-field textarea::placeholder{color:#91a5bf}
+.checklist-description-meta{
+  display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  font:400 11px/1.6 Inter,Arial,sans-serif;color:#aabdd6
+}
+.checklist-description-meta>span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+@media(max-width:530px){
+  .player-task-entry .player-daily-info{flex:0 0 36px;width:36px;height:36px}
+  .player-task-tooltip{max-height:min(70dvh,540px);padding:17px 19px}
+  .player-daily-row .player-daily-label{flex-basis:44%}
+}
