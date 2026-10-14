@@ -1,13 +1,51 @@
 import { chromium } from 'playwright-core';
 const mode=process.argv[2]||'app';
-const port=mode==='fixture'?4174:mode==='editor'?4175:mode==='site'?4176:4173;
+const port=mode==='fixture'?4174:mode==='editor'?4175:mode==='site'?4176:mode==='weekly'?4177:4173;
 const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
 const failures=[];
 page.on('pageerror',e=>failures.push('Uncaught JavaScript: '+e.message));
 const check=(ok,label)=>{console.log((ok?'PASS':'FAIL')+' '+label);if(!ok)failures.push(label);};
 try {
-  if(mode==='site') {
+  if(mode==='weekly') {
+    await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
+    const items=page.locator('.player-scenic-weekly .player-task-entry-weekly');
+    await items.first().waitFor({timeout:10000});
+    check(await items.count()===3,'weekly fixture renders compact activity names');
+    check(await page.locator('.player-scenic-weekly .player-task small').count()===0,
+      'weekly descriptions are not shown inside checklist rows');
+    const rowHeight=await items.first().locator('.player-weekly-row').evaluate(el=>el.getBoundingClientRect().height);
+    check(rowHeight<=48,'weekly name-only row is compact');
+    await items.first().hover();
+    const tooltip=page.getByRole('tooltip');
+    await tooltip.waitFor({timeout:3000});
+    check((await tooltip.innerText()).includes('Complete your dungeon entry before the weekly reset'),
+      'weekly help text floats on hover');
+    const placement=await tooltip.evaluate(el=>({
+      outsideScenic:el.parentElement===document.body,
+      bounds:el.getBoundingClientRect().toJSON()
+    }));
+    check(placement.outsideScenic && placement.bounds.left>=0 && placement.bounds.right<=1280,
+      'tooltip is portaled outside scenic overflow and stays in viewport');
+    await page.locator('.player-scenic-weekly .player-weekly-label').first().click();
+    check(await items.first().locator('input[type="checkbox"]').isChecked(),
+      'compact row still allows normal checklist toggling');
+    await page.getByRole('button',{name:'Outside focus'}).click();
+    check(await tooltip.count()===0,'tooltip closes after focus moves away');
+    await page.setViewportSize({width:390,height:844});
+    const details=items.last().getByRole('button',{name:'About Shared Weekly Server Mission'});
+    await details.tap();
+    await tooltip.waitFor({timeout:3000});
+    check((await tooltip.innerText()).includes('shared by all alts') &&
+      (await tooltip.innerText()).includes('Shared across characters'),
+      'touch information button opens the external details blurb');
+    const mobile=await tooltip.evaluate(el=>({
+      left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right,
+      body:document.documentElement.scrollWidth,viewport:innerWidth
+    }));
+    check(mobile.left>=0 && mobile.right<=mobile.viewport+1 && mobile.body<=mobile.viewport+1,
+      'touch tooltip remains within the narrow viewport');
+  } else if(mode==='site') {
     await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
     const editor=page.locator('.site-copy-editor');
     await editor.getByRole('heading',{name:'Site Content'}).waitFor({timeout:10000});
