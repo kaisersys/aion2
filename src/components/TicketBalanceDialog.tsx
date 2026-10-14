@@ -17,6 +17,8 @@ type Props={
 export default function TicketBalanceDialog({task,characterName,current,pending,setupRequired,onClose,onSave}:Props){
   const titleId=useId(),descriptionId=useId(),inputId=useId();
   const dialogRef=useRef<HTMLDivElement>(null);
+  const closeRef=useRef(onClose);
+  closeRef.current=onClose;
   const inputRef=useRef<HTMLInputElement>(null);
   const [draft,setDraft]=useState(current===null?'':String(current));
   const [error,setError]=useState('');
@@ -30,7 +32,7 @@ export default function TicketBalanceDialog({task,characterName,current,pending,
     document.body.style.overflow='hidden';
     inputRef.current?.focus();
     const onKeyDown=(event:KeyboardEvent)=>{
-      if(event.key==='Escape'){event.preventDefault();onClose();return;}
+      if(event.key==='Escape'){event.preventDefault();closeRef.current();return;}
       if(event.key!=='Tab'||!dialogRef.current)return;
       const items=Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
         'button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
@@ -46,7 +48,7 @@ export default function TicketBalanceDialog({task,characterName,current,pending,
       document.body.style.overflow=previousOverflow;
       if(opener?.isConnected)opener.focus();
     };
-  },[onClose]);
+  },[]);
 
   const apply=async(amount:number)=>{
     if(pending)return;
