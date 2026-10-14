@@ -58,3 +58,13 @@ jobs:
           sleep 3
           export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           node tests/browser-smoke.mjs site
+      - name: Build compact weekly checklist fixture
+        run: |
+          cp tests/weekly-compact-fixture.tsx src/main.tsx
+          npm run build
+      - name: Test weekly tooltips, checkboxes and touch targets in Chrome
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4177 > /tmp/atreia-weekly.log 2>&1 &
+          sleep 3
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          node tests/browser-smoke.mjs weekly

@@ -3,6 +3,7 @@ import type {User} from '@supabase/supabase-js';
 import {ArrowUpRight,Bookmark,BookOpen,CalendarClock,Check,ChevronDown,ChevronUp,Clock3,Plus,Save,ShieldCheck,Trash2,UserRound} from 'lucide-react';
 import {supabase} from '../lib/supabase';
 import {ensurePlayerProfile} from '../lib/playerProfile';
+import WeeklyTaskRow from './WeeklyTaskRow';
 import {PLAYER_CLASSES,recommendedGuides,type PlayerProfile,type SuggestedGuide} from '../lib/playerData';
 import {globalResetSnapshot,countdown,completionKey,visibleTasks,
   type PlayerCharacter,type GameTask} from '../lib/globalReset';
@@ -262,15 +263,19 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
              const completed=taskDone(task);
              const key=completionKey(task,selected!,resets.day,resets.week);
              const bank=bankEntry(task);
-             return <div className="player-task-entry" key={task.key}>
-               <label className={'player-task'+(completed?' done':'')}>
-                 <input type="checkbox" checked={completed} disabled={loading||Boolean(savingKey)||Boolean(error&&error.includes('migration'))}
-                   onChange={()=>void toggleTask(task)}/>
-                 <span className="player-task-check"><Check size={15}/></span>
-                 <span><strong>{task.label}</strong><small>{task.hint}</small></span>
-                 {task.scope==='server'&&<span className="player-shared-tag" title="Shared across characters on this server">SERVER</span>}
-                 {savingKey===key&&<span className="player-saving-indicator">Saving…</span>}
-               </label>
+             return <div className={'player-task-entry'+(period==='weekly'?' player-task-entry-weekly':'')} key={task.key}>
+               {period==='weekly'?
+                 <WeeklyTaskRow task={task} checked={completed}
+                   disabled={loading||Boolean(savingKey)||Boolean(error&&error.includes('migration'))}
+                   saving={savingKey===key} onToggle={()=>void toggleTask(task)}/> :
+                 <label className={'player-task'+(completed?' done':'')}>
+                   <input type="checkbox" checked={completed} disabled={loading||Boolean(savingKey)||Boolean(error&&error.includes('migration'))}
+                     onChange={()=>void toggleTask(task)}/>
+                   <span className="player-task-check"><Check size={15}/></span>
+                   <span><strong>{task.label}</strong><small>{task.hint}</small></span>
+                   {task.scope==='server'&&<span className="player-shared-tag" title="Shared across characters on this server">SERVER</span>}
+                   {savingKey===key&&<span className="player-saving-indicator">Saving…</span>}
+                 </label>}
                {bank&&<div className="player-ticket-tracker">
                  <span className="player-ticket-title">{bank.current===null?'Optional ticket tracker':bank.current+' / '+task.recharge!.cap+' tickets estimated'}</span>
                  <span className="player-ticket-rate">+{task.recharge!.amount} / {task.type==='daily'?'day':'week'} · cap {task.recharge!.cap}</span>
