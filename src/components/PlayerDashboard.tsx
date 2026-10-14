@@ -221,8 +221,8 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
  const saveBalance=async(task:ChecklistTask,explicit?:number)=>{
    if(!supabase||!user||savingKey||ticketSetupRequired||!task.recharge)return;
    const state=bankEntry(task);if(!state)return;
-   const input=explicit??Number(ticketDrafts[state.id]);
-   if(!Number.isInteger(input)||input<0||input>task.recharge.cap){
+   const input=explicit??(ticketDrafts[state.id]===undefined?state.current:Number(ticketDrafts[state.id]));
+   if(input===null||!Number.isInteger(input)||input<0||input>task.recharge.cap){
      setError('Enter a whole number of tickets between 0 and '+task.recharge.cap+'.');return;
    }
    setSavingKey('ticket:'+state.id);setError('');setNotice('');
