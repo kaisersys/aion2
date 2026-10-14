@@ -8,7 +8,8 @@ export const DEFAULT_CHECKLIST_TASKS:ChecklistTask[]=[
   ...WEEKLY_GAME_TASKS
 ];
 export const CHECKLIST_LIMIT=90;
-export const CHECKLIST_JSON_LIMIT=45000;
+export const CHECKLIST_DESCRIPTION_LIMIT=2000;
+export const CHECKLIST_JSON_LIMIT=240000;
 
 export function validChecklistTasks(input:unknown):input is ChecklistTask[]{
   if(!Array.isArray(input)||input.length>CHECKLIST_LIMIT)return false;
@@ -19,7 +20,7 @@ export function validChecklistTasks(input:unknown):input is ChecklistTask[]{
     if(typeof row.key!=='string'||!/^[-a-z0-9]{1,90}$/.test(row.key)||keys.has(row.key))return false;
     keys.add(row.key);
     if(typeof row.label!=='string'||!row.label.trim()||row.label.length>100)return false;
-    if(typeof row.hint!=='string'||row.hint.length>240)return false;
+    if(typeof row.hint!=='string'||row.hint.length>CHECKLIST_DESCRIPTION_LIMIT)return false;
     if(typeof row.group!=='string'||!row.group.trim()||row.group.length>60)return false;
     if(row.type!=='daily'&&row.type!=='weekly')return false;
     if(row.scope!=='character'&&row.scope!=='server')return false;

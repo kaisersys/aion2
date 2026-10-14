@@ -8,7 +8,7 @@ import type {ChecklistTask} from './lib/checklistConfig';
 import './style.css';
 
 const daily:ChecklistTask[]=[
- {key:'nightmare',label:'Nightmare attempts',hint:'+2 tickets per day, banked up to 14',type:'daily',group:'Dungeons',scope:'character',recharge:{amount:2,cap:14}},
+ {key:'nightmare',label:'Nightmare attempts',hint:'Nightmare tickets regenerate daily and can be banked up to the configured cap.\\n\\n'+('Review the reset timer, record tickets spent in-game, and double-check your inventory. '.repeat(18)),type:'daily',group:'Dungeons',scope:'character',recharge:{amount:2,cap:14}},
  {key:'conquest',label:'Conquest Dungeon',hint:'Claim your daily dungeon rewards',type:'daily',group:'Conquest',scope:'character',recharge:{amount:2,cap:10}},
  {key:'attendance',label:'Attendance check-in',hint:'Claim the daily reward',type:'daily',group:'Events',scope:'character'}
 ];
