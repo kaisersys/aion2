@@ -1365,3 +1365,47 @@
  .player-guide-tabs{width:100%}
  .player-guide-tabs button{flex:1;justify-content:center}
 }
+
+
+/* Editable player activity catalog / editor controls */
+.checklist-editor{display:grid;gap:17px;padding-bottom:60px}
+.checklist-editor>h1{font:500 clamp(28px,4vw,43px)/1.3 Manrope,Inter,sans-serif;color:#e9f2ff}
+.checklist-editor .page-intro{max-width:940px}
+.checklist-editor-top,.checklist-editor-bottom{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.checklist-editor-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.checklist-editor .studio-quiet-button{display:inline-flex;align-items:center;gap:9px}
+.checklist-editor-list{display:grid;gap:13px}
+.checklist-editor-item{background:linear-gradient(130deg,#17283d,#101a2a);border:1px solid #94a9c34b;padding:20px}
+.checklist-editor-item-top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:15px}
+.checklist-editor-item-buttons{display:flex;gap:6px}
+.checklist-editor-item-buttons button{background:#192b40;border:1px solid #8ba2bd54;color:#c9d8ec;padding:8px;display:flex;align-items:center}
+.checklist-editor-item-buttons button:disabled{opacity:.3;cursor:default}
+.checklist-editor-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.checklist-editor-fields .full{grid-column:1 / -1}
+.checklist-recharge-settings{display:grid;gap:12px;margin-top:17px;padding-top:15px;border-top:1px solid #97aac24d}
+.checklist-recharge-switch{display:flex;align-items:center;gap:9px;color:#c7d8ed;font-size:12px}
+.checklist-recharge-switch input{accent-color:#b4cbe7}
+.checklist-recharge-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-width:600px}
+.checklist-editor-bottom{margin-top:12px;padding:16px;border-top:1px solid #879aba69;color:#bbcce1;font-size:12px}
+.player-task-entry{border-top:1px solid #b7c4d138}
+.player-task-entry .player-task{border-top:0}
+.player-ticket-tracker{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 15px 34px;padding:12px 13px;background:#101d2cc9;border:1px solid #9ab1cf51}
+.player-ticket-title{font-size:12px;font-weight:700;color:#d6e6f9}
+.player-ticket-rate{font-size:10px;color:#9eb5d0}
+.player-ticket-controls{display:flex;align-items:center;gap:8px;flex:1 1 100%;flex-wrap:wrap}
+.player-ticket-controls input{background:#091525;border:1px solid #98adca8c;color:#ebf4ff;max-width:135px;width:100%;padding:9px 10px;font:500 12px Inter,Arial,sans-serif}
+.player-ticket-controls button{background:#243a54;color:#dceaf9;border:1px solid #8da4c277;padding:9px 10px;font-size:10px;cursor:pointer}
+.player-ticket-controls button:disabled{opacity:.45;cursor:not-allowed}
+.player-ticket-controls button:hover:not(:disabled){border-color:#d7e7f8;background:#304a6a}
+.player-ticket-error{font-size:11px;color:#ffbbc8}
+@media(max-width:760px){
+ .checklist-editor-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .checklist-recharge-fields{grid-template-columns:1fr}
+}
+@media(max-width:530px){
+ .checklist-editor-fields{grid-template-columns:1fr}
+ .checklist-editor-item{padding:13px}
+ .checklist-editor-actions{width:100%}
+ .checklist-editor-actions button{flex:1;justify-content:center}
+ .player-ticket-tracker{margin-left:0}
+}
