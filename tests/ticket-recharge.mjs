@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import ts from 'typescript';
-const compile=(text)=>ts.transpileModule(text,{
- compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}
-}).outputText;
-const resetSource=readFileSync(new URL('../src/lib/globalReset.ts',import.meta.url),'utf8');
-const resetUri='data:text/javascript;charset=utf-8,'+encodeURIComponent(compile(resetSource));
-const configSource=readFileSync(new URL('../src/lib/checklistConfig.ts',import.meta.url),'utf8')
- .replace("from './globalReset'","from '"+resetUri+"'");
+import {build} from 'esbuild';
+// Bundle the real TypeScript source and its dependency instead of constructing
+// a nested data URI that some Node/TS combinations parse incorrectly.
+const result=await build({
+ entryPoints:['src/lib/checklistConfig.ts'],bundle:true,write:false,
+ platform:'node',format:'esm',logLevel:'silent'
+});
 const {DEFAULT_CHECKLIST_TASKS,validChecklistTasks,parseChecklistTasks,
- projectedTickets,ticketOwner,ticketId}=await import('data:text/javascript;charset=utf-8,'+encodeURIComponent(compile(configSource)));
+ projectedTickets,ticketOwner,ticketId}=await import('data:text/javascript;base64,'+Buffer.from(result.outputFiles[0].text).toString('base64'));
 assert.ok(DEFAULT_CHECKLIST_TASKS.length>30);
 const nightmare=DEFAULT_CHECKLIST_TASKS.find(t=>t.key==='nightmare');
 assert.deepEqual(nightmare.recharge,{amount:2,cap:14});
