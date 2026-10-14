@@ -14,6 +14,9 @@ try {
     check(await daily.locator('.player-daily-details small').count()===0,
       'daily task descriptions no longer crowd the checklist rows');
     await daily.locator('.player-daily-row').first().hover();
+    check(await page.getByRole('tooltip').count()===0,
+      'hovering daily activity name does not trigger the description');
+    await daily.getByRole('button',{name:'About Nightmare attempts'}).hover();
     const dailyTooltip=page.getByRole('tooltip');
     await dailyTooltip.waitFor({timeout:3000});
     const dailyDescription=await dailyTooltip.innerText();
@@ -33,6 +36,10 @@ try {
     await page.waitForTimeout(250);
     check(await dailyTooltip.count()===1 && await dailyTooltip.evaluate(el=>el.scrollTop)>0,
       'players can scroll through extended daily help text without closing the tooltip');
+    await page.mouse.move(1200,22);
+    await dailyTooltip.waitFor({state:'hidden',timeout:3000});
+    check(await dailyTooltip.count()===0,
+      'daily description closes when mouse leaves the info icon and popover');
     check(await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).count()===1,
       'rechargeable daily activity has a Balance button');
     check(await daily.getByRole('button',{name:'Balance for Conquest Dungeon'}).count()===1 &&
@@ -110,6 +117,9 @@ try {
     const rowHeight=await items.first().locator('.player-weekly-row').evaluate(el=>el.getBoundingClientRect().height);
     check(rowHeight<=48,'weekly name-only row is compact');
     await items.first().hover();
+    check(await page.getByRole('tooltip').count()===0,
+      'hovering the weekly task name alone does not open a tooltip');
+    await items.first().getByRole('button',{name:'About Dungeon Weekly Entry'}).hover();
     const tooltip=page.getByRole('tooltip');
     await tooltip.waitFor({timeout:3000});
     check((await tooltip.innerText()).includes('Complete your dungeon entry before the weekly reset'),
@@ -122,6 +132,14 @@ try {
       'tooltip is portaled outside scenic overflow and stays in viewport');
     check(await tooltip.evaluate(el=>el.scrollHeight>el.clientHeight),
       'long weekly descriptions remain readable in a scrollable tooltip');
+    await tooltip.hover();
+    await page.waitForTimeout(250);
+    check(await tooltip.count()===1,
+      'popover stays open when pointer moves directly from info icon into text');
+    await page.mouse.move(1180,20);
+    await tooltip.waitFor({state:'hidden',timeout:3000});
+    check(await tooltip.count()===0,
+      'weekly popover closes automatically when pointer leaves its bounds');
     await page.locator('.player-scenic-weekly .player-weekly-label').first().click();
     check(await items.first().locator('input[type="checkbox"]').isChecked(),
       'compact row still allows normal checklist toggling');
