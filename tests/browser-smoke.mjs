@@ -32,19 +32,24 @@ try {
       'compact row still allows normal checklist toggling');
     await page.getByRole('button',{name:'Outside focus'}).click();
     check(await tooltip.count()===0,'tooltip closes after focus moves away');
-    await page.setViewportSize({width:390,height:844});
-    const details=items.last().getByRole('button',{name:'About Shared Weekly Server Mission'});
+    // Playwright's default desktop page cannot .tap(). Use a separate
+    // touch-enabled context to test the real mobile interaction.
+    const touchPage=await browser.newPage({viewport:{width:390,height:844},hasTouch:true});
+    await touchPage.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
+    const details=touchPage.getByRole('button',{name:'About Shared Weekly Server Mission'});
     await details.tap();
-    await tooltip.waitFor({timeout:3000});
-    check((await tooltip.innerText()).includes('shared by all alts') &&
-      (await tooltip.innerText()).includes('Shared across characters'),
+    const touchTooltip=touchPage.getByRole('tooltip');
+    await touchTooltip.waitFor({timeout:3000});
+    check((await touchTooltip.innerText()).includes('shared by all alts') &&
+      (await touchTooltip.innerText()).includes('Shared across characters'),
       'touch information button opens the external details blurb');
-    const mobile=await tooltip.evaluate(el=>({
+    const mobile=await touchTooltip.evaluate(el=>({
       left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right,
       body:document.documentElement.scrollWidth,viewport:innerWidth
     }));
     check(mobile.left>=0 && mobile.right<=mobile.viewport+1 && mobile.body<=mobile.viewport+1,
       'touch tooltip remains within the narrow viewport');
+    await touchPage.close();
   } else if(mode==='site') {
     await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
     const editor=page.locator('.site-copy-editor');
