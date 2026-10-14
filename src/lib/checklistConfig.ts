@@ -27,8 +27,8 @@ export function validChecklistTasks(input:unknown):input is ChecklistTask[]{
     if(row.recharge!==undefined){
       if(!row.recharge||typeof row.recharge!=='object'||Array.isArray(row.recharge))return false;
       const r=row.recharge as Record<string,unknown>;
-      if(!Number.isInteger(r.amount)||Number(r.amount)<1||Number(r.amount)>500)return false;
-      if(!Number.isInteger(r.cap)||Number(r.cap)<1||Number(r.cap)>100000)return false;
+      if(typeof r.amount!=='number'||!Number.isInteger(r.amount)||r.amount<1||r.amount>500)return false;
+      if(typeof r.cap!=='number'||!Number.isInteger(r.cap)||r.cap<1||r.cap>100000)return false;
       if(Number(r.amount)>Number(r.cap))return false;
     }
     return true;
