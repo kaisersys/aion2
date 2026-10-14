@@ -28,7 +28,10 @@ try {
       'long daily tooltip floats outside scenic panel and scrolls within viewport');
     await dailyTooltip.hover();
     await page.mouse.wheel(0,320);
-    check(await dailyTooltip.evaluate(el=>el.scrollTop)>0,
+    // Wheel scrolling is asynchronous in Chromium; let the compositor
+    // apply it before checking the actual scroll position.
+    await page.waitForTimeout(250);
+    check(await dailyTooltip.count()===1 && await dailyTooltip.evaluate(el=>el.scrollTop)>0,
       'players can scroll through extended daily help text without closing the tooltip');
     check(await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).count()===1,
       'rechargeable daily activity has a Balance button');
