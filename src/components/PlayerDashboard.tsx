@@ -5,7 +5,7 @@ import {supabase} from '../lib/supabase';
 import {ensurePlayerProfile} from '../lib/playerProfile';
 import {PLAYER_CLASSES,recommendedGuides,type PlayerProfile,type SuggestedGuide} from '../lib/playerData';
 import {globalResetSnapshot,countdown,completionKey,visibleTasks,
-  type PlayerCharacter} from '../lib/globalReset';
+  type PlayerCharacter,type GameTask} from '../lib/globalReset';
 import {parseChecklistTasks,projectedTickets,ticketOwner,ticketId,type ChecklistTask,type TicketBalance} from '../lib/checklistConfig';
 
 type Props={user:User;checklistItemsJson:string;guides:SuggestedGuide[];onGuide:(slug:string)=>void;onLibrary:()=>void};
