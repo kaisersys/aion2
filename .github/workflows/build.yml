@@ -27,6 +27,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Regression test player profile initialization
         run: node tests/player-profile-race.mjs
+      - name: Validate Global reset schedule and character isolation
+        run: node tests/global-reset.mjs
       - name: Verify Supabase Guide Studio configuration
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
