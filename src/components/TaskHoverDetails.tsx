@@ -72,7 +72,7 @@ export default function TaskHoverDetails({task,children}:Props){
 
   const infoButton=<button type="button"
     className={'player-weekly-info player-task-info'+(task.type==='daily'?' player-daily-info':'')}
-    onClick={()=>{clearHide();setVisible(was=>!was);}}
+    onClick={show}
     aria-label={'About '+task.label} aria-expanded={visible} aria-describedby={visible?tooltipId:undefined}
     title={'More about '+task.label}><Info size={15}/></button>;
 
