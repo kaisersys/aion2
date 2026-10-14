@@ -51,7 +51,7 @@ try {
     check(await ticketInput.inputValue()==='7','one-ticket-used control updates count');
     await page.keyboard.press('Escape');
     check(await page.getByRole('dialog').count()===0 &&
-      await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).isFocused(),
+      await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).evaluate(el=>document.activeElement===el),
       'Escape closes dialog and returns focus to Balance button');
     await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).click();
     check(await page.getByRole('spinbutton',{name:'Nightmare attempts current tickets'}).inputValue()==='7',
