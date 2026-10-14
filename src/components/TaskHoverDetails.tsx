@@ -75,8 +75,9 @@ export default function TaskHoverDetails({task,children}:Props){
     onMouseEnter={show} onMouseLeave={delayHide}
     onFocus={show} onBlur={delayHide}
     onClick={show}
-    aria-label={'About '+task.label} aria-expanded={visible} aria-describedby={visible?tooltipId:undefined}
-    title={'More about '+task.label}><Info size={15}/></button>;
+    aria-label={'About '+task.label} aria-expanded={visible} aria-describedby={visible?tooltipId:undefined}>
+      <Info size={15}/>
+    </button>;
 
   return <>
     <div className="player-task-hover-anchor">
