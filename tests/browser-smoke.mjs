@@ -122,8 +122,10 @@ try {
     await page.locator('.player-scenic-weekly .player-weekly-label').first().click();
     check(await items.first().locator('input[type="checkbox"]').isChecked(),
       'compact row still allows normal checklist toggling');
-    await page.getByRole('button',{name:'Outside focus'}).click();
-    check(await tooltip.count()===0,'tooltip closes after focus moves away');
+    await page.mouse.move(1180,20);
+    await page.getByRole('button',{name:'Outside focus'}).focus();
+    await tooltip.waitFor({state:'hidden',timeout:3000});
+    check(await tooltip.count()===0,'tooltip closes after hover and focus move away');
     // Playwright's default desktop page cannot .tap(). Use a separate
     // touch-enabled context to test the real mobile interaction.
     const touchPage=await browser.newPage({viewport:{width:390,height:844},hasTouch:true});
