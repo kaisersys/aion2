@@ -12,6 +12,12 @@ assert.ok(DEFAULT_CHECKLIST_TASKS.length>30);
 const nightmare=DEFAULT_CHECKLIST_TASKS.find(t=>t.key==='nightmare');
 assert.deepEqual(nightmare.recharge,{amount:2,cap:14});
 assert.ok(validChecklistTasks(DEFAULT_CHECKLIST_TASKS));
+const longDescription='Extended Global activity guidance. '.repeat(58).slice(0,2000);
+assert.equal(longDescription.length,2000);
+assert.ok(validChecklistTasks([{...nightmare,hint:longDescription}]),
+  'admin descriptions may contain 2,000 characters');
+assert.ok(!validChecklistTasks([{...nightmare,hint:longDescription+'!'}]),
+  'admin validation rejects blurbs exceeding 2,000 characters');
 const serialized=JSON.stringify(DEFAULT_CHECKLIST_TASKS);
 assert.equal(parseChecklistTasks(serialized).length,DEFAULT_CHECKLIST_TASKS.length);
 assert.ok(!validChecklistTasks([...DEFAULT_CHECKLIST_TASKS,nightmare]),'duplicate task keys must be rejected');
