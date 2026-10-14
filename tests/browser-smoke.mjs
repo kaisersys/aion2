@@ -11,6 +11,25 @@ try {
     await page.goto('http://127.0.0.1:'+port+'/',{waitUntil:'domcontentloaded'});
     const daily=page.locator('.player-scenic-daily');
     await daily.waitFor({timeout:10000});
+    check(await daily.locator('.player-daily-details small').count()===0,
+      'daily task descriptions no longer crowd the checklist rows');
+    await daily.locator('.player-daily-row').first().hover();
+    const dailyTooltip=page.getByRole('tooltip');
+    await dailyTooltip.waitFor({timeout:3000});
+    const dailyDescription=await dailyTooltip.innerText();
+    check(dailyDescription.includes('Nightmare tickets regenerate daily') &&
+      dailyDescription.length>1100,'daily activity hover reveals its complete extended description');
+    const dailyPopup=await dailyTooltip.evaluate(el=>({
+      outside:el.parentElement===document.body,
+      constrained:el.getBoundingClientRect().bottom<=innerHeight,
+      scrollable:el.scrollHeight>el.clientHeight
+    }));
+    check(dailyPopup.outside&&dailyPopup.constrained&&dailyPopup.scrollable,
+      'long daily tooltip floats outside scenic panel and scrolls within viewport');
+    await dailyTooltip.hover();
+    await page.mouse.wheel(0,320);
+    check(await dailyTooltip.evaluate(el=>el.scrollTop)>0,
+      'players can scroll through extended daily help text without closing the tooltip');
     check(await daily.getByRole('button',{name:'Balance for Nightmare attempts'}).count()===1,
       'rechargeable daily activity has a Balance button');
     check(await daily.getByRole('button',{name:'Balance for Conquest Dungeon'}).count()===1 &&
@@ -98,6 +117,8 @@ try {
     }));
     check(placement.outsideScenic && placement.bounds.left>=0 && placement.bounds.right<=1280,
       'tooltip is portaled outside scenic overflow and stays in viewport');
+    check(await tooltip.evaluate(el=>el.scrollHeight>el.clientHeight),
+      'long weekly descriptions remain readable in a scrollable tooltip');
     await page.locator('.player-scenic-weekly .player-weekly-label').first().click();
     check(await items.first().locator('input[type="checkbox"]').isChecked(),
       'compact row still allows normal checklist toggling');
