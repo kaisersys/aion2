@@ -79,6 +79,8 @@ jobs:
           # Until these are configured, the site remains in setup mode.
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
+          # Optional: only populate after a market data provider explicitly authorizes reuse.
+          VITE_MARKET_FEED_URL: ${{ secrets.VITE_MARKET_FEED_URL || vars.VITE_MARKET_FEED_URL }}
         run: npm run build
       - name: Package ready-to-upload website
         uses: actions/upload-artifact@v4
