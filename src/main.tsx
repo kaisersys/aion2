@@ -8,6 +8,7 @@ const GuideArticle = React.lazy(() => import('./components/GuideArticle'));
 import { getPublishedGuides, type GuideRecord } from './lib/guides';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 const PlayerPortal = React.lazy(() => import('./components/PlayerPortal'));
+const MarketPage = React.lazy(() => import('./components/MarketPage'));
 import { DEFAULT_SITE_CONTENT, getSiteContent, activeNewsItems, parseNewsItems, type SiteContent } from './lib/siteContent';
 import type { JSONContent } from '@tiptap/core';
 
@@ -26,6 +27,7 @@ function routeFromHash():string {
   if(hash==='#/account')return 'account';
   if(hash==='#admin')return 'admin';
   if(hash==='#/library')return 'library';
+  if(hash==='#/market')return 'market';
   if(hash.startsWith('#/guides/')) {
     try {return 'guide:'+decodeURIComponent(hash.slice('#/guides/'.length).split('?')[0]);}
     catch{return 'home';}
@@ -137,8 +139,8 @@ function App(){
  const current=guides.find(g=>page==='guide:'+g.slug);const filtered=guides.filter(g=>(category==='All Guides'||g.category===category)&&(g.title+' '+g.summary+' '+g.category).toLowerCase().includes(search.toLowerCase()));
  const suggestions=finderQuery.trim()?guides.filter(g=>(g.title+' '+g.category+' '+g.summary).toLowerCase().includes(finderQuery.toLowerCase())).slice(0,4):[];
  const go=(slug:string)=>{
-   window.location.hash=slug==='admin'?'admin':slug==='home'?'':slug==='library'?'/library':slug==='account'?'/account':'/guides/'+encodeURIComponent(slug);
-   setPage(slug==='admin'||slug==='home'||slug==='library'||slug==='account'?slug:'guide:'+slug);
+   window.location.hash=slug==='admin'?'admin':slug==='home'?'':slug==='library'?'/library':slug==='account'?'/account':slug==='market'?'/market':'/guides/'+encodeURIComponent(slug);
+   setPage(slug==='admin'||slug==='home'||slug==='library'||slug==='account'||slug==='market'?slug:'guide:'+slug);
    setMenu(false);setOpenMenu(null);window.scrollTo({top:0,behavior:'smooth'});
  };
  useEffect(()=>{
@@ -159,7 +161,7 @@ function App(){
     <button className="nav-link" aria-expanded={openMenu===n.title} onClick={()=>setOpenMenu(openMenu===n.title?null:n.title)}>{n.title}<ChevronDown size={13}/></button>
     <div className={'dropdown '+(openMenu===n.title?'show':'')}>{n.items.map(item=><button key={item} onClick={()=>choose(item)}><span>{item}</span><ChevronRight size={14}/></button>)}</div>
    </div>)}
-   <button className="nav-link" onClick={()=>choose('All Guides')}>{t.navigationAllGuides}</button><button className="nav-link nav-account-mobile" onClick={()=>go('account')}>{authUser?'My Dashboard':'Log in / Join'}</button><button className="nav-link mobile-admin-link" onClick={()=>go('admin')}>{t.navigationAdmin}</button>
+   <button className="nav-link" onClick={()=>choose('All Guides')}>{t.navigationAllGuides}</button><button className="nav-link" onClick={()=>go('market')}>MARKET</button><button className="nav-link nav-account-mobile" onClick={()=>go('account')}>{authUser?'My Dashboard':'Log in / Join'}</button><button className="nav-link mobile-admin-link" onClick={()=>go('admin')}>{t.navigationAdmin}</button>
    </nav><div className="header-actions"><button className="header-search" onClick={()=>go('library')} aria-label="Search guides"><Search size={19}/></button><button className="header-account" onClick={()=>go('account')}><UserRound size={15}/>{authUser?'My Dashboard':'Log in / Join'}</button><button className="outline-button" onClick={()=>go('admin')}>{t.navigationAdmin} <ArrowUpRight size={14}/></button><button className="mobile-toggle" onClick={()=>setMenu(!menu)} aria-label="Toggle menu">{menu?<X/>:<Menu/>}</button></div></header>
    {page==='home'? <><section className="hero" ref={heroRef}><div className="hero-art" aria-hidden="true"/><div className="hero-sky" aria-hidden="true"/><div className="hero-foreground" aria-hidden="true"/><div className="hero-aura" aria-hidden="true"/><div className="hero-motes" aria-hidden="true">{Array.from({length:18},(_,index)=><span key={index}/>)}</div>
    <div className="hero-content">
@@ -231,7 +233,8 @@ function App(){
        : <div className="recent-empty"><BookOpen size={26}/><span>{guidesLoading?'Loading the latest guides...':t.latestEmpty}</span><button onClick={()=>choose('All Guides')}>{t.latestButton}<ArrowUpRight size={16}/></button></div>}
    </section>
 </>:
-   page==='account'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading player portal...</p></main>}><PlayerPortal user={authUser} checklistItemsJson={t.checklistItemsJson} guides={guides.map(g=>({slug:g.slug,title:g.title,category:g.category,summary:g.summary}))} onBack={()=>go('home')} onGuide={go} onLibrary={()=>choose('All Guides')}/></React.Suspense>:
+   page==='market'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading market tools...</p></main>}><MarketPage user={authUser} onBack={()=>go('home')} onLogin={()=>go('account')}/></React.Suspense>:
+    page==='account'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading player portal...</p></main>}><PlayerPortal user={authUser} checklistItemsJson={t.checklistItemsJson} guides={guides.map(g=>({slug:g.slug,title:g.title,category:g.category,summary:g.summary}))} onBack={()=>go('home')} onGuide={go} onLibrary={()=>choose('All Guides')}/></React.Suspense>:
    page==='library'?<main className="inner-page section-wrap"><button className="back-link" onClick={()=>go('home')}><ArrowLeft size={16}/> BACK TO HOME</button><div className="section-kicker left">{t.libraryEyebrow}</div><h1>{t.libraryTitle} <i>{t.libraryAccent}</i></h1><p className="page-intro">{t.libraryDescription}</p><div className="library-controls"><label className="search-box"><Search size={20}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t.librarySearchPlaceholder} aria-label="Search guides"/></label><select value={category} onChange={e=>setCategory(e.target.value)} aria-label="Filter by category">{['All Guides',...new Set(guides.map(g=>g.category))].map(c=><option key={c}>{c}</option>)}</select></div>{guidesError&&<p role="status" className="studio-message">{guidesError}</p>}<div className="guide-grid">{filtered.map(g=><GuideCard key={g.slug} guide={g} onClick={()=>go(g.slug)}/>)}</div>{filtered.length===0&&<p>No matching guides. Try another search.</p>}</main>:
    page==='admin'?<React.Suspense fallback={<main className="inner-page section-wrap"><p>Loading Guide Studio...</p></main>}><AdminPanel onExit={()=>go('home')} onContentChanged={()=>{void refreshGuides();void refreshSiteContent();}}/></React.Suspense>:
    current?<React.Suspense fallback={<main className="inner-page article-wrap"><p>Loading guide...</p></main>}>
