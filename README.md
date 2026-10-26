@@ -323,3 +323,41 @@ reset, cap 14.
 5. Switch main and alt. Character-scoped balances must be independent;
    server-scoped balances must be shared when server names match.
 6. Confirm a regular player still cannot access Guide Studio.
+
+## Market Watch (mobile-first market companion)
+
+The public website has a new **Market** route at `https://atreiastreet.com/#/market`, reachable from the main navigation. Visitors can search a curated starter catalog, choose a region and type their world/server, and open Aion2.exchange to check current listings. On a device, users can save a watchlist, enter their own observed asking prices, see 7/30-day price charts with **real** observations, and set per-server target prices. Signed-in accounts sync their watchlist, personal price notes and targets via **Supabase Auth user metadata** under `atreia_market_v1`; this version needs **no SQL migration**. Anonymous preferences remain in that browser.
+
+**Important:** There is no live price feed preconfigured. Aion2.exchange has not been confirmed to offer public reuse rights or a documented third-party API. Never scrape its market or mirror its item PNGs without permission. Market Watch explicitly labels missing quotes and does not invent live prices, history, icons or notifications. The initial catalog is just a compact set of factual item names and IDs, not a copy of a provider's listings.
+
+### Optional approved market data feed
+
+After obtaining explicit approval and a provider endpoint, set `VITE_MARKET_FEED_URL` as a GitHub Actions production environment secret or variable. This is a **public browser-readable** HTTPS JSON endpoint: no API key, cookies, game credentials or privileged token may be included in the URL. It must permit cross-origin reads (CORS) from `https://atreiastreet.com`. The frontend validates incoming records; it does not discover provider APIs automatically.
+
+Example JSON (illustrative shape only — prices are NOT sample data to publish):
+```json
+{
+  "items": [
+    {
+      "item_id": "610610014",
+      "name": "Fine Odyle",
+      "category": "Materials",
+      "region": "NA East",
+      "server": "Your world name",
+      "price": 1,
+      "listings": 3,
+      "observed_at": "2026-10-26T12:00:00Z",
+      "icon_url": "https://licensed-assets.example/item.png",
+      "history": [
+        {"at": "2026-10-25T12:00:00Z", "price": 2},
+        {"at": "2026-10-26T12:00:00Z", "price": 1}
+      ]
+    }
+  ]
+}
+```
+Replace the illustrative placeholder amounts and URLs with provider-supplied actual observations. `image_url` is also recognized in place of `icon_url`. The main build workflow passes the optional variable to Vite. When feed access is approved, credit and follow the provider's stated terms, frequency limits, and permitted icon usage.
+
+**Alerts:** Thresholds are evaluated in the Market UI against an existing observation when the page is open. No email, browser push, periodic backend checks or automatic notifications are implemented yet. A missing price never triggers an alert. The data source and current observation time are shown.
+
+**Account caveat:** For the intended lightweight use, preferences are stored in user-editable auth metadata rather than a new database table. This is not a substitute for a production-scale alert engine or a high-volume item history service; cap the user's notes and items and migrate to an RLS-backed Supabase table if usage grows.
