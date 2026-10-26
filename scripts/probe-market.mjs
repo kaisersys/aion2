@@ -4,6 +4,7 @@ async function get(path) {
   const response=await fetch(origin+path,{headers:{Accept:'application/json', 'User-Agent':'AtreiaStreet/1.0 (+https://atreiastreet.com)'},
     signal:AbortSignal.timeout(16000)});
   if(!response.ok)throw new Error(path+' responded '+response.status);
+  console.log('CORS',path.slice(0,45),response.headers.get('access-control-allow-origin')||'(none)');
   if(!response.headers.get('content-type')?.includes('json'))throw new Error(path+' is not JSON');
   return response.json();
 }
