@@ -1,0 +1,67 @@
+name: Market data refresh (approval gated)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/sync-market.mjs'
+      - '.github/workflows/market-refresh.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sync-market.mjs'
+      - '.github/workflows/market-refresh.yml'
+  schedule:
+    - cron: '23 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  market:
+    # The source being readable does not constitute permission to mirror it.
+    # Set MARKET_SOURCE_APPROVED=true in repository Actions variables only after approval.
+    if: github.event_name == 'pull_request' || vars.MARKET_SOURCE_APPROVED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: production
+    env:
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_USER: ${{ secrets.FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate live public JSON shape on one server (no publishing)
+        if: github.event_name == 'pull_request'
+        run: node scripts/sync-market.mjs --smoke
+      - name: Check FTPS configuration
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          test -n "$FTP_HOST" && test -n "$FTP_USER" && test -n "$FTP_PASSWORD" && test -n "$FTP_REMOTE_DIR"
+      - name: Refresh approved per-server market snapshots
+        if: github.event_name != 'pull_request'
+        run: node scripts/sync-market.mjs
+      - name: Normalize isolated data directory
+        if: github.event_name != 'pull_request'
+        id: destination
+        shell: bash
+        run: |
+          folder="${FTP_REMOTE_DIR%/}/market-data/"
+          echo "server_dir=$folder" >> "$GITHUB_OUTPUT"
+      - name: Publish ONLY market-data files via encrypted FTPS
+        if: github.event_name != 'pull_request'
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./market-data/
+          server-dir: ${{ steps.destination.outputs.server_dir }}
+          log-level: minimal
