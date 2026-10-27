@@ -5,6 +5,7 @@ import {supabase} from '../lib/supabase';
 import {REGIONS,STARTER_ITEMS,MARKET_SOURCE,parseMarketFeed,quoteFor,latestPrice,
   type MarketItem,type MarketQuote,type PricePoint} from '../lib/marketCatalog';
 import {loadMarketServers,loadMarketSnapshot,type MarketServer} from '../lib/marketFeed';
+import {loadOfficialIcons} from '../lib/officialItemIcons';
 import './market.css';
 
 type MarketPrefs={region:string;server:string;watchlist:string[];targets:Record<string,number>;notes:Record<string,PricePoint[]>};
@@ -78,6 +79,12 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
   const [marketItems,setMarketItems]=useState<MarketItem[]>([]);
   const [lastRefresh,setLastRefresh]=useState('');
   const [characterServers,setCharacterServers]=useState<string[]>([]);
+  const [officialIcons,setOfficialIcons]=useState<Record<string,string>>({});
+  useEffect(()=>{
+    const controller=new AbortController();
+    void loadOfficialIcons(controller.signal).then(setOfficialIcons).catch(()=>{});
+    return()=>controller.abort();
+  },[]);
 
   // A player's own auth metadata stores a deliberately compact watchlist; no new SQL migration.
   useEffect(()=>{
@@ -188,8 +195,8 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
       const previous=all.get(quote.id);
       all.set(quote.id,{id:quote.id,name:quote.name,category:quote.category||previous?.category||'Other',imageUrl:quote.imageUrl||previous?.imageUrl});
     }else if(quote.imageUrl&&all.has(quote.id)){all.set(quote.id,{...all.get(quote.id)!,imageUrl:quote.imageUrl});}
-    return [...all.values()].sort((a,b)=>a.name.localeCompare(b.name));
-  },[quotes,marketItems]);
+    return [...all.values()].map(item=>({...item,imageUrl:item.imageUrl||officialIcons[item.id]})).sort((a,b)=>a.name.localeCompare(b.name));
+  },[quotes,marketItems,officialIcons]);
   const currentQuote=(id:string)=>prefs.server.trim()?quoteFor(quotes,id,prefs.region,prefs.server):undefined;
   const noteFor=(id:string)=>latestPrice(prefs.notes[targetKey(id)]||[]);
   const quoteOrNote=(id:string)=>{
@@ -258,7 +265,7 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
         <div className="market-items">{rows.length?rows.map(item=>{
           const observed=quoteOrNote(item.id),watching=prefs.watchlist.includes(item.id),target=prefs.targets[targetKey(item.id)],change24=currentQuote(item.id)?.changePct;
           return <article className="market-item" key={item.id}>
-            <div className="market-item-icon">{item.imageUrl?<img src={item.imageUrl} alt="" loading="lazy" onError={e=>{e.currentTarget.style.display='none';}}/>:<Package size={23}/>}</div>
+            <div className="market-item-icon"><Package size={23}/>{item.imageUrl&&<img src={item.imageUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={e=>{e.currentTarget.style.display="none";}}/>}</div>
             <div className="market-item-name"><strong>{item.name}</strong><small>{item.category} · #{item.id}</small>
               {target&&observed&&observed.price<=target&&<span className="market-reached">BUY TARGET REACHED</span>}
             </div>
@@ -282,6 +289,6 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
     </>}
     <div className="market-footer-note"><ChartNoAxesCombined size={19}/><div><strong>{user?'Your watchlist syncs to your Atreia Street account.':'Want your watchlist on multiple devices?'}</strong>
        <p>{user?(saving?'Saving changes…':'Prices and favorites are stored in account preferences, with a browser backup.'):'You can browse and save locally now. Sign in to sync your watchlist and notes to your phone.'}</p></div>{!user&&<button onClick={onLogin}>Sign in <ArrowUpRight size={15}/></button>}</div>
-    <p className="market-attribution">Fan-made companion; not affiliated with NCSOFT. AION 2 item names and artwork belong to their respective owners. Market data source, when authorized, will be credited here. Market updates require provider approval before activation. Item artwork is not mirrored.</p>
+    <p className="market-attribution">Fan-made companion; not affiliated with NCSOFT. AION 2 item names and artwork belong to their respective owners. Market data source, when authorized, will be credited here. Item artwork is linked directly from NCSOFT's official image CDN, not mirrored; missing image references use a fallback icon.</p>
   </main>;
 }
