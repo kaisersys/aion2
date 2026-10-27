@@ -371,3 +371,13 @@ The exchange exposes unauthenticated read-only `/api/servers` and `/api/items?se
 The public exchange responses do **not** include item icon URLs. The script therefore does not copy, guess or hotlink a PNG library. Game artwork belongs to NCSOFT and needs a separately validated asset source or embed integration.
 
 Market changes are the source's 24-hour listed-price differences, and snapshots contain the latest asking price on each selected world. Charts still use available history/manual notes; the initial sync does not magically supply seven or thirty days of old observations. In-page buy targets are not background push notifications.
+
+### Official NCSOFT PNG icons for Market Watch
+
+NCSOFT's public TW AION 2 item dictionary associates item IDs with PNG image URLs on its own CDN (`assets.playnccdn.com/static-aion2-gamedata/resources/`). The script `scripts/sync-nc-icons.mjs` conservatively fetches item *metadata* (up to the catalog's public listing limit) and saves only the item ID → **validated PNG filename** mapping as `market-icons/icons.json`. It never downloads, stores or mirrors any images.
+
+`.github/workflows/nc-icon-index.yml` publishes the compact JSON to an **isolated** `market-icons/` folder on hosting.com using the existing FTPS settings. It executes when added to `main`, on a monthly schedule or when manually dispatched. Visitors to Market Watch load that index once, and their browsers retrieve matching PNGs directly from NC's image servers. A neutral item glyph remains underneath for items with missing/failed images, and images are lazy-loaded to save phone bandwidth. A missing index does not break the market.
+
+Source attribution: `© NCSOFT Corporation. All Rights Reserved.` This is a noncommercial independent fan reference; NC retains all game art rights. Publicly accessible assets are **not** public domain; respect publisher terms and remove or change materials if required. Do not redistribute the game's icon bundle or host copies without appropriate authorization. The catalog may not cover every Global item, and item IDs with no verified icon are intentionally left as placeholders.
+
+The item-icon refresh is entirely separate from the already-active Aion2.exchange price refresh. No new Supabase migration or secret is needed.
