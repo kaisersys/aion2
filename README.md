@@ -381,3 +381,11 @@ NCSOFT's public TW AION 2 item dictionary associates item IDs with PNG image URL
 Source attribution: `© NCSOFT Corporation. All Rights Reserved.` This is a noncommercial independent fan reference; NC retains all game art rights. Publicly accessible assets are **not** public domain; respect publisher terms and remove or change materials if required. Do not redistribute the game's icon bundle or host copies without appropriate authorization. The catalog may not cover every Global item, and item IDs with no verified icon are intentionally left as placeholders.
 
 The item-icon refresh is entirely separate from the already-active Aion2.exchange price refresh. No new Supabase migration or secret is needed.
+
+### Market Pulse overview
+
+Market Watch now opens with a mobile-first **Market Pulse** section and concise server snapshot indicators (currently priced items, number of open listings, significant 24-hour movers). Each world has three top-ten leaderboards. On desktop all three appear together; on mobile visitors can switch between the boards. Clicking an item opens its Explorer details. Icons use the existing official NCSOFT icon index, with a fallback glyph.
+
+**Never conflate listing counts with completed sales.** Aion2.exchange's `/api/items` response currently supplies `price`, `listings`, `change_pct` and frequently has `units_sold` / `sold_max_price` set to `null`. The importer now preserves the latter when *actually present*. The leaderboard uses confirmed `sold_max_price` to rank highest sale prices and `units_sold` to rank most sold, but otherwise explicitly shows **Most expensive listings** (asking price per unit) and **Most listed items** (open offers). These fallback rankings never claim any sale occurred.
+
+**Hot items** are the biggest absolute 24-hour price movements weighted by the number of listings, requiring at least three listings and a recorded 24-hour move of 0.5% or greater. They are observations, not recommendations to buy. The market refresh workflow continues at its existing cadence. Run `node --experimental-strip-types tests/market-overview.mjs` to check ranking semantics independently of the browser.
