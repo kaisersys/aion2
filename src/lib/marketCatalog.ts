@@ -4,7 +4,8 @@ export type MarketItem = { id: string; name: string; category: string; imageUrl?
 export type PricePoint = { at: string; price: number };
 export type MarketQuote = {
   id: string; region: string; server: string; price: number; listings: number | null;
-  observedAt: string; history: PricePoint[]; imageUrl?: string; name?: string; category?: string; changePct?: number
+  observedAt: string; history: PricePoint[]; imageUrl?: string; name?: string; category?: string; changePct?: number;
+  unitsSold?: number; soldMaxPrice?: number
 };
 export const REGIONS = ['NA East', 'NA West', 'Europe', 'South America', 'Asia'] as const;
 export const MARKET_SOURCE = 'https://aion2.exchange/items';
@@ -72,7 +73,9 @@ export function parseMarketFeed(input: unknown): MarketQuote[] {
     }).sort((a,b)=>Date.parse(a.at)-Date.parse(b.at));
     quotes.push({id,region,server,price,listings:Number.isFinite(listings)&&listings!==null&&listings>=0?listings:null,
       observedAt,history,imageUrl:validIcon(r.icon_url ?? r.image_url),name:shortText(r.name,120)||undefined,category:shortText(r.category,60)||undefined,
-      changePct:typeof r.change_pct==='number'&&Number.isFinite(r.change_pct)?r.change_pct:undefined});
+      changePct:typeof r.change_pct==='number'&&Number.isFinite(r.change_pct)?r.change_pct:undefined,
+      unitsSold:typeof r.units_sold==='number'&&Number.isSafeInteger(r.units_sold)&&r.units_sold>0?r.units_sold:undefined,
+      soldMaxPrice:typeof r.sold_max_price==='number'&&Number.isFinite(r.sold_max_price)&&r.sold_max_price>0?r.sold_max_price:undefined});
   }
   return quotes;
 }
