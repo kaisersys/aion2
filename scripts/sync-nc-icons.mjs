@@ -41,7 +41,7 @@ function validFilename(value){
   }catch{return null;}
 }
 const icons={};
-const limit=SMOKE?1:75;
+const limit=SMOKE?1:240;
 let pages=0,received=0;
 for(let page=1;page<=limit;page++){
   const q=new URLSearchParams({locale:'en-US',page:String(page),size:String(PAGE_SIZE)});
@@ -56,7 +56,7 @@ for(let page=1;page<=limit;page++){
     lastPage:body.pagination.lastPage,limit:body.pagination.limit,size:body.pagination.size}));
   if(page%12===0)console.log('NC_ICON_PROGRESS',page,Object.keys(icons).length);
   if(body.contents.length===0||page>=Number(body.pagination.lastPage))break;
-  if(!SMOKE)await pause(900);
+  if(!SMOKE)await pause(650);
 }
 if(Object.keys(icons).length<(SMOKE?3:500))throw new Error('Too few icon mappings; refusing to replace existing index');
 await mkdir(OUT,{recursive:true});
