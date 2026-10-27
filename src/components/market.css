@@ -106,3 +106,8 @@
 
 .market-up{color:#a9dfbc!important}.market-down{color:#e5acb2!important}
 .market-controls select{min-width:180px}
+
+/* Game icons are painted above the neutral placeholder. If the CDN is unavailable,
+   onError hides the image and reveals the original Package glyph. */
+.market-item-icon{position:relative;overflow:hidden}
+.market-item-icon img{position:absolute;inset:4px;width:calc(100% - 8px);height:calc(100% - 8px);object-fit:contain}

@@ -1,0 +1,67 @@
+name: Refresh official NCSOFT item icon references
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/sync-nc-icons.mjs'
+      - '.github/workflows/nc-icon-index.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sync-nc-icons.mjs'
+      - '.github/workflows/nc-icon-index.yml'
+  schedule:
+    - cron: '17 4 2 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-nc-icon-index
+  cancel-in-progress: false
+
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: production
+    env:
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_USER: ${{ secrets.FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate item to CDN references (one catalog page)
+        if: github.event_name == 'pull_request'
+        run: node scripts/sync-nc-icons.mjs --smoke
+      - name: Check website FTPS configuration
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          test -n "$FTP_HOST" && test -n "$FTP_USER" && test -n "$FTP_PASSWORD" && test -n "$FTP_REMOTE_DIR"
+      - name: Fetch official item icon references (filenames only)
+        if: github.event_name != 'pull_request'
+        run: node scripts/sync-nc-icons.mjs
+      - name: Choose isolated icon-index directory
+        if: github.event_name != 'pull_request'
+        id: destination
+        shell: bash
+        run: |
+          echo "server_dir=${FTP_REMOTE_DIR%/}/market-icons/" >> "$GITHUB_OUTPUT"
+      - name: Publish ONLY the icon filename index via FTPS
+        if: github.event_name != 'pull_request'
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./market-icons/
+          server-dir: ${{ steps.destination.outputs.server_dir }}
+          log-level: minimal
