@@ -31,6 +31,8 @@ jobs:
         run: node tests/global-reset.mjs
       - name: Validate editable checklists and ticket recharge projections
         run: node tests/ticket-recharge.mjs
+      - name: Verify market overview rankings never confuse listings with sales
+        run: node --experimental-strip-types tests/market-overview.mjs
       - name: Verify Supabase Guide Studio configuration
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
