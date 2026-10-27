@@ -75,7 +75,10 @@ for(let n=0;n<chosen.length;n++){
         listings:Number.isInteger(r.listings)&&r.listings>=0?r.listings:0,
         observed_at:observedAt,listed:active,
         change_pct:Number.isFinite(change)&&r.change_pct!==null?Number(change.toFixed(2)):null,
-        last_price:positive(Number(r.last_price))?Number(r.last_price):null
+        last_price:positive(Number(r.last_price))?Number(r.last_price):null,
+        // Null means unavailable. Never infer completed sales from listing counts.
+        units_sold:Number.isSafeInteger(r.units_sold)&&r.units_sold>0?r.units_sold:null,
+        sold_max_price:positive(r.sold_max_price)?r.sold_max_price:null
       });
     }
     if(items.length>10000)throw new Error('Unexpectedly large board');

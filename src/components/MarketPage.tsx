@@ -2,10 +2,11 @@ import React,{useEffect,useMemo,useState} from 'react';
 import type {User} from '@supabase/supabase-js';
 import {ArrowLeft,ArrowUpRight,Bell,Bookmark,BookmarkCheck,ChartNoAxesCombined,Clock3,ExternalLink,Info,Package,Plus,Search,Trash2} from 'lucide-react';
 import {supabase} from '../lib/supabase';
-import {REGIONS,STARTER_ITEMS,MARKET_SOURCE,parseMarketFeed,quoteFor,latestPrice,
+import {REGIONS,STARTER_ITEMS,MARKET_SOURCE,parseMarketFeed,latestPrice,
   type MarketItem,type MarketQuote,type PricePoint} from '../lib/marketCatalog';
 import {loadMarketServers,loadMarketSnapshot,type MarketServer} from '../lib/marketFeed';
 import {loadOfficialIcons} from '../lib/officialItemIcons';
+import MarketPulse from './MarketPulse';
 import './market.css';
 
 type MarketPrefs={region:string;server:string;watchlist:string[];targets:Record<string,number>;notes:Record<string,PricePoint[]>};
@@ -197,7 +198,21 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
     }else if(quote.imageUrl&&all.has(quote.id)){all.set(quote.id,{...all.get(quote.id)!,imageUrl:quote.imageUrl});}
     return [...all.values()].map(item=>({...item,imageUrl:item.imageUrl||officialIcons[item.id]})).sort((a,b)=>a.name.localeCompare(b.name));
   },[quotes,marketItems,officialIcons]);
-  const currentQuote=(id:string)=>prefs.server.trim()?quoteFor(quotes,id,prefs.region,prefs.server):undefined;
+  // One indexed selection per server is considerably lighter on mobile than
+  // repeatedly scanning every quote for each visible item and leaderboard.
+  const serverQuotes=useMemo(()=>quotes.filter(q=>
+    q.region.trim().toLowerCase()===prefs.region.trim().toLowerCase() &&
+    q.server.trim().toLowerCase()===prefs.server.trim().toLowerCase()
+  ),[quotes,prefs.region,prefs.server]);
+  const quoteIndex=useMemo(()=>{
+    const index=new Map<string,MarketQuote>();
+    for(const quote of serverQuotes){
+      const previous=index.get(quote.id);
+      if(!previous||Date.parse(quote.observedAt)>Date.parse(previous.observedAt))index.set(quote.id,quote);
+    }
+    return index;
+  },[serverQuotes]);
+  const currentQuote=(id:string)=>quoteIndex.get(id);
   const noteFor=(id:string)=>latestPrice(prefs.notes[targetKey(id)]||[]);
   const quoteOrNote=(id:string)=>{
     const quote=currentQuote(id),note=noteFor(id);
@@ -214,6 +229,17 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
   const points=active?[...(currentQuote(active.id)?.history||[]),...(prefs.notes[key]||[])]:[];
   const shownTargets=prefs.watchlist.map(id=>({id,item:items.find(i=>i.id===id),target:prefs.targets[targetKey(id)],price:quoteOrNote(id)})).filter(r=>r.item);
   const triggered=shownTargets.filter(r=>r.target&&r.price&&r.price.price<=r.target).length;
+  const openFromPulse=(id:string)=>{
+    const item=items.find(x=>x.id===id);
+    if(!item)return;
+    setTab('explore');
+    setSelected(id);
+    setQuery(item.name);
+    setCategory('All');
+    setNotePrice('');
+    setTargetValue('');
+    window.requestAnimationFrame(()=>document.getElementById('market-browse')?.scrollIntoView({behavior:'smooth',block:'start'}));
+  };
 
   return <main className="market-page inner-page section-wrap">
     <button className="back-link" onClick={onBack}><ArrowLeft size={16}/> BACK TO HOME</button>
@@ -241,6 +267,8 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
     {lastRefresh&&Date.now()-Date.parse(lastRefresh)>86400000&&<div className="market-info"><Clock3 size={17}/> The latest market refresh is more than 24 hours old; double-check prices before buying.</div>}
     {feedError&&<div className="market-info" role="status">{feedError}</div>}
     {saveError&&<div className="market-info" role="alert">{saveError}</div>}
+    <MarketPulse quotes={serverQuotes} items={items} server={prefs.server} loading={feedLoading} refreshedAt={lastRefresh} onOpen={openFromPulse}/>
+    <div id="market-browse" className="market-workspace-heading"><div><span className="section-kicker left">YOUR PERSONAL MARKET</span><h2>Follow what <i>matters.</i></h2><p>Favorites, item discovery and buy targets — all in one place.</p></div></div>
     <div className="market-tabs" role="tablist" aria-label="Market tools">
       {([['watchlist','Watchlist',<Bookmark size={16}/>],['explore','Explore',<Search size={16}/>],['alerts','Targets',<Bell size={16}/>]] as const).map(([value,label,icon])=>
         <button key={value} role="tab" aria-selected={tab===value} className={tab===value?'active':''} onClick={()=>{setTab(value);setSelected(null);setQuery('');setCategory('All');}}>{icon}{label}{value==='watchlist'&&<span>{prefs.watchlist.length}</span>}{value==='alerts'&&triggered>0&&<span className="market-alert-count">{triggered}</span>}</button>)}
