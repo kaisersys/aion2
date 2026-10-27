@@ -4,6 +4,7 @@ import {ArrowLeft,ArrowUpRight,Bell,Bookmark,BookmarkCheck,ChartNoAxesCombined,C
 import {supabase} from '../lib/supabase';
 import {REGIONS,STARTER_ITEMS,MARKET_SOURCE,parseMarketFeed,quoteFor,latestPrice,
   type MarketItem,type MarketQuote,type PricePoint} from '../lib/marketCatalog';
+import {loadMarketServers,loadMarketSnapshot,type MarketServer} from '../lib/marketFeed';
 import './market.css';
 
 type MarketPrefs={region:string;server:string;watchlist:string[];targets:Record<string,number>;notes:Record<string,PricePoint[]>};
@@ -73,6 +74,9 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
   const [quotes,setQuotes]=useState<MarketQuote[]>([]);
   const [feedError,setFeedError]=useState('');
   const [feedLoading,setFeedLoading]=useState(Boolean(FEED_URL));
+  const [marketServers,setMarketServers]=useState<MarketServer[]>([]);
+  const [marketItems,setMarketItems]=useState<MarketItem[]>([]);
+  const [lastRefresh,setLastRefresh]=useState('');
   const [characterServers,setCharacterServers]=useState<string[]>([]);
 
   // A player's own auth metadata stores a deliberately compact watchlist; no new SQL migration.
@@ -116,24 +120,44 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
     return()=>{active=false;};
   },[user?.id]);
 
-  const reloadFeed=async(signal?:AbortSignal)=>{
-    if(!FEED_URL){setFeedLoading(false);return;}
-    try{
-      const u=new URL(FEED_URL);
-      if(u.protocol!=='https:')throw new Error('Only HTTPS market feeds are supported.');
-      setFeedLoading(true);setFeedError('');
-      const response=await fetch(u.toString(),{signal,cache:'no-store',headers:{Accept:'application/json'}});
-      if(!response.ok)throw new Error('Market feed returned HTTP '+response.status);
-      setQuotes(parseMarketFeed(await response.json()));
-    }catch(error){
-      if((error as Error).name!=='AbortError')setFeedError('The price feed is unavailable. Saved prices and watchlists still work.');
-    }finally{if(!signal?.aborted)setFeedLoading(false);}
-  };
   useEffect(()=>{
+    if(FEED_URL)return;
     const controller=new AbortController();
-    void reloadFeed(controller.signal);
+    void loadMarketServers(controller.signal).then(servers=>setMarketServers(servers)).catch(()=>{
+      // Personal notes and watchlists still work before the optional feed is enabled.
+    });
     return()=>controller.abort();
   },[]);
+  const matchedServer=marketServers.find(server=>server.region===prefs.region&&server.label===prefs.server);
+  useEffect(()=>{
+    const controller=new AbortController();
+    if(!FEED_URL&&!matchedServer){
+      setQuotes([]);setMarketItems([]);setFeedLoading(false);setLastRefresh('');
+      return()=>controller.abort();
+    }
+    setFeedLoading(true);setFeedError('');
+    void (async()=>{
+      try{
+        if(FEED_URL){
+          const u=new URL(FEED_URL);
+          if(u.protocol!=='https:')throw new Error('Only HTTPS market feeds are supported.');
+          const response=await fetch(u.toString(),{signal:controller.signal,cache:'no-cache',headers:{Accept:'application/json'}});
+          if(!response.ok)throw new Error('Market feed returned HTTP '+response.status);
+          const raw=await response.json();
+          if(!controller.signal.aborted){setQuotes(parseMarketFeed(raw));setMarketItems([]);}
+        }else{
+          const result=await loadMarketSnapshot(matchedServer!.id,controller.signal);
+          if(!controller.signal.aborted){setQuotes(result.quotes);setMarketItems(result.items);setLastRefresh(result.refreshedAt);}
+        }
+      }catch(error){
+        if(!controller.signal.aborted){
+          setFeedError('Could not load prices for this server. Saved notes still work.');
+          setQuotes([]);setMarketItems([]);
+        }
+      }finally{if(!controller.signal.aborted)setFeedLoading(false);}
+    })();
+    return()=>controller.abort();
+  },[prefs.region,prefs.server,marketServers]);
 
   const set=(change:Partial<MarketPrefs>)=>setPrefs(old=>({...old,...change}));
   const addWatch=(id:string)=>setPrefs(old=>({...old,watchlist:old.watchlist.includes(id)?old.watchlist:[...old.watchlist,id].slice(0,60)}));
@@ -159,12 +183,13 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
 
   const items=useMemo(()=>{
     const all=new Map<string,MarketItem>(STARTER_ITEMS.map(item=>[item.id,item]));
+    for(const item of marketItems)all.set(item.id,item);
     for(const quote of quotes)if(quote.name){
       const previous=all.get(quote.id);
       all.set(quote.id,{id:quote.id,name:quote.name,category:quote.category||previous?.category||'Other',imageUrl:quote.imageUrl||previous?.imageUrl});
     }else if(quote.imageUrl&&all.has(quote.id)){all.set(quote.id,{...all.get(quote.id)!,imageUrl:quote.imageUrl});}
     return [...all.values()].sort((a,b)=>a.name.localeCompare(b.name));
-  },[quotes]);
+  },[quotes,marketItems]);
   const currentQuote=(id:string)=>prefs.server.trim()?quoteFor(quotes,id,prefs.region,prefs.server):undefined;
   const noteFor=(id:string)=>latestPrice(prefs.notes[targetKey(id)]||[]);
   const quoteOrNote=(id:string)=>{
@@ -194,12 +219,19 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
     </div>
     <div className="market-controls">
       <label>Region<select value={prefs.region} onChange={e=>{set({region:e.target.value});setSelected(null);}}>{REGIONS.map(region=><option key={region}>{region}</option>)}</select></label>
-      <label>World / server<input list="market-known-servers" value={prefs.server} onChange={e=>{set({server:e.target.value});setSelected(null);}} placeholder="Enter your server" maxLength={48}/></label>
+      <label>World / server{marketServers.length?
+        <select value={prefs.server} onChange={e=>{set({server:e.target.value});setSelected(null);}} aria-label="Choose faction and world">
+          <option value="">Select world and faction</option>
+          {prefs.server&&!marketServers.some(server=>server.label===prefs.server&&server.region===prefs.region)&&<option value={prefs.server}>Previously saved: {prefs.server}</option>}
+          {marketServers.filter(server=>server.region===prefs.region).map(server=><option key={server.id} value={server.label}>{server.label}</option>)}
+        </select>:
+        <input list="market-known-servers" value={prefs.server} onChange={e=>{set({server:e.target.value});setSelected(null);}} placeholder="Enter your server" maxLength={48}/>}</label>
       <datalist id="market-known-servers">{characterServers.map(s=><option value={s} key={s}/>)}</datalist>
-      <div className="market-sync"><span className={'market-dot '+(quotes.length?'online':'')}/>{feedLoading?'Checking feed…':quotes.length?quotes.length+' market records loaded':'Live feed not connected'}</div>
+      <div className="market-sync"><span className={'market-dot '+(quotes.length?'online':'')}/>{feedLoading?'Checking prices…':quotes.length?quotes.length+' market quotes · '+(lastRefresh?since(lastRefresh):'feed'):'No live market feed'}</div>
     </div>
     {!prefs.server.trim()&&<div className="market-info" role="status"><Info size={17}/> Enter your world/server to keep prices, history and buy targets separate for each server.</div>}
-    {!FEED_URL&&<div className="market-info"><Info size={17}/><span><strong>Live price integration pending.</strong> Aion2.exchange has market information, but Atreia Street has not been granted a reusable data feed. You can save items, record prices and set buy targets now. Open Aion2.exchange for current listings.</span></div>}
+    {!FEED_URL&&!marketServers.length&&<div className="market-info"><Info size={17}/><span><strong>Automatic market updates are not active.</strong> The scheduled feed requires approval from the source and must be enabled by the site owner. You can still save items, enter prices and open Aion2.exchange for listings.</span></div>}
+    {lastRefresh&&Date.now()-Date.parse(lastRefresh)>86400000&&<div className="market-info"><Clock3 size={17}/> The latest market refresh is more than 24 hours old; double-check prices before buying.</div>}
     {feedError&&<div className="market-info" role="status">{feedError}</div>}
     {saveError&&<div className="market-info" role="alert">{saveError}</div>}
     <div className="market-tabs" role="tablist" aria-label="Market tools">
@@ -224,13 +256,13 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
       </div>
       {tab==='watchlist'&&!prefs.watchlist.length?<div className="market-empty"><Bookmark size={29}/><h3>Build your watchlist</h3><p>Save items you buy regularly, then check them from your phone without searching again.</p><button onClick={()=>setTab('explore')}>Find items <Plus size={16}/></button></div>:
         <div className="market-items">{rows.length?rows.map(item=>{
-          const observed=quoteOrNote(item.id),watching=prefs.watchlist.includes(item.id),target=prefs.targets[targetKey(item.id)];
+          const observed=quoteOrNote(item.id),watching=prefs.watchlist.includes(item.id),target=prefs.targets[targetKey(item.id)],change24=currentQuote(item.id)?.changePct;
           return <article className="market-item" key={item.id}>
             <div className="market-item-icon">{item.imageUrl?<img src={item.imageUrl} alt="" loading="lazy" onError={e=>{e.currentTarget.style.display='none';}}/>:<Package size={23}/>}</div>
             <div className="market-item-name"><strong>{item.name}</strong><small>{item.category} · #{item.id}</small>
               {target&&observed&&observed.price<=target&&<span className="market-reached">BUY TARGET REACHED</span>}
             </div>
-            <div className="market-item-price"><strong>{observed?pretty(observed.price)+' Kina':'—'}</strong><small>{observed?observed.kind+' · '+since(observed.at):'No price recorded'}</small></div>
+            <div className="market-item-price"><strong>{observed?pretty(observed.price)+' Kina':'—'}</strong><small>{observed?observed.kind+' · '+since(observed.at):'No price recorded'}</small>{typeof change24==='number'&&<small className={change24>=0?'market-up':'market-down'}>{change24>=0?'+':''}{change24.toFixed(1)}% (24h)</small>}</div>
             <div className="market-item-actions"><button onClick={()=>watching?removeWatch(item.id):addWatch(item.id)} title={watching?'Remove from watchlist':'Add to watchlist'} aria-label={(watching?'Remove ':'Watch ')+item.name}>{watching?<BookmarkCheck size={19}/>:<Bookmark size={19}/>}</button>
               <button onClick={()=>{setSelected(selected===item.id?null:item.id);setNotePrice('');setTargetValue('');}} aria-expanded={selected===item.id}>Details <ArrowUpRight size={14}/></button></div>
             {selected===item.id&&<div className="market-detail">
@@ -250,6 +282,6 @@ export default function MarketPage({user,onBack,onLogin}:{user:User|null;onBack:
     </>}
     <div className="market-footer-note"><ChartNoAxesCombined size={19}/><div><strong>{user?'Your watchlist syncs to your Atreia Street account.':'Want your watchlist on multiple devices?'}</strong>
        <p>{user?(saving?'Saving changes…':'Prices and favorites are stored in account preferences, with a browser backup.'):'You can browse and save locally now. Sign in to sync your watchlist and notes to your phone.'}</p></div>{!user&&<button onClick={onLogin}>Sign in <ArrowUpRight size={15}/></button>}</div>
-    <p className="market-attribution">Fan-made companion; not affiliated with NCSOFT. AION 2 item names and artwork belong to their respective owners. Market data source, when authorized, will be credited here. No data or PNGs are copied from Aion2.exchange in this release.</p>
+    <p className="market-attribution">Fan-made companion; not affiliated with NCSOFT. AION 2 item names and artwork belong to their respective owners. Market data source, when authorized, will be credited here. Market updates require provider approval before activation. Item artwork is not mirrored.</p>
   </main>;
 }

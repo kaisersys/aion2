@@ -1,0 +1,22 @@
+name: Probe public market data compatibility
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/probe-market.mjs'
+      - '.github/workflows/market-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check public Aion2.exchange JSON response shapes (3 read-only requests)
+        run: node scripts/probe-market.mjs
