@@ -103,3 +103,6 @@
  .market-target-row form{grid-column:auto;grid-row:auto}.market-target-status{text-align:left}
  .market-footer-note{flex-wrap:wrap}.market-footer-note button{width:100%}
 }
+
+.market-up{color:#a9dfbc!important}.market-down{color:#e5acb2!important}
+.market-controls select{min-width:180px}
