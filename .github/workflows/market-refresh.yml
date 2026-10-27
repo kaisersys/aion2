@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+# Avoid overlapping scheduled/manual FTPS refreshes touching the same cache folder.
+concurrency:
+  group: market-data-refresh
+  cancel-in-progress: false
+
 jobs:
   market:
     # The source being readable does not constitute permission to mirror it.
