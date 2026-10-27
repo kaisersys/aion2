@@ -361,3 +361,13 @@ Replace the illustrative placeholder amounts and URLs with provider-supplied act
 **Alerts:** Thresholds are evaluated in the Market UI against an existing observation when the page is open. No email, browser push, periodic backend checks or automatic notifications are implemented yet. A missing price never triggers an alert. The data source and current observation time are shown.
 
 **Account caveat:** For the intended lightweight use, preferences are stored in user-editable auth metadata rather than a new database table. This is not a substitute for a production-scale alert engine or a high-volume item history service; cap the user's notes and items and migrate to an RLS-backed Supabase table if usage grows.
+
+### Automated exchange feed (staged, requires permission)
+
+The exchange exposes unauthenticated read-only `/api/servers` and `/api/items?server=<id>` endpoints. A separate `.github/workflows/market-refresh.yml` workflow and `scripts/sync-market.mjs` now support a conservatively paced refresh every four hours: one server at a time, approximately one board request per world, retry/backoff, no game account, and clear attribution. The data is transformed into small per-server JSON snapshots and uploaded to a dedicated `market-data/` directory using the existing encrypted hosting.com FTPS credentials. Atreia Street fetches a single server's file after selecting the exact **region + world + faction**, so 106 servers are not sent to every mobile visitor. The UI also displays 24-hour percentage changes and capture age.
+
+**Source access is NOT a redistribution license.** Other projects were individually authorized by Aion2.exchange. Contact their author, document explicit permission for redistribution/caching and accepted request frequency, then set the GitHub Actions repository **variable** `MARKET_SOURCE_APPROVED=true`. Without that setting, scheduled and push sync jobs intentionally skip; the Market still works for manual observations. No scraping or automatic mirroring is activated merely by merging these files. `workflow_dispatch` permits a manual run **after approval**. If the source objects to reuse, leave this variable unset and use a separate approved feed.
+
+The public exchange responses do **not** include item icon URLs. The script therefore does not copy, guess or hotlink a PNG library. Game artwork belongs to NCSOFT and needs a separately validated asset source or embed integration.
+
+Market changes are the source's 24-hour listed-price differences, and snapshots contain the latest asking price on each selected world. Charts still use available history/manual notes; the initial sync does not magically supply seven or thirty days of old observations. In-page buy targets are not background push notifications.
