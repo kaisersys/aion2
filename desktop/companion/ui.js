@@ -86,6 +86,8 @@ function render(){
  $('diagnostic-market-scans').textContent=String(market.scans||0);
  $('diagnostic-market-chars').textContent=String(market.recognizedChars||0);
  $('diagnostic-market-fee').textContent=market.feeLabelSeen?'Yes':'No';
+ $('diagnostic-market-phase').textContent=market.screenPhase||'—';
+ $('diagnostic-market-ocr-mode').textContent=market.recognitionMode||'—';
  $('diagnostic-market-time').textContent=market.lastScanAt?
   new Date(market.lastScanAt).toLocaleTimeString():'Never';
  $('diagnostic-market-evidence').textContent=Array.isArray(market.feeEvidence)&&market.feeEvidence.length?
@@ -163,6 +165,12 @@ function render(){
  const money=window.AtreiaWallets.movements(events,p.daily);
  const itemEconomy=window.AtreiaItemEconomy.attribute(events,money,p.daily);
  const itemByWalletId=new Map(itemEconomy.matches.map(m=>[m.walletId,m]));
+ const marketFeeByWalletId=new Map();
+ for(const x of state.marketObservations||[]) {
+  if(!match(x,profile)||x.status!=='corroborated'||x.screen_phase!=='confirmation'||
+     !Array.isArray(x.wallet_event_ids))continue;
+  for(const walletId of x.wallet_event_ids)marketFeeByWalletId.set(walletId,x);
+ }
  const regularWallet=walletView.regular, boundWallet=walletView.bound;
  const t={dayEarned:0,daySpent:0};
  let hasEarned=false,hasSpent=false;
@@ -227,14 +235,22 @@ function render(){
    const row=document.createElement('div');row.className='movement-row';
    const info=document.createElement('div');
    const label=document.createElement('span');label.className='activity-name';
-   label.textContent=(movement.currency==='unbound'?'Regular':'Bound')+' Kina '+(movement.direction==='in'?'in':'out');
+   const marketFee=marketFeeByWalletId.get(movement.id);
+   label.textContent=marketFee
+    ?'Market registration fee · '+(movement.currency==='unbound'?'regular':'bound')+' Kina'
+    :(movement.currency==='unbound'?'Regular':'Bound')+' Kina '+(movement.direction==='in'?'in':'out');
    const details=document.createElement('span');details.className='movement-source';
    const association=itemByWalletId.get(movement.id);
    const itemName=association?window.AtreiaItems.name(association.item_id):null;
    details.textContent='Balance '+num(movement.before)+' → '+num(movement.after)+
-     (association?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
-       itemName+' ×'+num(association.quantity)+' (unverified)'
-       :' · source unknown');
+     (marketFee
+      ?' · Market listing fee '+(marketFee.item_name||'item')+
+       (marketFee.quantity?' ×'+num(marketFee.quantity):'')+
+       ' · Confirm prompt + wallet debit (inferred)'
+      :association
+       ?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
+         itemName+' ×'+num(association.quantity)+' (unverified)'
+       :' · source not yet identified');
    info.append(label,details);
    const amount=document.createElement('strong');
    amount.className=movement.direction==='in'?'up':'down';
@@ -326,9 +342,17 @@ function render(){
   const verified=entry.status==='corroborated';
   const currency=entry.currency_kind==='mixed'?'bound + regular':
    entry.currency_kind==='bound'?'bound':entry.currency_kind==='unbound'?'regular':null;
+  const since=Date.now()-Date.parse(entry.occurred_at);
+  const status=verified
+   ?'Fee matched to '+currency+' Kina debit · likely registered'
+   :entry.screen_phase==='confirmation'
+    ?since>=60000
+      ?'No matching Kina decrease observed · possibly canceled or capture missed'
+      :'Confirm/Cancel prompt seen · waiting for a Kina decrease'
+    :entry.screen_phase==='listing_form'
+     ?'Sale form only · not yet confirmed':'OCR observation only';
   desc.textContent=caption+' · '+new Date(entry.occurred_at).toLocaleString()+
-   (verified?' · Fee matched to '+currency+' Kina debit':' · OCR only, not charged')+
-   (entry.synced?' · account synced':' · pending sync');
+   ' · '+status+(entry.synced?' · account synced':' · pending sync');
   info.append(name,desc);
   const qty=document.createElement('span');qty.className='item-group-qty';
   qty.textContent=entry.quantity?'×'+num(entry.quantity):'—';
