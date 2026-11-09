@@ -33,28 +33,19 @@ function render(s){
  $('status-dot').className=ok?'ok':capture==='error'?'fail':'';
  const events=(s.events||[]).filter(e=>active&&idOf(e)===idOf(active)&&Date.parse(e.occurred_at)<=Date.now())
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
- let regular=null,bound=null,regularFirst=null,regularLatest=null,regularReadings=0;
  const periods=periodStarts(), counters=new Map();
+ const wallets=window.AtreiaWallets.calculate(events,periods.daily);
  for (const e of events) {
    const when=Date.parse(e.occurred_at);
-   if(e.type==='wallet_snapshot'){
-     if(e.currency_kind==='bound')bound=e.balance;
-     if(e.currency_kind==='unbound'){
-       regular=e.balance;
-       if(when>=periods.daily){
-         if(regularFirst===null)regularFirst=e.balance;
-         regularLatest=e.balance;
-         regularReadings++;
-       }
-     }
-   }
    if(e.type==='counter'&&when>=(e.frequency==='weekly'?periods.weekly:periods.daily))
      counters.set(e.key,e);
  }
- $('regular').textContent=fmt(regular);
- $('bound').textContent=fmt(bound);
- const observedNet=regularReadings>=2?regularLatest-regularFirst:null;
- $('net').textContent=observedNet===null?'—':(observedNet>0?'+':'')+fmt(observedNet);
+ $('regular').textContent=fmt(wallets.regularBalance);
+ $('bound').textContent=fmt(wallets.boundBalance);
+ $('all').textContent=wallets.combinedExact?fmt(wallets.allBalance):
+   wallets.minimumAll!==null?'≥ '+fmt(wallets.minimumAll):'—';
+ $('net').textContent=wallets.netToday===null?'—':
+   (wallets.netToday>0?'+':'')+fmt(wallets.netToday);
  $('counter-caption').textContent=counters.size?'Live / last seen':'Awaiting game data';
  const holder=$('counter-list');holder.replaceChildren();
  const preferred=['nightmare','odyle-energy','ascension','subjugation','invasion','unknown-fissure','shugo-server'];

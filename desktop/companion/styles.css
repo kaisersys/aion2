@@ -9,3 +9,5 @@
 
 @media(max-width:980px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.metrics{grid-template-columns:1fr}}
+
+.wallet-equation{font-size:11px;color:#9db3cb;margin:-5px 2px 15px;line-height:1.5}

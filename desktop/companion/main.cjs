@@ -381,7 +381,7 @@ function secureWindowContents(target) {
 function createOverlay() {
   if (overlay && !overlay.isDestroyed()) { overlay.showInactive(); return; }
   overlay = new BrowserWindow({
-    width:332, height:318, minWidth:332, minHeight:318,
+    width:332, height:365, minWidth:332, minHeight:365,
     backgroundColor:'#101a28', frame:false, transparent:false,
     show:false, skipTaskbar:true, alwaysOnTop:true, resizable:false, movable:true,
     webPreferences:{

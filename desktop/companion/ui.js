@@ -115,23 +115,13 @@ function render(){
  $('weekly-reset').textContent='Next '+new Date(p.nextWeekly).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
  const events=(state.events||[]).filter(e=>match(e,profile) && Date.parse(e.occurred_at)<=Date.now())
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
+ const walletView=window.AtreiaWallets.calculate(events,p.daily);
+ const regularWallet=walletView.regular, boundWallet=walletView.bound;
  const t={dayEarned:0,daySpent:0};
- let regularWallet=null, boundWallet=null;
- let regularDayBaseline=null, regularDayLast=null, regularDayReadings=0;
  let hasEarned=false,hasSpent=false;
  const counters=new Map();
  for(const e of events){
    const at=Date.parse(e.occurred_at);
-   if(e.type==='wallet_snapshot'){
-     if(e.currency_kind==='bound')boundWallet=e;
-     if(e.currency_kind==='unbound'){
-       regularWallet=e;
-       if(at>=p.daily){
-         if(regularDayBaseline===null) regularDayBaseline=e.balance;
-         regularDayLast=e.balance; regularDayReadings++;
-       }
-     }
-   }
    if(e.type==='kinah_earned'||e.type==='kinah_spent'){
      const field=e.type==='kinah_earned'?'Earned':'Spent';
      if(at>=p.daily){
@@ -150,10 +140,17 @@ function render(){
  $('bound-wallet-note').textContent=boundWallet
    ?'Last observed '+new Date(boundWallet.occurred_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})
    :'Waiting for bound Kina inventory packets';
- const both=Boolean(regularWallet && boundWallet);
- $('total-wallet').textContent=both?num(regularWallet.balance+boundWallet.balance):'—';
- $('total-wallet-note').textContent=both?'Sum of latest observed balances':'Needs both wallet readings';
- const net=regularDayReadings>=2?regularDayLast-regularDayBaseline:null;
+ if(walletView.combinedExact) {
+   $('total-wallet').textContent=num(walletView.allBalance);
+   $('total-wallet-note').textContent='Regular + bound, based on latest observed balances';
+ } else if(walletView.minimumAll!==null){
+   $('total-wallet').textContent='≥ '+num(walletView.minimumAll);
+   $('total-wallet-note').textContent='Minimum known; other currency not observed yet';
+ } else {
+   $('total-wallet').textContent='—';
+   $('total-wallet-note').textContent='Waiting for currency readings';
+ }
+ const net=walletView.netToday;
  $('regular-day-net').textContent=net===null?'—':(net>0?'+':'')+num(net);
  $('regular-day-net').className=net===null?'':net<0?'down':net>0?'up':'';
  $('regular-day-note').textContent=net===null?'Awaiting a second reading today':'Net vs first reading today · not gross earnings';

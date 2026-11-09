@@ -524,6 +524,35 @@ public static class SelfTest
             walletDecoder.OnFrame(MakeWalletFrame((930100031u,4600,(byte)1)),DateTime.UtcNow);
             if(incomeEvents.Count(x=>x.ToString()!.Contains("wallet_snapshot"))!=3)
                 throw new Exception("Regular Kina increase did not publish an updated balance.");
+            // Regression: Chanter has 462,000 regular Kina, 0 bound Kina,
+            // and therefore 462,000 total. The complete inventory snapshot
+            // carries only regular currency when the bound slot is absent.
+            byte[] chanterInventory = new byte[6000];
+            byte[] chanterCurrency = MakeWalletFrame((930100031u,462000,(byte)1));
+            Array.Copy(chanterCurrency,chanterInventory,chanterCurrency.Length);
+            chanterInventory[0]=0x11; chanterInventory[1]=0x56;
+            if (!TicketProtocol.TryReadKinahWallets(chanterInventory,
+                    out List<WalletReading> chanterBalances) ||
+                chanterBalances.Count!=2 ||
+                chanterBalances.Single(x=>x.CurrencyKind=="unbound").Balance!=462000 ||
+                chanterBalances.Single(x=>x.CurrencyKind=="bound").Balance!=0)
+                throw new Exception("Chanter zero-bound currency snapshot incorrectly decoded.");
+            // By contrast, absence of a currency in a PARTIAL slot change must
+            // not assume it is zero: its previous quantity is still unknown.
+            if (!TicketProtocol.TryReadKinahWallets(chanterCurrency,
+                    out List<WalletReading> chanterChange) ||
+                chanterChange.Count!=1 || chanterChange[0].CurrencyKind!="unbound")
+                throw new Exception("Partial slot update fabricated a zero bound-wallet balance.");
+            byte[] boundOnlyInventory = new byte[6000];
+            byte[] boundOnly = MakeWalletFrame((930100001u,900000,(byte)1));
+            Array.Copy(boundOnly,boundOnlyInventory,boundOnly.Length);
+            boundOnlyInventory[0]=0x11; boundOnlyInventory[1]=0x56;
+            if (!TicketProtocol.TryReadKinahWallets(boundOnlyInventory,
+                    out List<WalletReading> boundOnlyReadings) ||
+                boundOnlyReadings.Count!=2 ||
+                boundOnlyReadings.Single(x=>x.CurrencyKind=="bound").Balance!=900000 ||
+                boundOnlyReadings.Single(x=>x.CurrencyKind=="unbound").Balance!=0)
+                throw new Exception("Snapshot with only bound Kina failed to infer zero regular Kina.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }

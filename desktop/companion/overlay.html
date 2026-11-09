@@ -23,7 +23,8 @@
    <div class="status"><i id="status-dot"></i><span id="capture-status">Connecting to local capture…</span></div>
    <div class="stats">
      <div class="stat"><small>REGULAR KINA</small><strong id="regular">—</strong></div>
-     <div class="stat"><small>BOUND KINA</small><strong id="bound">—</strong></div>
+     <div class="stat" title="Bound-only wallet. Not the blue Kina (All) indicator."><small>BOUND KINA</small><strong id="bound">—</strong></div>
+     <div class="stat" title="Regular + bound Kina. ≥ means one balance was not observed yet."><small>KINA (ALL)</small><strong id="all">—</strong></div>
      <div class="stat" title="Net unbound balance change vs the first reading today, not verified income"><small>NET TODAY</small><strong id="net">—</strong></div>
    </div>
    <div class="section-heading"><span>PROGRESSION</span><span id="counter-caption">Latest observations</span></div>
@@ -31,6 +32,7 @@
   </div>
   <footer><span>DESKTOP COMPANION · READ ONLY</span><button id="view-details" class="no-drag">Full dashboard ↗</button></footer>
  </div>
+ <script src="./wallets.js" defer></script>
  <script src="./overlay.js" defer></script>
 </body>
 </html>

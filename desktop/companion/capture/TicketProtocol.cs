@@ -328,6 +328,15 @@ public sealed class TicketProtocol
             latest[currencyKind]=kind==2 ? 0 : (long)value;
             i+=13; // skip this validated record so random internal bytes do not masquerade as another
         }
+        // The 0x1156 frame is a COMPLETE login inventory listing (not a slot delta).
+        // If at least one recognized wallet occurs in that validated full snapshot,
+        // absence of the other wallet's slot implies its current quantity is zero.
+        // A partial 0x1b56 slot-change frame NEVER implies zero for missing wallets.
+        if (frame[0]==0x11 && frame.Length>5000 && latest.Count>0)
+        {
+            if(!latest.ContainsKey("bound"))latest["bound"]=0;
+            if(!latest.ContainsKey("unbound"))latest["unbound"]=0;
+        }
         foreach(var kv in latest)readings.Add(new WalletReading(kv.Key,kv.Value));
         return readings.Count>0;
     }
