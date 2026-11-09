@@ -10,7 +10,10 @@
     "dist:win": "electron-builder --win nsis --x64",
     "capture:build": "dotnet publish capture/AtreiaCapture.csproj -c Release -r win-x64 --self-contained true -o capture/publish"
   },
-  "dependencies": {\n    "tesseract.js": "^6.0.1"\n  },\n  "devDependencies": {
+  "dependencies": {
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8"
   },
@@ -36,7 +39,8 @@
       "overlay-preload.cjs",
       "wallets.js",
       "item-catalog.js",
-      "item-economy.js",\n      "market-ocr.cjs"
+      "item-economy.js",
+      "market-ocr.cjs"
     ],
     "win": {
       "target": "nsis",
