@@ -363,8 +363,6 @@ async function marketOcrTick() {
     :'Market settlement amount is visible; claiming it has not been verified.');
    return;
   }
-  lastMarketFrame=key;
-  recentMarket.set(key,now);
   // A preview of the same proposed listing is not a second fee.
   // When the confirmation dialog appears, promote the local proposal instead
   // of charging twice. Its time becomes the confirmation observation time.
@@ -378,6 +376,8 @@ async function marketOcrTick() {
       'Listing confirmation was shown; returned to Market form. Awaiting a matching Kina decrease (cancel is possible).');
     return;
   }
+  lastMarketFrame=key;
+  recentMarket.set(key,now);
   const existing=parsed.screen_phase==='confirmation'?
    marketObservations.findLast(x=>x.user_id===remote.user_id &&
     x.character===current.character && x.server===current.server &&
