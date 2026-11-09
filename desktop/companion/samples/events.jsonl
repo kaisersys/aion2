@@ -1,0 +1,4 @@
+{"id":"example-1","character":"Example Daeva","server":"Example Server","type":"wallet_snapshot","balance":12500000,"occurred_at":"2026-11-08T08:00:00Z","source":"manual"}
+{"id":"example-2","character":"Example Daeva","server":"Example Server","type":"kinah_earned","amount":350000,"occurred_at":"2026-11-08T09:00:00Z","source":"manual"}
+{"id":"example-3","character":"Example Daeva","server":"Example Server","type":"kinah_spent","amount":80000,"occurred_at":"2026-11-08T09:05:00Z","source":"manual"}
+{"id":"example-4","character":"Example Daeva","server":"Example Server","type":"counter","key":"nightmare","frequency":"daily","scope":"character","current":7,"maximum":14,"occurred_at":"2026-11-08T09:10:00Z","source":"manual"}

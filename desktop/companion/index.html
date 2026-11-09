@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Atreia Street Companion</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+ <div class="shell">
+  <aside class="sidebar">
+   <div class="brand"><span class="brand-mark">✦</span><span>ATREIA <strong>STREET</strong><small>COMPANION</small></span></div>
+   <div class="nav-title">OVERVIEW</div>
+   <div class="nav-active"><span class="nav-icon">◈</span> Command center</div>
+   <div class="nav-title">YOUR CHARACTER</div>
+   <label for="character-select" class="visually-hidden">Character</label>
+   <select id="character-select" class="select-character"></select>
+   <button id="show-add" class="sidebar-link">＋ Add a character</button>
+   <form id="add-character" class="mini-form" hidden>
+    <input id="character-name" placeholder="Character name" maxlength="40" required />
+    <input id="character-server" placeholder="Server" maxlength="48" required />
+    <button type="submit">Save character</button>
+   </form>
+   <div class="sidebar-bottom">
+    <div class="sidebar-caption">WEBSITE CONNECTION</div>
+    <div id="connection-status" class="status-text">Local-only mode</div>
+    <button id="show-login" class="sidebar-link">Connect account</button>
+    <button id="sync-now" class="sidebar-link" disabled>↻ Sync progress</button>
+    <button id="open-website" class="sidebar-link">↗ Open Atreia Street</button>
+   </div>
+  </aside>
+  <main class="main">
+   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1 · MVP</span></div>
+   <div class="header">
+    <div><div class="eyebrow">YOUR PROGRESS, AT A GLANCE</div>
+     <h1>Character <em>overview.</em></h1>
+     <p>Track your Kinah, limits, and daily progression. Detailed insights belong on the website.</p>
+    </div>
+    <div class="sync-indicator"><span class="light"></span><span id="activity-status">Local history active</span></div>
+   </div>
+   <div id="alert" class="alert" role="status" hidden></div>
+   <section class="panel source-panel">
+    <div><span class="section-label">DATA SOURCE</span><h2>Decoded event feed</h2>
+      <p id="feed-label">Not connected · no live game capture yet.</p>
+    </div>
+    <div class="source-actions"><button id="choose-feed" class="outlined">Choose JSONL feed</button><button id="toggle-entry" class="filled">＋ Record entry</button></div>
+   </section>
+   <section id="entry-panel" class="panel entry-panel" hidden>
+    <div class="section-label">MANUAL ENTRY · FOR TESTING OR CORRECTIONS</div>
+    <form id="event-form" class="entry-form">
+     <label>Record type<select id="entry-type"><option value="kinah_earned">Kinah earned</option><option value="kinah_spent">Kinah spent</option><option value="wallet_snapshot">Current wallet balance</option><option value="counter">Daily / weekly counter</option></select></label>
+     <label id="amount-field">Amount<input type="number" id="entry-amount" min="0" step="1" required /></label>
+     <label id="key-field" hidden>Activity key<input id="entry-key" placeholder="nightmare" pattern="[a-z0-9-]+" /></label>
+     <label id="frequency-field" hidden>Period<select id="entry-frequency"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label>
+     <label id="scope-field" hidden>Scope<select id="entry-scope"><option value="character">Character</option><option value="server">Server</option></select></label>
+     <label id="max-field" hidden>Maximum<input type="number" id="entry-max" min="0" step="1" /></label>
+     <button type="submit" class="filled">Save locally</button>
+    </form>
+   </section>
+   <section class="metrics" aria-label="Kinah summary">
+    <article class="metric primary"><span>CURRENT KINAH <small>◎</small></span><strong id="wallet">—</strong><p id="wallet-note">Awaiting wallet snapshot</p></article>
+    <article class="metric"><span>EARNED TODAY <small>↗</small></span><strong id="today-earned">—</strong><p>Explicit earned transactions</p></article>
+    <article class="metric"><span>SPENT TODAY <small>↘</small></span><strong id="today-spent">—</strong><p>Explicit spending transactions</p></article>
+    <article class="metric"><span>NET THIS WEEK <small>◷</small></span><strong id="week-net">—</strong><p id="week-note">No ledger entries yet</p></article>
+   </section>
+   <div class="main-grid">
+    <section class="panel">
+      <div class="section-top"><div><div class="section-label">PROGRESSION</div><h2>Daily counters</h2></div><span id="daily-reset" class="tag">Reset: —</span></div>
+      <div id="daily-counters" class="counter-list"></div>
+    </section>
+    <section class="panel">
+      <div class="section-top"><div><div class="section-label">PROGRESSION</div><h2>Weekly counters</h2></div><span id="weekly-reset" class="tag">Reset: —</span></div>
+      <div id="weekly-counters" class="counter-list"></div>
+    </section>
+   </div>
+   <section class="panel activity">
+     <div class="section-top"><div><div class="section-label">YOUR LEDGER</div><h2>Recent activity</h2></div><span id="ledger-count" class="tag">0 records</span></div>
+     <div id="activity-rows"></div>
+   </section>
+   <div class="footnote">Only validated decoded events or your manual entries are recorded. Wallet changes are never assumed to be earnings or expenses. Raw packets are not stored or uploaded.</div>
+  </main>
+ </div>
+ <div id="auth-backdrop" class="modal-backdrop" hidden>
+   <form id="auth-form" class="auth-modal">
+     <button type="button" id="close-login" class="modal-close" aria-label="Close sign in">×</button>
+     <div class="section-label">ATREIA STREET · ACCOUNT</div><h2>Connect your website.</h2>
+     <p>Sign in with the account you already use on atreiastreet.com. Only summarized records will be synced when you choose.</p>
+     <label>Email<input type="email" id="auth-email" autocomplete="username" required /></label>
+     <label>Password<input type="password" id="auth-password" autocomplete="current-password" required /></label>
+     <button class="filled" type="submit">Connect account</button>
+     <small>Passwords are sent to your configured Supabase authentication endpoint and never saved to disk by this app.</small>
+   </form>
+ </div>
+ <script src="./ui.js" defer></script>
+</body>
+</html>
