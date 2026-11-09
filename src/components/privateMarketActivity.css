@@ -1,0 +1,8 @@
+.player-market-activity{margin-top:26px;display:grid;gap:13px}
+.player-market-activity h2{margin:0;font-size:24px}
+.private-market-rows{display:grid;gap:10px;margin-top:7px}
+.private-market-row{display:flex;justify-content:space-between;align-items:start;gap:15px;padding:14px;border:1px solid rgba(170,188,218,.18);border-radius:10px;background:rgba(9,19,31,.45)}
+.private-market-row strong{display:block;overflow-wrap:anywhere}
+.private-market-row small{display:block;margin-top:5px;opacity:.75}
+.private-market-figures{text-align:right;display:grid;gap:5px;min-width:195px;font-size:13px}
+@media(max-width:660px){.private-market-row{display:grid}.private-market-figures{text-align:left;min-width:0}}
