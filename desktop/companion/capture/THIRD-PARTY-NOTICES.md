@@ -54,3 +54,5 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+English item-label names in desktop/companion/item-catalog.js derive from public client-data metadata: https://github.com/l33tm3/FullAIon2Companion (desktop/FullAIon2Companion/items.json). Only the factual item ID → English name table is bundled. No application source code, third-party artwork or recipe data is copied from this catalog. Aion 2 game assets and data remain the property of NCSOFT.

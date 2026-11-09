@@ -34,3 +34,12 @@ test('overview and mini contain visible In / Out totals for balance movements',(
  assert.ok(html.indexOf('wallets.js')<html.indexOf('ui.js'));
  assert.ok(mini.indexOf('wallets.js')<mini.indexOf('overlay.js'));
 });
+
+test('item-level grouping is visible in Overview and not in Diagnostics',()=>{
+ assert.match(html,/id="item-groups"/);
+ assert.match(html,/id="diagnostic-item-deltas"/);
+ assert.ok(html.indexOf('item-catalog.js')<html.indexOf('ui.js'));
+ assert.ok(html.indexOf('item-economy.js')<html.indexOf('ui.js'));
+ assert.ok(html.indexOf('id="item-groups"')>html.indexOf('id="view-overview"'));
+ assert.ok(html.indexOf('id="diagnostic-item-deltas"')<html.indexOf('id="view-overview"'));
+});
