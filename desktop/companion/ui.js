@@ -95,6 +95,9 @@ function render(){
  $('diagnostic-item-updates').textContent=h?String(h.itemUpdates):'—';
  $('diagnostic-item-deltas').textContent=h?String(h.itemDeltas):'—';
  $('diagnostic-item-stacks').textContent=h?String(h.itemStacks):'—';
+ $('diagnostic-ground-items').textContent=h?String(h.groundItems||0):'—';
+ $('diagnostic-ground-pickups').textContent=h?String(h.groundPickups||0):'—';
+ $('diagnostic-ground-matches').textContent=h?String(h.groundMatches||0):'—';
  $('diagnostic-wallet-regular').textContent=h?String(h.unboundWalletReadings):'—';
  $('diagnostic-wallet-bound').textContent=h?String(h.boundWalletReadings):'—';
  $('diagnostic-opcodes').textContent=h?.popularOpcodes?.length
@@ -250,6 +253,28 @@ function render(){
    caption.textContent='Possible '+(isSpend?'purchase':'sale')+' · '+num(Math.round(group.totalKina/group.totalQuantity))+' each · unverified';
    const amountWrap=document.createElement('div');amountWrap.append(price,caption);
    row.append(detail,qty,amountWrap);itemGroups.append(row);
+ }
+ const groundGroups=$('ground-groups');
+ groundGroups.replaceChildren();
+ if(!itemEconomy.groundGroups.length) {
+  const empty=document.createElement('div');empty.className='empty';
+  empty.textContent='No corroborated ground pickups yet. Missing ground or inventory packets remain unattributed.';
+  groundGroups.append(empty);
+ }
+ for(const group of itemEconomy.groundGroups.slice(0,30)) {
+  const row=document.createElement('div');row.className='item-group-row';
+  const info=document.createElement('div');
+  const name=document.createElement('strong');
+  name.textContent=window.AtreiaItems.name(group.item_id);
+  const detail=document.createElement('span');detail.className='movement-source';
+  detail.textContent='Item #'+group.item_id+' · '+group.observations+
+   ' corroborated ground pickup'+(group.observations===1?'':'s');
+  info.append(name,detail);
+  const qty=document.createElement('span');qty.className='item-group-qty';
+  qty.textContent='×'+num(group.totalQuantity);
+  const note=document.createElement('div');note.className='item-group-caption';
+  note.textContent='Ground pickup · not Market earnings';
+  row.append(info,qty,note);groundGroups.append(row);
  }
  for(const period of ['daily','weekly']){
   const holder=$(period+'-counters');holder.replaceChildren();
