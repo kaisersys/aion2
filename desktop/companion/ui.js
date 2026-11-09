@@ -165,12 +165,8 @@ function render(){
  const money=window.AtreiaWallets.movements(events,p.daily);
  const itemEconomy=window.AtreiaItemEconomy.attribute(events,money,p.daily);
  const itemByWalletId=new Map(itemEconomy.matches.map(m=>[m.walletId,m]));
- const marketFeeByWalletId=new Map();
- for(const x of state.marketObservations||[]) {
-  if(!match(x,profile)||x.status!=='corroborated'||x.screen_phase!=='confirmation'||
-     !Array.isArray(x.wallet_event_ids))continue;
-  for(const walletId of x.wallet_event_ids)marketFeeByWalletId.set(walletId,x);
- }
+ const marketFeeByWalletId=window.AtreiaMarketAttribution.feeSources(
+  state.marketObservations||[],profile?.character,profile?.server);
  const regularWallet=walletView.regular, boundWallet=walletView.bound;
  const t={dayEarned:0,daySpent:0};
  let hasEarned=false,hasSpent=false;
