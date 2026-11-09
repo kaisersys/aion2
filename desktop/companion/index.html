@@ -116,6 +116,9 @@
      <div id="item-groups" class="item-groups"><div class="empty">No item-level associations yet.</div></div>
      <div class="movement-list-title item-groups-title"><span>CORROBORATED GROUND PICKUPS</span><small>Ground spawn + own pickup + inventory update</small></div>
      <div id="ground-groups" class="item-groups"><div class="empty">No ground pickups corroborated yet.</div></div>
+     <div class="movement-list-title item-groups-title"><span>MARKET SCREEN OBSERVATIONS</span><small>Account-connected · OCR evidence · unverified</small></div>
+     <p class="movement-help" id="market-ocr-status">Sign in to begin reading the Aion 2 Market window.</p>
+     <div id="market-observations" class="item-groups"><div class="empty">No Market observations yet.</div></div>
    </section>
    <div class="main-grid">
     <section class="panel">
@@ -131,7 +134,7 @@
      <div class="section-top"><div><div class="section-label">YOUR LEDGER</div><h2>Recent activity</h2></div><span id="ledger-count" class="tag">0 records</span></div>
      <div id="activity-rows"></div>
    </section>
-   <div class="footnote">Automatic capture begins when the companion opens. You may pause it at any time. Discovered characters are stored locally and shown after their first detected login. Only validated decoded events or your manual entries are recorded. Regular and bound Kina are tracked separately. Today's regular net change is not gross earnings. Wallet changes are never assumed to be earned or spent transactions. Raw packets are not stored or uploaded. This app does not automatically identify Market sales or purchases.</div>
+   <div class="footnote">Game packet capture starts with the companion; Market screen reading starts after account sign-in and stops at sign-out. OCR reads only the AION2 window. Extracted Market listing and settlement observations sync to your private account, not raw images or screen text. OCR observations are unverified until independently reconciled. Wallet changes alone are not proof of Market sales or purchases. See the account notice before connecting.</div>
    </section>
   </main>
  </div>
@@ -139,7 +142,7 @@
    <form id="auth-form" class="auth-modal">
      <button type="button" id="close-login" class="modal-close" aria-label="Close sign in">×</button>
      <div class="section-label">ATREIA STREET · ACCOUNT</div><h2>Connect your website.</h2>
-     <p>Sign in with the account you already use on atreiastreet.com. Only summarized records will be synced when you choose.</p>
+     <p>Connecting enables automatic Market screen reading while the AION2 game window is visible. The companion reads listing fees, prices and settlements using on-device OCR and automatically uploads extracted transaction fields to your private account. No screenshots or unrelated screen contents are uploaded. Closing the app or signing out stops Market reading. The companion also supports separate manual synchronization of wallet and progression events.</p>
      <label>Email<input type="email" id="auth-email" autocomplete="username" required /></label>
      <label>Password<input type="password" id="auth-password" autocomplete="current-password" required /></label>
      <button class="filled" type="submit">Connect account</button>
