@@ -68,3 +68,39 @@ test('does not accept contradictory fees, total prices or mixed listing and sett
  assert.equal(readMarket('Market\nTotal Price 500\nTotal Price 1000\nRegistration Fee 30').status,'incomplete');
  assert.equal(readMarket('Market\nRegistration Fee 100\nSettlement Amount 300').status,'ambiguous');
 });
+
+test('parses screenshot confirmation prompt with Refining Stone 5, total 1,165 and registration fee 23',()=>{
+ const screen=[
+  'Are you sure you wish to list for sale?',
+  'Refining Stone',
+  'Total Sale Price 1,165',
+  'Sale Price Per Item 233',
+  'Registration Fee 23',
+  'Funds 478,715',
+  'Cancel Confirm'
+ ].join('\n');
+ const parsed=readMarket(screen);
+ assert.equal(parsed.status,'observed');
+ assert.equal(parsed.screen_phase,'confirmation');
+ assert.deepEqual(parsed.evidence,{
+  kind:'listing_observation',amount:1165,fee:23,quantity:5,item_name:'Refining Stone'
+ });
+});
+test('form view is never confirmation just because it has a fee',()=>{
+ const parsed=readMarket('Market\nSale Quantity: 5\nTotal Sale Price: 1,165\nRegistration Fee 23');
+ assert.equal(parsed.screen_phase,'listing_form');
+});
+test('registration fee is not confused with Funds balance',()=>{
+ const parsed=readMarket('Are you sure you wish to list for sale?\nRegistration Fee 23\nFunds 478,715\nCancel\nConfirm');
+ assert.equal(parsed.status,'observed');
+ assert.equal(parsed.evidence.amount,23);
+ assert.equal(parsed.evidence.fee,23);
+});
+
+test('reads currency icon following amount without confusing Funds for registration fee',()=>{
+ const x=readMarket('Are you sure you wish to list for sale?\nTotal Sale Price 1,165 ©\nSale Price Per Item 233 ©\nRegistration Fee 23 ◎\nFunds 478,715 ◎\nCancel Confirm');
+ assert.equal(x.status,'observed');
+ assert.equal(x.screen_phase,'confirmation');
+ assert.equal(x.evidence.fee,23);
+ assert.equal(x.evidence.amount,1165);
+});
