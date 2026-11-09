@@ -98,6 +98,7 @@ function render(){
  $('diagnostic-ground-items').textContent=h?String(h.groundItems||0):'—';
  $('diagnostic-ground-pickups').textContent=h?String(h.groundPickups||0):'—';
  $('diagnostic-ground-matches').textContent=h?String(h.groundMatches||0):'—';
+ $('market-ocr-status').textContent=state.marketStatus?.message||'Account sign-in required.';
  $('diagnostic-wallet-regular').textContent=h?String(h.unboundWalletReadings):'—';
  $('diagnostic-wallet-bound').textContent=h?String(h.boundWalletReadings):'—';
  $('diagnostic-opcodes').textContent=h?.popularOpcodes?.length
@@ -275,6 +276,43 @@ function render(){
   const note=document.createElement('div');note.className='item-group-caption';
   note.textContent='Ground pickup · not Market earnings';
   row.append(info,qty,note);groundGroups.append(row);
+ }
+ const marketRows=$('market-ocr-rows');
+ marketRows.replaceChildren();
+ const marketRecords=(state.marketObservations||[]).filter(x=>match(x,profile))
+   .sort((a,b)=>Date.parse(b.occurred_at)-Date.parse(a.occurred_at)).slice(0,30);
+ if(!marketRecords.length) {
+   const empty=document.createElement('div');empty.className='empty';
+   empty.textContent=state.remote
+    ?'Watching the Aion 2 window for Market details. Open a listing or settlement panel to capture recognized fields.'
+    :'Sign in to enable automatic Market observation and private account sync.';
+   marketRows.append(empty);
+ }
+ const kindLabel={
+  listing_preview:'Listing preview',listing_confirmed_screen:'Listing confirmation seen',
+  settlement_visible:'Settlement details',settlement_claimed_screen:'Claim confirmation seen',
+  purchase_preview:'Purchase preview'
+ };
+ for(const item of marketRecords) {
+  const row=document.createElement('div');row.className='item-group-row';
+  const info=document.createElement('div');
+  const name=document.createElement('strong');name.textContent=item.item_name+' ×'+num(item.quantity);
+  const details=document.createElement('span');details.className='movement-source';
+  details.textContent=(kindLabel[item.kind]||'Market observation')+
+   ' · '+new Date(item.occurred_at).toLocaleString()+
+   ' · '+(item.uploaded?'Private account synced':'Waiting for account sync');
+  info.append(name,details);
+  const values=document.createElement('div');
+  const amount=document.createElement('strong');
+  amount.className='item-group-cost';
+  const seenValue=item.proceeds??item.listing_fee??item.gross??item.unit_price;
+  amount.textContent=num(seenValue)+' Kina';
+  const caption=document.createElement('small');caption.className='item-group-caption';
+  caption.textContent=item.proceeds!=null?'Settlement shown, wallet unverified':
+   item.listing_fee!=null?'Registration fee shown, debit unverified':
+   'Screen price observed, not a completed trade';
+  values.append(amount,caption);
+  row.append(info,values);marketRows.append(row);
  }
  for(const period of ['daily','weekly']){
   const holder=$(period+'-counters');holder.replaceChildren();
