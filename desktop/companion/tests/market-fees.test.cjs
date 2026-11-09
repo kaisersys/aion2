@@ -12,7 +12,7 @@ function wallet(id,offset,balance,currency) {
 }
 function fee(amount=200,overrides={}){
  return {id:'fee1',character:'Ceti',server:'S1',kind:'listing_fee_observation',
-  status:'unverified',fee,amount:fee,occurred_at:t(0),synced:true,...overrides};
+  status:'unverified',fee:amount,amount,occurred_at:t(0),synced:true,...overrides};
 }
 test('matching bound Kina decrease corroborates a fee exactly once',()=>{
  const candidate=fee();
