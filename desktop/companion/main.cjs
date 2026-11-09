@@ -14,13 +14,14 @@ const FILE_LIMIT = 8 * 1024 * 1024;
 let win;
 let overlay;
 const DEFAULT_SETTINGS = { autoCapture:true, overlayEnabled:true, gamePort:13328 };
-let state = { profiles:[], events:[], marketObservations:[], settings:{...DEFAULT_SETTINGS}, activeCharacter:null };
+let state = { profiles:[], events:[], marketObservations:[], syncedEventHashes:[], settings:{...DEFAULT_SETTINGS}, activeCharacter:null };
 let feed = null;
 let marketObserver = null;
 let marketStatus = {state:'signed-out',message:'Connect your Atreia Street account to enable automatic Market tracking.'};
 let marketSyncTimer=null;
 let marketSyncQueued=null;
 let marketSyncBusy=false;
+let eventSyncBusy=false;
 let remote = null;
 let capture = null;
 let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
@@ -37,6 +38,8 @@ function loadState() {
     state = {
       profiles:Array.isArray(saved.profiles) ? saved.profiles.slice(0,80) : [],
       events:Array.isArray(saved.events) ? saved.events.slice(-50000) : [],
+      syncedEventHashes:Array.isArray(saved.syncedEventHashes) ?
+        saved.syncedEventHashes.filter(x=>typeof x==='string' && /^[a-f0-9]{64}$/.test(x)).slice(-50000) : [],
       marketObservations:Array.isArray(saved.marketObservations) ?
         saved.marketObservations.slice(-5000) : [],
       settings:{
@@ -48,7 +51,7 @@ function loadState() {
       },
       activeCharacter:saved.activeCharacter||null
     };
-  } catch { state = { profiles:[], events:[],marketObservations:[],settings:{...DEFAULT_SETTINGS},activeCharacter:null }; }
+  } catch { state = { profiles:[], events:[],marketObservations:[],syncedEventHashes:[],settings:{...DEFAULT_SETTINGS},activeCharacter:null }; }
 }
 function saveState() {
   fs.mkdirSync(path.dirname(storePath()), { recursive:true });
@@ -123,6 +126,11 @@ async function characters() {
 }
 async function sync() {
   if (!remote) throw new Error('Sign in first.');
+  if(eventSyncBusy)return {uploaded:0,unmatched:0,ticketBalances:0};
+  eventSyncBusy=true;
+  try{ return await syncEventsImpl(); } finally {eventSyncBusy=false;}
+}
+async function syncEventsImpl() {
   await characters();
   const byKey = new Map();
   for (const profile of state.profiles) {
@@ -131,6 +139,7 @@ async function sync() {
   }
   for (const c of remote.characters) byKey.set(charKey(c.name,c.server_name),c.id);
   const rows = [];
+  const previouslySent=new Set(state.syncedEventHashes||[]);
   let unmatched = 0;
   for (const ev of state.events) {
     // Item-level movements are local-only: website telemetry schema intentionally
@@ -138,8 +147,11 @@ async function sync() {
     if (ev.type==='item_change' || ev.type==='item_origin') continue;
     const id=byKey.get(charKey(ev.character,ev.server));
     if (!id) { unmatched++; continue; }
+    const eventHash=crypto.createHash('sha256')
+      .update(ev.id+'|'+ev.character+'|'+ev.server).digest('hex');
+    if(previouslySent.has(eventHash))continue;
     rows.push({user_id:remote.user_id, character_id:id,
-      event_hash:crypto.createHash('sha256').update(ev.id+'|'+ev.character+'|'+ev.server).digest('hex'),
+      event_hash:eventHash,
       kind:ev.type, occurred_at:ev.occurred_at, source:ev.source, currency_kind:ev.currency_kind??null,
       amount:ev.amount ?? null, balance:ev.balance ?? null,
       counter_key:ev.key ?? null, counter_frequency:ev.frequency ?? null,
@@ -148,8 +160,14 @@ async function sync() {
   }
   for (let i=0;i<rows.length;i+=150) {
     await refreshed();
+    const batch=rows.slice(i,i+150);
     await request('/rest/v1/player_companion_events?on_conflict=user_id,character_id,event_hash',
-      'POST',rows.slice(i,i+150),true,{prefer:'resolution=ignore-duplicates,return=minimal',noContent:true});
+      'POST',batch,true,{prefer:'resolution=ignore-duplicates,return=minimal',noContent:true});
+    // Mark only successfully uploaded records, including records that already
+    // existed in the server via ignore-duplicates.
+    for(const row of batch)previouslySent.add(row.event_hash);
+    state.syncedEventHashes=[...previouslySent].slice(-50000);
+    saveState();
   }
   // Only actual decoded ticket snapshots update the website's existing balance
   // system. Manually entered/illustrative counters never overwrite website data.
@@ -258,8 +276,12 @@ function ensureMarketObserver() {
   onStatus:next=>{marketStatus={...marketStatus,...next};notify();}
  });
  marketObserver.start();
- if(!marketSyncTimer)marketSyncTimer=setInterval(()=>{void syncMarket().catch(()=>{});},60000);
+ if(!marketSyncTimer)marketSyncTimer=setInterval(()=>{
+  void sync().catch(()=>{});
+  void syncMarket().catch(()=>{});
+ },60000);
  queueMarketSync();
+ void sync().catch(()=>{});
 }
 function stopMarketObserver() {
  if(marketSyncTimer){clearInterval(marketSyncTimer);marketSyncTimer=null;}
