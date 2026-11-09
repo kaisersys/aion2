@@ -24,6 +24,7 @@ function render(s){
    :health?.frames===0?'Packets only · decoder needs attention'
    :health?.characterPackets>0 && health?.identities===0?'Character packet parse mismatch'
    :health?.bundles>0 && health?.bundlesDecoded===0?'Compressed data needs updating'
+   :health?.lobbyRosterCharacters>0 && health?.identities===0?'Account roster seen · world identity pending'
    :health?.identities===0 && health?.bundlesDecoded>0?'Compressed frames · identity pending'
    :health?.identities===0?'Frames decoded · identity not seen'
    :'Checking character identity'

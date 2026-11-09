@@ -30,6 +30,9 @@ public static class Program
                 if (int.TryParse(item, out int port) && port is > 0 and <= 65535) ports.Add(port);
         }
         if (ports.Count == 0) { Status("error", "Supply at least one valid Aion 2 server port."); return 2; }
+        // Lobby's observed server port (community capture). Game process TCP owners
+        // are also tracked for other regions; the port is a narrow fallback.
+        ports.Add(13700);
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; Stop.Cancel(); };
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Stop.Cancel();
         using var service = new ReadOnlyCapture(ports);
@@ -133,6 +136,8 @@ internal sealed class ReadOnlyCapture : IDisposable
                         characterPackets = _protocol.CharacterOpcodesSeen,
                         rosterPackets = _protocol.RosterOpcodesSeen,
                         ticketPackets = _protocol.TicketOpcodesSeen,
+                        lobbyRosterPackets = _protocol.LobbyRosterPackets,
+                        lobbyRosterCharacters = _protocol.LobbyRosterCharacters,
                         popularOpcodes = _observedOpcodes.OrderByDescending(x=>x.Value)
                             .Take(8).Select(x=>new { opcode = x.Key.ToString("x4"), count=x.Value }).ToArray(),
                         dropped = Interlocked.Read(ref _dropped),
@@ -202,7 +207,8 @@ internal sealed class ReadOnlyCapture : IDisposable
 
     private void RefreshGameConnections()
     {
-        _nextConnectionCheck=Environment.TickCount64+4000;
+        // Short-lived lobby flows can complete before the 4-second refresh.
+        _nextConnectionCheck=Environment.TickCount64+(_gameConnections>0?3000:750);
         var observed=GameConnections.Observe();
         _gameRunning=observed.Running;
         _gameConnections=observed.Endpoints.Count;
@@ -387,6 +393,88 @@ public static class SelfTest
             truncatedBundle[^1]=255;
             if (Aion2Bundles.TryExpand(truncatedBundle.AsMemory(0,truncatedBundle.Length-1),out _))
                 throw new Exception("Truncated LZ4 block incorrectly accepted.");
+
+            // Aion 2 lobby character-list fixture based on nuriland/a2kit's
+            // MIT-licensed game/parse_test.go record generator. Includes Unicode
+            // player names, four-character group masks and two distinct servers.
+            static byte[] LobbyMessage(params (string Name, ushort Server, uint Level)[] entries)
+            {
+                var b=new List<byte>{0x0b,0x39,0,0,(byte)entries.Length};
+                for(int j=0;j<entries.Length;j++)
+                {
+                    var ch=entries[j];
+                    byte[] bytes=System.Text.Encoding.UTF8.GetBytes(ch.Name);
+                    if(bytes.Length>80)throw new Exception("Lobby fixture name is too long.");
+                    b.AddRange(BitConverter.GetBytes(ch.Server));
+                    b.Add((byte)bytes.Length);
+                    b.AddRange(bytes);
+                    b.AddRange(BitConverter.GetBytes(ch.Level));
+                    b.AddRange(BitConverter.GetBytes(0u));  // experience
+                    b.AddRange(BitConverter.GetBytes(0u));  // reserved
+                    b.AddRange(BitConverter.GetBytes(6u));  // class code
+                    b.Add(1);                              // flags
+                    b.AddRange(BitConverter.GetBytes(1800000000000UL));
+                    b.AddRange(new byte[8]);
+                    if(j%4==0)b.Add(0);                    // group mask
+                }
+                b.Add(1);b.Add(1);
+                return b.ToArray();
+            }
+            byte[] lobbyMessage=LobbyMessage(("Aria",1301,45),("누리",1302,33));
+            var lobbyRoster=LobbyRoster.Parse(lobbyMessage);
+            if(lobbyRoster.Count!=2 || lobbyRoster[0].Name!="Aria" ||
+                lobbyRoster[0].ServerId!=1301 || lobbyRoster[1].Name!="누리" ||
+                lobbyRoster[1].ServerId!=1302)
+                throw new Exception("Aion 2 lobby character-list parser failed.");
+            var withPlaceholder=LobbyRoster.Parse(
+                LobbyMessage(("$hidden",1301,1),("Aria",1301,45)));
+            if(withPlaceholder.Count!=1 || withPlaceholder[0].Name!="Aria")
+                throw new Exception("Lobby placeholder was not excluded.");
+            var five=LobbyRoster.Parse(LobbyMessage(
+                ("A",1301,1),("B",1301,2),("C",1302,3),("D",1302,4),("E",2304,5)));
+            if(five.Count!=5)
+                throw new Exception("Lobby roster group mask boundaries failed.");
+            byte[] invalidLobby=(byte[])lobbyMessage.Clone();
+            invalidLobby[^1]=0;
+            if(LobbyRoster.Parse(invalidLobby).Count!=0)
+                throw new Exception("Corrupt lobby roster was accepted.");
+
+            var lobbyProtocolEvents=new List<object>();
+            var lobbyProtocol=new TicketProtocol(e=>lobbyProtocolEvents.Add(e));
+            lobbyProtocol.OnFrame(lobbyMessage,DateTime.UtcNow);
+            if(lobbyProtocol.LobbyRosterPackets!=1 ||
+               lobbyProtocol.LobbyRosterCharacters!=2 ||
+               lobbyProtocol.RosterRecords!=1 ||
+               !lobbyProtocolEvents.Any(e=>e.ToString()!.Contains("kind = roster")))
+                throw new Exception("Lobby character-list was not delivered as roster event.");
+
+            // Read-only framing must decode the lobby list even when followed by
+            // an incomplete next message on the same connection.
+            var lobbyWire=new List<byte>();
+            long encodedSize=lobbyMessage.Length+4;
+            do
+            {
+                byte part=(byte)(encodedSize&127);
+                encodedSize>>=7;
+                if(encodedSize>0)part|=128;
+                lobbyWire.Add(part);
+            }while(encodedSize>0);
+            lobbyWire.AddRange(lobbyMessage);
+            lobbyWire.AddRange(new byte[]{0x10,0x00});
+            var lobbyTcp=new TcpReassembler();
+            int lobbyFrames=0;
+            for(int offset=0;offset<lobbyWire.Count;offset+=17)
+            {
+                int chunk=Math.Min(17,lobbyWire.Count-offset);
+                var segment=new TcpSegment(DateTime.UtcNow,"lobby:13700","player:50444",
+                    (uint)(3000+offset),lobbyWire.ToArray().AsMemory(offset,chunk),true);
+                var bodies=lobbyTcp.Push(segment,new FrameLayout(),new HashSet<int>{0x0b39});
+                lobbyFrames+=bodies.Count;
+                if(bodies.Any(x=>!x.Span.SequenceEqual(lobbyMessage)))
+                    throw new Exception("Unexpected lobby frame after split TCP stream.");
+            }
+            if(lobbyFrames!=1)
+                throw new Exception("Lobby character list lost during TCP framing.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }

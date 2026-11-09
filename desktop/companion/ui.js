@@ -69,6 +69,7 @@ function render(){
  $('diagnostic-bundle-errors').textContent=h?String(h.bundleFailures):'—';
  $('diagnostic-inner').textContent=h?String(h.innerFrames):'—';
  $('diagnostic-identity').textContent=h?String(h.identities+h.rosters):'—';
+ $('diagnostic-lobby').textContent=h?String(h.lobbyRosterCharacters)+' from '+String(h.lobbyRosterPackets)+' packet(s)':'—';
  $('diagnostic-identity-packets').textContent=h?String(h.characterPackets+h.rosterPackets):'—';
  $('diagnostic-ticket-packets').textContent=h?String(h.ticketPackets):'—';
  $('diagnostic-opcodes').textContent=h?.popularOpcodes?.length
@@ -84,6 +85,10 @@ function render(){
    ?'The companion sees no game packets. Check Npcap, administrator-only capture settings, and VPN/loopback routing; teleporting repeatedly will not help.'
    :h && h.frames===0
    ?'Packets are arriving, but the decoder has not produced game frames. This indicates a capture/protocol mismatch that requires investigation.'
+   :h && h.lobbyRosterCharacters>0
+   ?'Account character list loaded from lobby. The active character and progression are confirmed separately in the world session.'
+   :h && h.lobbyRosterPackets>0 && h.lobbyRosterCharacters===0
+   ?'Lobby roster arrived, but its format was not recognized. Character discovery needs an updated decoder.'
    :h && h.bundles>0 && h.bundlesDecoded===0
    ?'Compressed bundles were detected but failed to decompress; the decoder needs a format update.'
    :h && h.bundlesDecoded>0 && h.characterPackets===0 && h.rosterPackets===0
@@ -93,7 +98,7 @@ function render(){
    :h && h.rosterPackets>0 && h.rosters===0
    ?'Account roster packets are reaching us, but their layout is not being recognized by this build.'
    :h && h.frames>0
-   ?'Frame decoding is working. The opcode counts below show whether character messages are present in this game build.'
+   ?'World gameplay frames are arriving without login identities. Capture the lobby phase by opening the companion BEFORE launching the game. The new lobby character-list decoder is active.'
    :'Listening for Aion 2 data…';
  if(!portLoaded) { $('game-port').value=state.settings?.gamePort||13328; portLoaded=true; }
  $('overlay-toggle').textContent=state.settings?.overlayEnabled?'Hide mini overlay':'Show mini overlay';

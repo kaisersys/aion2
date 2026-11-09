@@ -26,6 +26,8 @@ public sealed class TicketProtocol
     public int RosterRecords { get; private set; }
     public int CharacterOpcodesSeen { get; private set; }
     public int RosterOpcodesSeen { get; private set; }
+    public int LobbyRosterPackets { get; private set; }
+    public int LobbyRosterCharacters { get; private set; }
     public int TicketOpcodesSeen { get; private set; }
 
     public TicketProtocol(Action<object> emit) => _emit = emit;
@@ -66,6 +68,17 @@ public sealed class TicketProtocol
         int opcode = frame[0] << 8 | frame[1];
         switch (opcode)
         {
+            case 0x0b39: // account character list from the lobby, before world join
+                LobbyRosterPackets++;
+                RosterOpcodesSeen++;
+                var lobbyCharacters = LobbyRoster.Parse(frame);
+                if (lobbyCharacters.Count > 0)
+                {
+                    RosterRecords++;
+                    LobbyRosterCharacters+=lobbyCharacters.Count;
+                    _emit(new {kind="roster",characters=lobbyCharacters});
+                }
+                break;
             case 0x0b61:
                 TicketOpcodesSeen++;
                 if (TryReadList(frame, out List<TicketReading> entries))

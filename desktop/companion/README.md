@@ -103,3 +103,31 @@ and a synthetic bundle containing a ticket and own-character record.
 
 Live Aion 2 Global compatibility is not yet proven; this remains an
 unofficial packet-capture beta with potential NCSOFT policy risk.
+
+## Automatic lobby character discovery
+
+The Aion 2 account lobby and in-world session use different network connections.
+The companion now includes the lobby fallback port 13700 (as observed in
+community captures) as well as discovery of current AION2.exe TCP endpoints.
+World port 13328 remains user-configurable.
+
+The lobby response opcode 0B39 provides the account-character roster. The
+companion validates name, server ID, and level using the wire layout documented
+by the MIT-licensed nuriland/a2kit project, ignores hidden $-prefixed
+placeholders, and builds a local roster. Login tokens, raw packet contents,
+account IDs, timestamps and character-selection masks are not exported.
+
+For first-time setup, OPEN THE COMPANION BEFORE LAUNCHING AION 2 and then
+start the game normally so the initial lobby response can be observed.
+If the character-selection lobby has already been exited, merely teleporting
+in the world will not re-send the lobby roster. Existing roster profiles stay
+saved locally between restarts.
+
+A lobby roster identifies the account characters; it does not itself prove
+which character is presently logged in. A roster with one playable character
+is selected for the mini window as a local profile, but account histories,
+tickets and wallets are only attributed from confirmed world records.
+
+The main app now displays lobby list packet and character counts separately
+from successfully parsed active-world identities. This remains unofficial
+passive packet analysis and may have NCSOFT account-policy implications.
