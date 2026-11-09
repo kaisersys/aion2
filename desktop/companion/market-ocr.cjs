@@ -40,7 +40,7 @@ function field(lines,label) {
   }
  }
  if(!values.length)return null;
- return values.every(v=>v===values[0])?values[0]:null;
+ return values.every(v=>v===values[0])?values[0]:Number.NaN;
 }
 function readMarket(text) {
  const lines=clean(text);
@@ -58,21 +58,23 @@ function readMarket(text) {
  if(listing&&settlement)return {status:'ambiguous'};
  if(!listing&&!settlement)return {status:'incomplete'};
  const qty=field(lines,QUANTITY);
- if(qty!==null&&qty>1000000)return {status:'incomplete'};
+ if(Number.isNaN(qty)||(qty!==null&&qty>1000000))return {status:'incomplete'};
  const names=lines.map(s=>s.match(ITEM)).filter(Boolean);
  const item=names.length===1?names[0][1].trim():null;
  if(settlement) {
   const proceeds=field(lines,PROCEEDS);
-  if(proceeds===null)return {status:'incomplete',kind:'settlement_observation'};
+  if(proceeds===null||Number.isNaN(proceeds))return {status:'incomplete',kind:'settlement_observation'};
   return {status:'observed',evidence:{
    kind:'settlement_observation',amount:proceeds,fee:null,quantity:qty,item_name:item
   }};
  }
  const fee=field(lines,FEE);
- if(fee===null)return {status:'incomplete',kind:'listing_fee_observation'};
+ if(fee===null||Number.isNaN(fee))return {status:'incomplete',kind:'listing_fee_observation'};
  let price=field(lines,TOTAL);
+ if(Number.isNaN(price))return {status:'incomplete',kind:'listing_observation'};
  if(price===null) {
   const unit=field(lines,UNIT);
+  if(Number.isNaN(unit))return {status:'incomplete',kind:'listing_observation'};
   if(unit!==null && qty!==null && Number.isSafeInteger(unit*qty) && unit*qty<=MAX_AMOUNT)
    price=unit*qty;
  }
