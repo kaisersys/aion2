@@ -164,6 +164,23 @@ public static class SelfTest
             wallet[2+i+12] = 1;
             if (!TicketProtocol.TryReadBoundKinah(wallet,out long amount) || amount!=123456789L)
                 throw new Exception("Bound Kinah inventory quantity decode failed.");
+            byte[] roster=new byte[160];
+            roster[0]=0x26; roster[1]=0x36;
+            int nameAt=8;
+            roster[nameAt]=4;
+            System.Text.Encoding.UTF8.GetBytes("Ceti",roster.AsSpan(nameAt+1));
+            int after=nameAt+5;
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(roster.AsSpan(after),9);
+            roster[after+4]=1; // faction
+            roster[after+6]=45; // level
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(roster.AsSpan(after+14),1450);
+            int tail=after+38+1+32;
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(roster.AsSpan(tail),123456u);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(roster.AsSpan(tail+6),1204);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(roster.AsSpan(tail+12),1800000000000UL);
+            List<AccountRoster.Character> account=AccountRoster.Parse(roster);
+            if(account.Count!=1||account[0].Name!="Ceti"||account[0].ServerId!=1204)
+                throw new Exception("Account roster decode failed.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }

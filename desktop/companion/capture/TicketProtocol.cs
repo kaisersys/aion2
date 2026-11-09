@@ -75,6 +75,12 @@ public sealed class TicketProtocol
                     else if (_currentName is not null) PublishTicket(update, observedAt);
                 }
                 break;
+            case 0x2636: // own-account character roster after switching to character selection
+            case 0x1536 when frame.Length > 500: // some initial-login roster frames
+                var roster = AccountRoster.Parse(frame);
+                if (roster.Count > 0)
+                    _emit(new { kind = "roster", characters = roster });
+                break;
             case 0x3336:
                 if (TryReadCharacter(frame, out string name, out int serverId))
                 {

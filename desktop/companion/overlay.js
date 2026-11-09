@@ -12,7 +12,7 @@ function periodStarts(){
  return {daily,weekly:daily-((new Date(daily).getUTCDay()+4)%7)*day};
 }
 function render(s){
- const active=s.activeCharacter||s.profiles?.[0]||null;
+ const active=s.activeCharacter||null;
  $('character').textContent=active?.character||'Waiting for character';
  $('server').textContent=active?.server||'Open Aion 2 to detect your character';
  const capture=s.capture?.state||'idle';

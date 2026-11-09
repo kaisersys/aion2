@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -222,6 +222,20 @@ function processCaptureMessage(message) {
     captureMessage(message.state==='error'?'error':message.state, String(message.message||''));
     return;
   }
+  if (message.kind==='roster' && Array.isArray(message.characters)) {
+    let changed=false, found=0;
+    for(const c of message.characters.slice(0,80)) {
+      if(!c || typeof c.Name!=='string' || !Number.isInteger(c.ServerId))continue;
+      const discovered=discoverProfile(state.profiles,c.Name,c.ServerId);
+      if(!discovered.profile)continue;
+      found++;
+      if(discovered.changed) {state.profiles=discovered.profiles;changed=true;}
+    }
+    if(changed){saveState();notify();}
+    if(found>0 && captureStatus.state!=='connected')
+      captureMessage('listening','Discovered '+found+' account characters; waiting for active character.');
+    return;
+  }
   if (message.kind==='character') {
     const found=resolveCapturedCharacter(message.name,message.serverId);
     if (found) captureMessage('connected','Tracking '+found.character+' · '+found.server);
@@ -302,6 +316,21 @@ function createOverlay() {
     webPreferences:{
       preload:path.join(__dirname,'overlay-preload.cjs'),contextIsolation:true,
       nodeIntegration:false,sandbox:true,webSecurity:true
+    }
+  });
+  // Keep the mini where the user dragged it, as long as a screen still contains it.
+  const saved=state.settings.overlayPosition;
+  if(saved && Number.isInteger(saved.x) && Number.isInteger(saved.y) &&
+     screen.getAllDisplays().some(d=>{
+       const b=d.workArea;
+       return saved.x>=b.x-100 && saved.x<b.x+b.width-90 &&
+              saved.y>=b.y-100 && saved.y<b.y+b.height-80;
+     }))overlay.setPosition(saved.x,saved.y);
+  overlay.on('moved',()=>{
+    if(overlay && !overlay.isDestroyed()){
+      const [x,y]=overlay.getPosition();
+      state.settings.overlayPosition={x,y};
+      saveState();
     }
   });
   overlay.removeMenu();
