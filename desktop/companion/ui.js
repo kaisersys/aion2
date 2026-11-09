@@ -45,19 +45,26 @@ function render(){
  $('connection-status').textContent=state.remote?'Connected · '+state.remote.email:'Local-only mode';
  $('show-login').textContent=state.remote?'Disconnect account':'Connect account';
  $('sync-now').disabled=!state.remote;
- $('feed-label').textContent=state.feedPath?'Watching '+state.feedPath+' for decoded JSONL events':'Not connected · no live game capture yet.';
- $('activity-status').textContent=state.feedPath?'Decoded feed connected':'Local history active';
+ $('feed-label').textContent=state.feedPath?'Also watching '+state.feedPath+' for decoded JSONL events':'Read-only Npcap capture; decoded events are stored locally.';
+ $('capture-detail').textContent=state.capture?.message||'Npcap not started.';
+ const capturing=['starting','listening','connected','unmapped'].includes(state.capture?.state);
+ $('capture-toggle').textContent=capturing?'Stop Npcap capture':'Start Npcap capture';
+ $('capture-toggle').dataset.capturing=String(capturing);
+ $('activity-status').textContent=state.capture?.state==='connected'?'Game connected':state.capture?.state==='listening'?'Listening for game':state.feedPath?'Test feed connected':'Local history active';
  const p=currentPeriods();
  $('daily-reset').textContent='Next '+new Date(p.nextDaily).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
  $('weekly-reset').textContent='Next '+new Date(p.nextWeekly).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
  const events=(state.events||[]).filter(e=>match(e,profile) && Date.parse(e.occurred_at)<=Date.now())
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
  const t={dayEarned:0,daySpent:0,weekEarned:0,weekSpent:0};
- let wallet=null;
+ let wallet=null, boundWallet=null;
  const counters=new Map();
  for(const e of events){
    const at=Date.parse(e.occurred_at);
-   if(e.type==='wallet_snapshot')wallet=e;
+   if(e.type==='wallet_snapshot'){
+     if(e.currency_kind==='bound')boundWallet=e;
+     else wallet=e;
+   }
    if(e.type==='kinah_earned'||e.type==='kinah_spent'){
      const field=e.type==='kinah_earned'?'Earned':'Spent';
      if(at>=p.daily)t['day'+field]+=e.amount;
@@ -65,8 +72,10 @@ function render(){
    }
    if(e.type==='counter'&&at>=(e.frequency==='daily'?p.daily:p.weekly))counters.set(e.frequency+':'+e.key,e);
  }
- $('wallet').textContent=wallet?num(wallet.balance):'—';
- $('wallet-note').textContent=wallet?'Last observed '+new Date(wallet.occurred_at).toLocaleString():'Awaiting wallet snapshot';
+ const shownWallet=boundWallet||wallet;
+ $('wallet-title').textContent=boundWallet?'BOUND KINAH (OBSERVED)':'OBSERVED KINAH';
+ $('wallet').textContent=shownWallet?num(shownWallet.balance):'—';
+ $('wallet-note').textContent=shownWallet?(boundWallet?'Bound Kinah only · ':'')+'Last seen '+new Date(shownWallet.occurred_at).toLocaleString():'Awaiting wallet snapshot';
  $('today-earned').textContent=num(t.dayEarned);
  $('today-spent').textContent=num(t.daySpent);
  const net=t.weekEarned-t.weekSpent;
@@ -125,6 +134,13 @@ $('event-form').addEventListener('submit',async e=>{
     frequency:$('entry-frequency').value,scope:$('entry-scope').value});
  try{await api.addEvent(record);$('event-form').reset();entryKind();show('Entry saved locally.');await refresh();}
  catch(err){show(err.message,true);}
+});
+$('capture-toggle').addEventListener('click',async()=>{
+ try{
+   if($('capture-toggle').dataset.capturing==='true')await api.stopCapture();
+   else await api.startCapture(Number($('game-port').value));
+   await refresh();
+ }catch(err){show(err.message,true);}
 });
 $('choose-feed').addEventListener('click',async()=>{
  try{const file=await api.chooseFeed();if(file)show('Watching '+file+'. Only supported decoded JSONL events will be imported.');await refresh();}

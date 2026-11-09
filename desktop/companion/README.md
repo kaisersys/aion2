@@ -4,22 +4,24 @@ A lightweight, **local-first character economy and daily/weekly summary** for th
 
 ## Status — important
 
-This is a **working desktop dashboard and sync scaffold**, not yet a verified live Npcap capture client. It accepts manual entries and an append-only, *already decoded* JSONL event feed. **Npcap connection, Aion 2 stream reassembly, and Kinah transaction message decoding are NOT implemented in this version.** Do not advertise it as automatic in-game tracking until real captured data has been validated.
+This version now integrates a **read-only Npcap capture helper** with TCP stream reconstruction and a decoder for Aion 2 character identity and game-reported daily/weekly ticket snapshots. You can click **Start Npcap capture**. The implementation is newly written and **has not been proven against a live Aion 2 Global session**; it has a small protocol parser self-test based on synthetic fixtures. Real game traffic is necessary to validate port differences, decoder coverage, character matching, and reset behavior before public release.
+
+**Kinah: only the known bound-Kinah item (ID 930100001) is decoded into a labeled balance snapshot**. Total Kinah, gross Kinah earned and gross Kinah spent are NOT automatically decoded yet. Manual economic entries remain available for testing and corrections. Do not treat bound-Kinah snapshots as full wallet totals or infer earnings/spending from changes in net wallet balance.
 
 The verified ticket-message research in MIT-licensed community projects is promising; the actual capture adapter must associate a login's ticket snapshots with the correct character and verify opcode coverage for Global. The Kinah earned/spent ledger must be based on independently observed transactions or explicitly marked estimates, never inferred from net wallet changes.
 
 ## Windows development
 
-Requirements: Node 22+, Windows 10/11.
+Requirements: Node 22+, .NET 10 SDK for development, Windows 10/11, and Npcap installed separately from npcap.com for live capture.
 
-1. From this folder run npm install, then npm start.
+1. From this folder run `npm install`, `npm run capture:build`, then `npm start`.
 2. Add or select a character (exact character name + server).
-3. Use **Record entry** to test Kinah events and counter snapshots, or select a JSONL feed emitted by a compatible, separately developed decoder.
+3. Click **Start Npcap capture**, then fully log out and back into your Aion 2 character. The helper defaults to TCP game-server port 13328 as documented for EU; the Global release may use a different port (you can change it in the app). Or use **Record entry** for manual testing / **JSONL test feed** for verified externally decoded events.
 4. Events are kept in your Electron user data directory as local-ledger.json. No credentials or raw packet captures are stored.
 5. When ready to sync, copy config.example.json to config.json and set the **existing website's** Supabase URL and publishable anon key. These are not service-role secrets. Run the additive migration supabase/migrations/20261108_companion_telemetry.sql in Supabase first.
 6. Sign in with your existing website account and press **Sync progress**. The desktop app matches by character name and server to your website's player_characters table.
 
-Run tests with npm test. Build a Windows installer with npm run dist:win (or the manual companion workflow). No installer has been produced or published by this commit.
+Run parser self-tests with `dotnet run --project capture/AtreiaCapture.csproj -- --self-test` and app tests with `npm test`. Build a Windows installer with `npm run capture:build` then `npm run dist:win` (or the Windows preview workflow). Npcap is never bundled. Installers are published as a GitHub Actions preview artifact only, not a public production release.
 
 ## Decoder JSONL contract
 
@@ -42,14 +44,14 @@ The feeder is polled every 2 seconds, capped at 8 MB. If a feed grows beyond tha
 
 ## Cloud storage & privacy
 
-The app keeps local history even without a website login. Website login is only in memory; its password is not persisted. Sync is explicit/opt-in, and uses the existing authenticated Supabase RLS. The additive player_companion_events table stores derived events, not raw packets, network addresses, chat, or game credentials. Decoder-originated ticket snapshots may also update the existing player_ticket_balances table; manually entered counters never overwrite those balances. No service-role key is shipped.
+The app only captures inbound TCP payloads on the selected Aion 2 server port, with no raw packet files or network addresses uploaded. The app keeps local history even without a website login. Website login is only in memory; its password is not persisted. Sync is explicit/opt-in, and uses the existing authenticated Supabase RLS. The additive player_companion_events table stores derived events, not raw packets, network addresses, chat, or game credentials. Decoder-originated ticket snapshots may also update the existing player_ticket_balances table; manually entered counters never overwrite those balances. No service-role key is shipped.
 
 The app's website character names and server names must match exactly (ignoring case); mismatched records remain local and are reported as unmatched after sync. Website analysis UI is deliberately not part of this MVP.
 
 ## Licensing and account risk
 
-Npcap is **not bundled**. Its free license does not permit redistribution of its installer; users who later opt into the capture integration would need to install it from npcap.com, subject to its terms. Third-party game traffic inspection remains unofficial and may violate NCSOFT rules or expose accounts to sanctions. This prototype does not read game traffic.
+Npcap is **not bundled**. Its free license does not permit redistribution of its installer; users who opt into the capture integration must separately install it from npcap.com, subject to its terms. The decoder is based on public MIT-licensed research from SkeeveTV's Aion-DPS-Meter with attribution under `capture/THIRD-PARTY-NOTICES.md`. Third-party game traffic inspection remains unofficial and may violate NCSOFT rules or expose accounts to sanctions. The helper is strictly passive and does not inject code, alter memory, or transmit game commands.
 
 ## Next technical milestone
 
-Build and validate the actual read-only capture adapter using independently vetted protocol-decoding code. Start with Aion 2 ticket list/update messages (0x0b61/0x0c61) and character identity; map to existing website checklist keys. Research complete Kinah income/spend event coverage *before* enabling automatic economic totals. Ship a preview channel before general release.
+Validate against a real Global login and controlled task changes, including ticket list/update messages (`0x0b61` / `0x0c61`), local character frame (`0x3336`), and bound Kinah inventory snapshots (`0x1156` / `0x1b56`). Confirm packet port, correct name/server identity, and expected values before changing website checkmarks. Research *complete* Kinah income/spend event coverage before enabling automatic gross economic totals. The current reader does not decode nested LZ4 bundles, so coverage can be incomplete.

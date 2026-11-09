@@ -3,6 +3,8 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { spawn } = require('node:child_process');
+const readline = require('node:readline');
 const { normalizeEvent, addEvents, charKey, periods } = require('./ledger.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const FILE_LIMIT = 8 * 1024 * 1024;
@@ -10,6 +12,9 @@ let win;
 let state = { profiles:[], events:[] };
 let feed = null;
 let remote = null;
+let capture = null;
+let captureStatus = {state:'idle',message:'Npcap capture not started.'};
+function captureMessage(state,message){captureStatus={state,message};notify();}
 
 function notify() {
   if (win && !win.isDestroyed()) win.webContents.send('state:changed');
@@ -33,7 +38,7 @@ function saveState() {
 function captureState() {
   return { ...state, feedPath:feed ? path.basename(feed.path) : null,
     remote:remote ? {email:remote.email,characters:remote.characters} : null,
-    configured:Boolean(readConfig()) };
+    configured:Boolean(readConfig()), capture:captureStatus };
 }
 function insert(raw, fallbackId) {
   const event = normalizeEvent(raw, fallbackId);
@@ -104,7 +109,7 @@ async function sync() {
     if (!id) { unmatched++; continue; }
     rows.push({user_id:remote.user_id, character_id:id,
       event_hash:crypto.createHash('sha256').update(ev.id+'|'+ev.character+'|'+ev.server).digest('hex'),
-      kind:ev.type, occurred_at:ev.occurred_at, source:ev.source,
+      kind:ev.type, occurred_at:ev.occurred_at, source:ev.source, currency_kind:ev.currency_kind??null,
       amount:ev.amount ?? null, balance:ev.balance ?? null,
       counter_key:ev.key ?? null, counter_frequency:ev.frequency ?? null,
       counter_scope:ev.scope ?? null, counter_current:ev.current ?? null,
@@ -175,6 +180,81 @@ function pollFeed() {
     }
   } catch { /* deleted/replaced file; retain previously observed data */ }
 }
+
+function resolveCapturedCharacter(packetCharacter,serverId) {
+  const wanted=String(packetCharacter||'').trim().toLowerCase();
+  if (!wanted) return null;
+  const profiles = state.profiles.map(p=>({character:p.character,server:p.server}));
+  if (remote) for (const c of remote.characters) profiles.push({character:c.name,server:c.server_name});
+  const unique = new Map();
+  for (const p of profiles) unique.set(charKey(p.character,p.server),p);
+  const matches=[...unique.values()].filter(p=>p.character.trim().toLowerCase()===wanted);
+  if (matches.length!==1) {
+    captureMessage('unmapped', matches.length===0
+      ? 'Detected '+packetCharacter+' (server ID '+serverId+'). Add this character to the companion to capture progress.'
+      : 'More than one '+packetCharacter+' character matched. Choose unique character names across servers before syncing.');
+    return null;
+  }
+  return matches[0];
+}
+function processCaptureMessage(message) {
+  if (!message || typeof message!=='object') return;
+  if (message.kind==='status') {
+    captureMessage(message.state==='error'?'error':message.state, String(message.message||''));
+    return;
+  }
+  if (message.kind==='character') {
+    const matching=resolveCapturedCharacter(message.name,message.serverId);
+    if (matching) captureMessage('connected','Reading '+matching.character+' on '+matching.server);
+    return;
+  }
+  if (message.kind==='event' && message.event && typeof message.event==='object') {
+    const e=message.event;
+    const matched=resolveCapturedCharacter(e.character,e.serverId);
+    if (!matched) return;
+    try { insert({...e,server:matched.server,source:'decoded'},e.id); }
+    catch { /* Ignore unknown or invalid frame data, never trust capture output blindly. */ }
+  }
+}
+function startCapture(gamePort=13328) {
+  if (capture) return captureStatus;
+  const port=Number(gamePort);
+  if (!Number.isInteger(port) || port<1 || port>65535) throw new Error('A valid Aion 2 TCP server port is required.');
+  const exe = app.isPackaged
+    ? path.join(process.resourcesPath,'capture','AtreiaCapture.exe')
+    : path.join(__dirname,'capture','publish','AtreiaCapture.exe');
+  if (!fs.existsSync(exe)) throw new Error('Capture helper missing. Build capture/AtreiaCapture.csproj first.');
+  const child=spawn(exe,['--ports',String(port)],{windowsHide:true,stdio:['ignore','pipe','pipe']});
+  capture=child;
+  captureMessage('starting','Initializing Npcap · server port '+port+'…');
+  const output=readline.createInterface({input:child.stdout});
+  output.on('line',line=>{
+    if (line.length>4000) return;
+    try { processCaptureMessage(JSON.parse(line)); } catch { /* malformed status line */ }
+  });
+  let errorText='';
+  child.stderr.on('data',b=>{errorText=(errorText+String(b)).slice(-1200);});
+  child.on('error',err=>{
+    if(capture===child)capture=null;
+    captureMessage('error','Capture helper failed: '+err.message);
+  });
+  child.on('exit',code=>{
+    if(capture===child){
+      capture=null;
+      captureMessage('stopped',code===0?'Capture stopped.':'Capture exited ('+code+'). '+errorText.slice(-160));
+    }
+  });
+  return captureStatus;
+}
+function stopCapture() {
+  if (capture) {
+    const child=capture;capture=null;
+    child.kill();
+  }
+  captureMessage('idle','Capture stopped.');
+  return captureStatus;
+}
+
 function createWindow() {
   win = new BrowserWindow({width:1120,height:760,minWidth:800,minHeight:580,
     backgroundColor:'#090f18',show:false,
@@ -201,6 +281,8 @@ app.whenReady().then(()=>{
     return captureState();
   });
   ipcMain.handle('event:add',(_,data)=>insert({...data,source:'manual',id:crypto.randomUUID()}));
+  ipcMain.handle('capture:start',(_,gamePort)=>startCapture(gamePort));
+  ipcMain.handle('capture:stop',()=>stopCapture());
   ipcMain.handle('feed:choose',async()=>{
     const result=await dialog.showOpenDialog(win,{
       title:'Choose a decoded Atreia JSONL event feed',
@@ -236,4 +318,4 @@ app.whenReady().then(()=>{
   app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
-app.on('before-quit',()=>{if(feed?.timer)clearInterval(feed.timer);});
+app.on('before-quit',()=>{if(feed?.timer)clearInterval(feed.timer);stopCapture();});

@@ -42,9 +42,9 @@
    <div id="alert" class="alert" role="status" hidden></div>
    <section class="panel source-panel">
     <div><span class="section-label">DATA SOURCE</span><h2>Decoded event feed</h2>
-      <p id="feed-label">Not connected · no live game capture yet.</p>
+      <p id="feed-label">Npcap not started. Add a character with their in-game name first.</p><p id="capture-detail" class="capture-detail">Only game-server TCP port 13328 is monitored.</p>
     </div>
-    <div class="source-actions"><button id="choose-feed" class="outlined">Choose JSONL feed</button><button id="toggle-entry" class="filled">＋ Record entry</button></div>
+    <div class="source-actions"><label class="capture-port">GAME PORT <input id="game-port" aria-label="Aion 2 game server port" type="number" min="1" max="65535" value="13328" /></label><button id="capture-toggle" class="filled">Start Npcap capture</button><button id="choose-feed" class="outlined">JSONL test feed</button><button id="toggle-entry" class="filled">＋ Record entry</button></div>
    </section>
    <section id="entry-panel" class="panel entry-panel" hidden>
     <div class="section-label">MANUAL ENTRY · FOR TESTING OR CORRECTIONS</div>
@@ -59,7 +59,7 @@
     </form>
    </section>
    <section class="metrics" aria-label="Kinah summary">
-    <article class="metric primary"><span>CURRENT KINAH <small>◎</small></span><strong id="wallet">—</strong><p id="wallet-note">Awaiting wallet snapshot</p></article>
+    <article class="metric primary"><span><span id="wallet-title">OBSERVED KINAH</span><small>◎</small></span><strong id="wallet">—</strong><p id="wallet-note">Awaiting wallet snapshot</p></article>
     <article class="metric"><span>EARNED TODAY <small>↗</small></span><strong id="today-earned">—</strong><p>Explicit earned transactions</p></article>
     <article class="metric"><span>SPENT TODAY <small>↘</small></span><strong id="today-spent">—</strong><p>Explicit spending transactions</p></article>
     <article class="metric"><span>NET THIS WEEK <small>◷</small></span><strong id="week-net">—</strong><p id="week-note">No ledger entries yet</p></article>

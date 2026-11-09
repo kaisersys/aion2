@@ -7,7 +7,8 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.cjs",
-    "dist:win": "electron-builder --win nsis --x64"
+    "dist:win": "electron-builder --win nsis --x64",
+    "capture:build": "dotnet publish capture/AtreiaCapture.csproj -c Release -r win-x64 --self-contained true -o capture/publish"
   },
   "devDependencies": {
     "electron": "^33.4.11",
@@ -16,9 +17,34 @@
   "build": {
     "appId": "com.atreiastreet.companion",
     "productName": "Atreia Street Companion",
-    "directories": { "output": "release" },
-    "files": ["main.cjs","preload.cjs","ledger.cjs","periods.cjs","index.html","ui.js","styles.css","config.json"],
-    "win": { "target": "nsis" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "ledger.cjs",
+      "periods.cjs",
+      "index.html",
+      "ui.js",
+      "styles.css",
+      "config.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "extraResources": [
+      {
+        "from": "capture/publish",
+        "to": "capture",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   }
 }

@@ -10,6 +10,7 @@ create table if not exists public.player_companion_events (
   occurred_at timestamptz not null,
   amount bigint check (amount between 0 and 100000000000000),
   balance bigint check (balance between 0 and 100000000000000),
+  currency_kind text check (currency_kind in ('bound')),
   counter_key text check (counter_key ~ '^[a-z0-9-]{1,90}$'),
   counter_frequency text check (counter_frequency in ('daily','weekly')),
   counter_scope text check (counter_scope in ('character','server')),
