@@ -20,6 +20,7 @@ let remote = null;
 let capture = null;
 let marketOcrTimer=null, marketOcrBusy=false, marketOcrWorker=null;
 let marketSyncBusy=false;
+let lastMarketSyncAttemptAt=0;
 let lastMarketFrame=null;
 let lastMarketSeenAt=0;
 let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0};
@@ -301,6 +302,7 @@ async function syncMarket() {
  try {
   const unsynced=marketObservations.filter(x=>!x.synced && x.user_id===remote.user_id).slice(0,100);
   if(!unsynced.length)return 0;
+  lastMarketSyncAttemptAt=Date.now();
   await refreshed();
   const rows=unsynced.map(x=>({
    user_id:x.user_id,character_id:x.character_id,observation_id:x.id,
@@ -321,8 +323,17 @@ async function syncMarket() {
 }
 function startMarketOcr() {
  if(marketOcrTimer)return;
- marketOcrTimer=setInterval(()=>{void marketOcrTick();},3000);
+ marketOcrTimer=setInterval(()=>{
+  void marketOcrTick();
+  if(remote && Date.now()-lastMarketSyncAttemptAt>30000 &&
+     marketObservations.some(x=>!x.synced&&x.user_id===remote.user_id)) {
+   void syncMarket().catch(err=>marketOcrMessage('sync-error',
+    'Fee saved locally; retrying account sync: '+String(err.message).slice(0,100)));
+  }
+ },3000);
  void marketOcrTick();
+ void syncMarket().catch(err=>marketOcrMessage('sync-error',
+  'Pending fee upload failed: '+String(err.message).slice(0,100)));
 }
 async function stopMarketOcr() {
  if(marketOcrTimer){clearInterval(marketOcrTimer);marketOcrTimer=null;}
