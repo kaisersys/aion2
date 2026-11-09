@@ -206,3 +206,14 @@ The companion marks an item gain as a **corroborated ground pickup** only when t
 **Overview** displays these pickups in their own section and excludes them from the nearby-wallet **possible purchase** model. **Diagnostics** displays ground drops, own pickups, and exact matches, without dumping game traffic. This helps avoid labeling looted items as NPC or Market purchases.
 
 This is **not** a Market/NPC transaction parser. The known inventory and wallet opcodes contain no verified Market order ID, seller, buyer, gross proceeds, fees, shop price, or transaction cause. An apparent purchase remains *possible*; delayed Market settlements, NPC sales, crafting, storage transfers and inventory consumption remain unassigned. No gross market revenue or itemized Market receipt is claimed. Additional packet mappings require evidence from controlled Global sessions. Passive capture is unofficial and has potential account-policy risk.
+
+
+## Account-connected Market OCR (experimental)
+
+When the user signs in, the companion checks **only** a window titled AION2 every eight seconds. A local Tesseract OCR worker reads the image in memory. The image and raw OCR text are never persisted or uploaded. A conservative parser accepts only Market panels containing explicitly labeled prices and listing fees or settlement proceeds. The result is an **unverified observation**, never a completed-sale or verified wallet-transaction claim. It can include item name and quantity when explicitly readable.
+
+Only structured observations (account, matched character, timestamp, type, observed amount, listing fee, item and quantity) sync over authenticated Supabase requests to `player_market_observations`. Row-level security restricts reads and inserts to the signed-in user; the table is not publicly readable. Observations are queued locally until upload succeeds. Signing out stops OCR; packet capture remains a separate existing control.
+
+**Important:** A visible Market listing is not proof of submission, and Settlement text is not proof of claiming the funds. No transaction is automatically marked as verified. OCR layouts and English UI labels need controlled testing against actual Aion 2 Global screenshots before general release. The OCR language model may download on first use; screenshots are processed locally. Tesseract OCR is not an NCSOFT-supported interface. Users must be told about continuous game-window reading and private structured-data upload before account connection. An account signup or Terms of Service alone should not be used to conceal this collection.
+
+Apply `supabase/migrations/20261109_market_observations.sql` to the matching Supabase project before distributing this build. The companion does not enable a public leaderboard or cross-account access to these observations.
