@@ -291,14 +291,36 @@ async function marketOcrTick() {
    const {createWorker}=require('tesseract.js');
    marketOcrWorker=await createWorker('eng');
   }
-  const result=await marketOcrWorker.recognize(games[0].thumbnail.toPNG());
-  const recognized=result.data?.text||'';
+  // The actual Confirm/Cancel dialog is centered, with the fee on a dark
+  // row. Reading a cropped, enlarged dialog avoids OCR confusion with the
+  // dimmed-out Market listings behind it. Fall back to the full window when
+  // the focused crop does not contain an identifiable transaction.
+  const full=games[0].thumbnail;
+  const box={x:Math.floor(dimensions.width*.25),y:Math.floor(dimensions.height*.025),
+    width:Math.floor(dimensions.width*.53),height:Math.floor(dimensions.height*.82)};
+  let focus=full.crop(box);
+  if(focus.getSize().width<1600)
+   focus=focus.resize({width:Math.min(1600,focus.getSize().width*2),quality:'best'});
+  const focused=await marketOcrWorker.recognize(focus.toPNG());
+  let recognized=focused.data?.text||'';
+  let parsed=readMarket(recognized);
+  marketOcrStatus.recognitionMode='centered-dialog';
+  if(parsed.status!=='observed') {
+   const fallback=await marketOcrWorker.recognize(full.toPNG());
+   const fullText=fallback.data?.text||'';
+   const fullParsed=readMarket(fullText);
+   if(fullParsed.status==='observed' || fullText.length>recognized.length) {
+    recognized=fullText;
+    parsed=fullParsed;
+    marketOcrStatus.recognitionMode='full-window';
+   }
+  }
   marketOcrStatus.recognizedChars=recognized.length;
   marketOcrStatus.feeLabelSeen=/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(recognized);
   marketOcrStatus.feeEvidence=recognized.split(/\r?\n/)
    .filter(x=>/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(x))
    .slice(0,3).map(x=>x.replace(/[^\x20-\x7e]/g,' ').trim().slice(0,100));
-  const parsed=readMarket(recognized);
+  marketOcrStatus.screenPhase=parsed.screen_phase||null;
   if(parsed.status!=='observed') {
    if(Date.now()-lastMarketSeenAt>10000)lastMarketFrame=null;
    marketOcrMessage('listening',
@@ -319,7 +341,7 @@ async function marketOcrTick() {
    marketOcrMessage('unmapped','Market fee visible, but no matching character and server exist in the signed-in website account.');
    return;
   }
-  const evidence=parsed.evidence;
+  const evidence={...parsed.evidence,screen_phase:parsed.screen_phase};
   const key=stableFingerprint(current.character,current.server,evidence);
   const now=Date.now();
   lastMarketSeenAt=now;
@@ -334,18 +356,37 @@ async function marketOcrTick() {
    const matched=last?.status==='corroborated';
    marketOcrMessage(matched?'corroborated':'listening',evidence.fee!==null
     ?('Registration fee: '+evidence.fee+' Kina. '+
-      (matched?'Matched a Kina decrease.':'Waiting for a matching bound or regular Kina decrease.'))
+      (matched?'Matched a Kina decrease.':
+       parsed.screen_phase==='confirmation'
+        ?'Confirm/Cancel prompt observed; awaiting a matching wallet decrease.'
+        :'Listing form only. No confirmation prompt observed yet.'))
     :'Market settlement amount is visible; claiming it has not been verified.');
    return;
   }
   lastMarketFrame=key;
   recentMarket.set(key,now);
-  marketObservations.push({
+  // A preview of the same proposed listing is not a second fee.
+  // When the confirmation dialog appears, promote the local proposal instead
+  // of charging twice. Its time becomes the confirmation observation time.
+  const existing=parsed.screen_phase==='confirmation'?
+   marketObservations.findLast(x=>x.user_id===remote.user_id &&
+    x.character===current.character && x.server===current.server &&
+    x.screen_phase==='listing_form' && x.status==='unverified' &&
+    x.fee===evidence.fee && x.amount===evidence.amount &&
+    Date.parse(x.occurred_at)>now-120000):null;
+  if(existing) {
+   existing.screen_phase='confirmation';
+   existing.occurred_at=new Date(now).toISOString();
+   existing.item_name=evidence.item_name||existing.item_name;
+   existing.quantity=evidence.quantity||existing.quantity;
+   existing.synced=false;
+  } else marketObservations.push({
    id:crypto.randomUUID(),user_id:remote.user_id,
    character:current.character,server:current.server,
-   character_id:match.id,occurred_at:new Date().toISOString(),
+   character_id:match.id,occurred_at:new Date(now).toISOString(),
    kind:evidence.kind,amount:evidence.amount,fee:evidence.fee,
    quantity:evidence.quantity,item_name:evidence.item_name,
+   screen_phase:parsed.screen_phase,
    evidence:'screen_ocr',status:'unverified',synced:false
   });
   marketObservations=marketObservations.slice(-2000);
@@ -354,8 +395,10 @@ async function marketOcrTick() {
   if(n)saveMarket();
   marketOcrMessage(n?'corroborated':'observed',
    evidence.fee!==null
-    ?(n?'Registration fee corroborated by a Kina decrease.':
-      'Registration fee quote captured ('+evidence.fee+' Kina); awaiting wallet confirmation.')
+    ?(n?'Registration fee matched a '+evidence.fee+' Kina wallet decrease.':
+       parsed.screen_phase==='confirmation'
+        ?'Listing Confirm/Cancel prompt found. Fee '+evidence.fee+' Kina is pending until a matching Kina debit follows.'
+        :'Listing form shows '+evidence.fee+' Kina fee; no Confirm/Cancel prompt yet.')
     :'Settlement amount observed; collection is not yet verified.');
   // Failures remain queued; no raw OCR text or screenshot is sent.
   try {await syncMarket();}
@@ -377,7 +420,8 @@ async function syncMarket() {
    user_id:x.user_id,character_id:x.character_id,observation_id:x.id,
    occurred_at:x.occurred_at,kind:x.kind,amount:x.amount,fee:x.fee,
    quantity:x.quantity,item_name:x.item_name,
-   evidence:x.evidence,status:x.status,currency_kind:x.currency_kind??null
+   evidence:x.evidence,status:x.status,currency_kind:x.currency_kind??null,
+   screen_phase:x.screen_phase||null
   }));
   await request('/rest/v1/player_market_observations?on_conflict=user_id,observation_id',
    'POST',rows,true,{prefer:'resolution=merge-duplicates,return=minimal',noContent:true});
