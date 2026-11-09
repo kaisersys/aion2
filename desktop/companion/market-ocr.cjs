@@ -24,7 +24,7 @@ function field(lines,names) {
 }
 function amount(lines,names) {
  const raw=field(lines,names);
- const first=raw.match(new RegExp('^\\s*'+NUMBER+'\\s*(?:kina|kinah)?\\b','i'));
+ const first=raw.match(new RegExp('^\\s*'+NUMBER+'\\s*(?:kina|kinah)?\b','i'));
  return first?positive(first[1]):null;
 }
 function itemName(lines) {
@@ -50,22 +50,22 @@ function parseMarketText(raw) {
  // show "Buy", "Sell" and "Settlement" at the same time.
  const fee=amount(lines,['registration fee','listing fee','registration cost']);
  const settlementAmount=amount(lines,['proceeds','settlement amount','net received','amount to receive']);
- const isListing=fee!==null && /\\b(?:register|listing|registration|sell)\\b/i.test(text);
- const isSettlement=settlementAmount!==null && /\\b(?:settlement|sale proceeds|sales history)\\b/i.test(text);
+ const isListing=fee!==null && /\b(?:register|listing|registration|sell)\b/i.test(text);
+ const isSettlement=settlementAmount!==null && /\b(?:settlement|sale proceeds|sales history)\b/i.test(text);
  if(isListing && isSettlement)return null;
  if(isListing) {
-  kind=/\\b(?:listed successfully|registration complete|listing completed)\\b/i.test(text)
+  kind=/\b(?:listed successfully|registration complete|listing completed)\b/i.test(text)
    ?'listing_confirmed_screen':'listing_preview';
   unit_price=amount(lines,['unit price','price per item','price each','sale price']);
   gross=amount(lines,['total price','total sale price','gross(?: value)?','total amount']);
   listing_fee=fee;
   if(!(unit_price||gross))return null;
  } else if(isSettlement) {
-  kind=/\\b(?:claimed successfully|claim completed|proceeds claimed)\\b/i.test(text)
+  kind=/\b(?:claimed successfully|claim completed|proceeds claimed)\b/i.test(text)
    ?'settlement_claimed_screen':'settlement_visible';
   proceeds=settlementAmount;
   gross=amount(lines,['gross sales?','sale total','total sale price']);
- } else if(/\\b(?:purchase|buy now|buy item)\\b/i.test(text) &&
+ } else if(/\b(?:purchase|buy now|buy item)\b/i.test(text) &&
            fee===null && settlementAmount===null) {
   kind='purchase_preview';
   unit_price=amount(lines,['unit price','price per item','price each']);
