@@ -12,7 +12,7 @@ function wallet(id,offset,balance,currency) {
 }
 function fee(amount=200,overrides={}){
  return {id:'fee1',character:'Ceti',server:'S1',kind:'listing_fee_observation',
-  status:'unverified',fee:amount,amount,occurred_at:t(0),synced:true,...overrides};
+  status:'unverified',screen_phase:'confirmation',fee:amount,amount,occurred_at:t(0),synced:true,...overrides};
 }
 test('matching bound Kina decrease corroborates a fee exactly once',()=>{
  const candidate=fee();
@@ -62,4 +62,23 @@ test('never treat OCR settlement proceeds as a listing fee',()=>{
  const candidate=fee(200,{kind:'settlement_observation'});
  const events=[wallet('a',-1000,1000,'bound'),wallet('b',2000,800,'bound')];
  assert.equal(reconcileFees([candidate],events,base+2200),0);
+});
+
+test('seeing only the listing form, or a canceled confirmation with no debit, is not a fee',()=>{
+ const form=fee(23,{screen_phase:'listing_form'});
+ const canceled=fee(23,{id:'canceled'});
+ assert.equal(reconcileFees([form],[wallet('before',-900,478715,'bound'),wallet('after',800,478692,'bound')],base+1000),0);
+ assert.equal(form.status,'unverified');
+ assert.equal(reconcileFees([canceled],[wallet('a',-900,478715,'bound')],base+30000),0);
+ assert.equal(canceled.status,'unverified');
+});
+test('a matching debit BEFORE a confirmation prompt cannot mark fee paid',()=>{
+ const candidate=fee(23);
+ const prior=[wallet('a',-20000,478715,'bound'),wallet('b',-5000,478692,'bound')];
+ assert.equal(reconcileFees([candidate],prior,base+1000),0);
+});
+test('a nonmatching incidental purchase cannot be labeled a Market fee',()=>{
+ const candidate=fee(23);
+ const prior=[wallet('a',-900,478715,'bound'),wallet('b',2000,478615,'bound')];
+ assert.equal(reconcileFees([candidate],prior,base+2000),0);
 });
