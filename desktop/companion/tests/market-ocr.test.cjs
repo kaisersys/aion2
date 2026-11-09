@@ -98,7 +98,7 @@ test('registration fee is not confused with Funds balance',()=>{
 });
 
 test('reads currency icon following amount without confusing Funds for registration fee',()=>{
- const x=readMarket('Are you sure you wish to list for sale?\\nTotal Sale Price 1,165 ©\\nSale Price Per Item 233 ©\\nRegistration Fee 23 ◎\\nFunds 478,715 ◎\\nCancel Confirm');
+ const x=readMarket('Are you sure you wish to list for sale?\nTotal Sale Price 1,165 ©\nSale Price Per Item 233 ©\nRegistration Fee 23 ◎\nFunds 478,715 ◎\nCancel Confirm');
  assert.equal(x.status,'observed');
  assert.equal(x.screen_phase,'confirmation');
  assert.equal(x.evidence.fee,23);
