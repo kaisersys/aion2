@@ -24,6 +24,7 @@ function render(s){
    :health?.frames===0?'Packets only · decoder needs attention'
    :health?.characterPackets>0 && health?.identities===0?'Character packet parse mismatch'
    :health?.bundles>0 && health?.bundlesDecoded===0?'Compressed data needs updating'
+   :health?.lobbyRosterCharacters>0 && health?.identities===0?'Account roster seen · world identity pending'
    :health?.identities===0 && health?.bundlesDecoded>0?'Compressed frames · identity pending'
    :health?.identities===0?'Frames decoded · identity not seen'
    :'Checking character identity'
@@ -32,19 +33,22 @@ function render(s){
  $('status-dot').className=ok?'ok':capture==='error'?'fail':'';
  const events=(s.events||[]).filter(e=>active&&idOf(e)===idOf(active)&&Date.parse(e.occurred_at)<=Date.now())
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
- let wallet=null, earned=0,spent=0, hasEarned=false,hasSpent=false;
  const periods=periodStarts(), counters=new Map();
+ const wallets=window.AtreiaWallets.calculate(events,periods.daily);
+ const changes=window.AtreiaWallets.movements(events,periods.daily);
  for (const e of events) {
    const when=Date.parse(e.occurred_at);
-   if(e.type==='wallet_snapshot'&&e.currency_kind==='bound')wallet=e.balance;
-   if(e.type==='kinah_earned'&&when>=periods.daily){earned+=e.amount;hasEarned=true;}
-   if(e.type==='kinah_spent'&&when>=periods.daily){spent+=e.amount;hasSpent=true;}
    if(e.type==='counter'&&when>=(e.frequency==='weekly'?periods.weekly:periods.daily))
      counters.set(e.key,e);
  }
- $('bound').textContent=fmt(wallet);
- $('earned').textContent=hasEarned?fmt(earned):'—';
- $('spent').textContent=hasSpent?fmt(spent):'—';
+ $('regular').textContent=fmt(wallets.regularBalance);
+ $('bound').textContent=fmt(wallets.boundBalance);
+ $('all').textContent=wallets.combinedExact?fmt(wallets.allBalance):
+   wallets.minimumAll!==null?'≥ '+fmt(wallets.minimumAll):'—';
+ $('net').textContent=wallets.netToday===null?'—':
+   (wallets.netToday>0?'+':'')+fmt(wallets.netToday);
+ $('mini-in').textContent=changes.observations?fmt(changes.inToday):'—';
+ $('mini-out').textContent=changes.observations?fmt(changes.outToday):'—';
  $('counter-caption').textContent=counters.size?'Live / last seen':'Awaiting game data';
  const holder=$('counter-list');holder.replaceChildren();
  const preferred=['nightmare','odyle-energy','ascension','subjugation','invasion','unknown-fissure','shugo-server'];

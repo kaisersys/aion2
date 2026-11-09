@@ -11,8 +11,9 @@
  <div class="shell">
   <aside class="sidebar">
    <div class="brand"><span class="brand-mark">✦</span><span>ATREIA <strong>STREET</strong><small>COMPANION</small></span></div>
-   <div class="nav-title">OVERVIEW</div>
-   <div class="nav-active"><span class="nav-icon">◈</span> Command center</div>
+   <div class="nav-title">WORKSPACE</div>
+   <button type="button" id="nav-overview" class="nav-tab nav-active" aria-current="page" aria-controls="view-overview"><span class="nav-icon">◈</span> Overview</button>
+   <button type="button" id="nav-diagnostics" class="nav-tab" aria-controls="view-diagnostics"><span class="nav-icon">≡</span> Diagnostics</button>
    <div class="nav-title">YOUR CHARACTER</div>
    <label for="character-select" class="visually-hidden">Character</label>
    <select id="character-select" class="select-character"></select>
@@ -36,12 +37,13 @@
    <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1 · MVP</span></div>
    <div class="header">
     <div><div class="eyebrow">YOUR PROGRESS, AT A GLANCE</div>
-     <h1>Character <em>overview.</em></h1>
-     <p>Characters and progression appear automatically as you play. The mini overlay keeps essentials in view.</p>
+     <h1><span id="page-title-prefix">Character </span><em id="page-title-topic">overview.</em></h1>
+     <p id="page-description">Characters and progression appear automatically as you play. The mini overlay keeps essentials in view.</p>
     </div>
     <div class="sync-indicator"><span class="light"></span><span id="activity-status">Local history active</span></div>
    </div>
    <div id="alert" class="alert" role="status" hidden></div>
+   <section id="view-diagnostics" class="tab-view" hidden>
    <section class="panel source-panel">
     <div><span class="section-label">AUTO DETECTION</span><h2>Aion 2 connection</h2>
       <p id="feed-label">Npcap starts automatically when the companion opens.</p>
@@ -56,19 +58,27 @@
         <span>Bundles unpacked / seen <strong id="diagnostic-bundles">—</strong></span>
         <span>Frames inside bundles <strong id="diagnostic-inner">—</strong></span>
         <span>Bundle failures <strong id="diagnostic-bundle-errors">—</strong></span>
+        <span>Lobby characters <strong id="diagnostic-lobby">—</strong></span>
         <span>Identity packets seen <strong id="diagnostic-identity-packets">—</strong></span>
         <span>Identity parsed <strong id="diagnostic-identity">—</strong></span>
         <span>Ticket packets <strong id="diagnostic-ticket-packets">—</strong></span>
+        <span>Inventory packets <strong id="diagnostic-inventory">—</strong></span>
+        <span>Regular Kina readings <strong id="diagnostic-wallet-regular">—</strong></span>
+        <span>Bound Kina readings <strong id="diagnostic-wallet-bound">—</strong></span>
       </div>
       <p class="opcode-diagnostic">Frequent game opcodes: <span id="diagnostic-opcodes">Awaiting frames</span></p>
     </div>
-    <div class="source-actions"><label class="capture-port">FALLBACK PORT <input id="game-port" aria-label="Aion 2 game server port" type="number" min="1" max="65535" value="13328" /></label><button id="capture-toggle" class="filled">Pause automatic tracking</button><button id="choose-feed" class="outlined">JSONL test feed</button><button id="toggle-entry" class="filled">＋ Record entry</button></div>
+    <div class="source-actions"><label class="capture-port">FALLBACK PORT <input id="game-port" aria-label="Aion 2 game server port" type="number" min="1" max="65535" value="13328" /></label><button id="capture-toggle" class="filled">Pause automatic tracking</button><button id="choose-feed" class="outlined">JSONL test feed</button></div>
    </section>
+   </section>
+   <section id="view-overview" class="tab-view">
+    <div class="overview-actions"><div class="section-label">YOUR CHARACTER · LIVE SUMMARY</div><button id="toggle-entry" class="outlined">＋ Record entry</button></div>
    <section id="entry-panel" class="panel entry-panel" hidden>
     <div class="section-label">MANUAL ENTRY · FOR TESTING OR CORRECTIONS</div>
     <form id="event-form" class="entry-form">
      <label>Record type<select id="entry-type"><option value="kinah_earned">Kinah earned</option><option value="kinah_spent">Kinah spent</option><option value="wallet_snapshot">Current wallet balance</option><option value="counter">Daily / weekly counter</option></select></label>
      <label id="amount-field">Amount<input type="number" id="entry-amount" min="0" step="1" required /></label>
+     <label id="currency-kind-field" hidden>Kina type<select id="entry-currency-kind"><option value="unbound">Regular (tradeable) Kina</option><option value="bound">Bound Kina</option></select></label>
      <label id="key-field" hidden>Activity key<input id="entry-key" placeholder="nightmare" pattern="[a-z0-9-]+" /></label>
      <label id="frequency-field" hidden>Period<select id="entry-frequency"><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label>
      <label id="scope-field" hidden>Scope<select id="entry-scope"><option value="character">Character</option><option value="server">Server</option></select></label>
@@ -77,10 +87,24 @@
     </form>
    </section>
    <section class="metrics" aria-label="Kinah summary">
-    <article class="metric primary"><span><span id="wallet-title">OBSERVED KINAH</span><small>◎</small></span><strong id="wallet">—</strong><p id="wallet-note">Awaiting wallet snapshot</p></article>
-    <article class="metric"><span>EARNED TODAY <small>↗</small></span><strong id="today-earned">—</strong><p>Explicit earned transactions</p></article>
-    <article class="metric"><span>SPENT TODAY <small>↘</small></span><strong id="today-spent">—</strong><p>Explicit spending transactions</p></article>
-    <article class="metric"><span>NET THIS WEEK <small>◷</small></span><strong id="week-net">—</strong><p id="week-note">No ledger entries yet</p></article>
+    <article class="metric primary"><span>REGULAR KINAH <small>◇</small></span><strong id="wallet">—</strong><p id="wallet-note">Waiting for regular Kina inventory packets</p></article>
+    <article class="metric"><span>BOUND KINAH ONLY <small>◈</small></span><strong id="bound-wallet">—</strong><p id="bound-wallet-note">Waiting for bound Kina inventory packets</p></article>
+    <article class="metric"><span>KINAH (ALL) — COMBINED <small>◎</small></span><strong id="total-wallet">—</strong><p id="total-wallet-note">Needs both wallet readings</p></article>
+    <article class="metric"><span>REGULAR NET TODAY <small>↗</small></span><strong id="regular-day-net">—</strong><p id="regular-day-note">Net vs first observed balance, not gross earnings</p></article>
+    <article class="metric"><span>RECORDED EARNED <small>＋</small></span><strong id="today-earned">—</strong><p>Only explicit transaction records · today</p></article>
+    <article class="metric"><span>RECORDED SPENT <small>−</small></span><strong id="today-spent">—</strong><p>Only explicit transaction records · today</p></article>
+   </section>
+   <p class="wallet-equation">Kina (All) = Regular Kina + Bound Kina. A blue combined-currency icon in Aion 2 is not the bound-only balance. The ≥ symbol means one wallet hasn't been confirmed yet.</p>
+   <section class="panel money-movement">
+     <div class="section-top"><div><span class="section-label">WALLET ACTIVITY</span><h2>Observed Kina movement</h2></div><span class="tag">Today · 07:00 UTC reset</span></div>
+     <p class="movement-help">Tracks increases and decreases in the regular and bound wallets while capture is active. Marketplace purchases, fees and claimed sale proceeds can appear here, but the source of each change is <strong>not verified</strong> by the game.</p>
+     <div class="movement-metrics">
+       <div class="movement-metric"><small>OBSERVED IN</small><strong class="up" id="observed-in">—</strong><p id="observed-in-breakdown">Waiting for a second wallet reading</p></div>
+       <div class="movement-metric"><small>OBSERVED OUT</small><strong class="down" id="observed-out">—</strong><p id="observed-out-breakdown">Waiting for a second wallet reading</p></div>
+       <div class="movement-metric"><small>NET MOVEMENT</small><strong id="observed-net">—</strong><p>Net change in captured wallet updates, not gross trading profit</p></div>
+     </div>
+     <div class="movement-list-title"><span>RECENT BALANCE CHANGES</span><small>Local-only observations · source unknown</small></div>
+     <div id="movement-rows" class="movement-rows" aria-live="polite"><div class="empty">No observed wallet movement yet.</div></div>
    </section>
    <div class="main-grid">
     <section class="panel">
@@ -96,7 +120,8 @@
      <div class="section-top"><div><div class="section-label">YOUR LEDGER</div><h2>Recent activity</h2></div><span id="ledger-count" class="tag">0 records</span></div>
      <div id="activity-rows"></div>
    </section>
-   <div class="footnote">Automatic capture begins when the companion opens. You may pause it at any time. Discovered characters are stored locally and shown after their first detected login. Only validated decoded events or your manual entries are recorded. Wallet changes are never assumed to be earnings or expenses. Raw packets are not stored or uploaded.</div>
+   <div class="footnote">Automatic capture begins when the companion opens. You may pause it at any time. Discovered characters are stored locally and shown after their first detected login. Only validated decoded events or your manual entries are recorded. Regular and bound Kina are tracked separately. Today's regular net change is not gross earnings. Wallet changes are never assumed to be earned or spent transactions. Raw packets are not stored or uploaded. This app does not automatically identify Market sales or purchases.</div>
+   </section>
   </main>
  </div>
  <div id="auth-backdrop" class="modal-backdrop" hidden>
@@ -110,6 +135,7 @@
      <small>Passwords are sent to your configured Supabase authentication endpoint and never saved to disk by this app.</small>
    </form>
  </div>
+ <script src="./wallets.js" defer></script>
  <script src="./ui.js" defer></script>
 </body>
 </html>

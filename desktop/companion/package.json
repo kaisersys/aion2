@@ -33,7 +33,8 @@
       "overlay.html",
       "overlay.css",
       "overlay.js",
-      "overlay-preload.cjs"
+      "overlay-preload.cjs",
+      "wallets.js"
     ],
     "win": {
       "target": "nsis",

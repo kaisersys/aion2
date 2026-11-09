@@ -33,7 +33,13 @@ function normalizeEvent(input, fallbackId) {
   } else if (ev.type === 'wallet_snapshot') {
     if (!validInt(input.balance)) throw new Error('Invalid wallet balance');
     ev.balance = input.balance;
-    if (input.currency_kind === 'bound') ev.currency_kind = 'bound';
+    if (input.currency_kind === 'bound' || input.currency_kind === 'unbound')
+      ev.currency_kind = input.currency_kind;
+    // Session boundaries are local provenance only. Never upload the session
+    // identifier, and never infer purchases/sales across separate game logins.
+    if (ev.source === 'decoded' && typeof input.observation_session === 'string' &&
+        /^[0-9a-f]{32}$/.test(input.observation_session))
+      ev.observation_session = input.observation_session;
   } else {
     ev.key = safeText(input.key, 90);
     ev.frequency = input.frequency;
@@ -62,10 +68,22 @@ function summarize(events, character, server, now = Date.now()) {
     Date.parse(e.occurred_at) <= now).sort((a,b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
   const sums = { dayEarned:0, daySpent:0, weekEarned:0, weekSpent:0 };
   let wallet = null;
+  const wallets = { bound:null, unbound:null };
+  let firstUnboundToday = null, lastUnboundToday = null, readingsUnboundToday = 0;
   const counters = new Map();
   for (const e of filtered) {
     const at = Date.parse(e.occurred_at);
-    if (e.type === 'wallet_snapshot') wallet = { balance:e.balance, occurred_at:e.occurred_at };
+    if (e.type === 'wallet_snapshot') {
+      const snapshot = { balance:e.balance, occurred_at:e.occurred_at };
+      if (e.currency_kind === 'bound' || e.currency_kind === 'unbound') {
+        wallets[e.currency_kind] = snapshot;
+        if (e.currency_kind === 'unbound' && at >= p.dailyAt) {
+          if (firstUnboundToday === null) firstUnboundToday = e.balance;
+          lastUnboundToday = e.balance;
+          readingsUnboundToday++;
+        }
+      } else wallet = snapshot; // legacy manual entries remain separate and unlabeled
+    }
     if (e.type === 'kinah_earned' || e.type === 'kinah_spent') {
       const field = e.type === 'kinah_earned' ? 'Earned' : 'Spent';
       if (at >= p.dailyAt) sums['day'+field] += e.amount;
@@ -77,7 +95,9 @@ function summarize(events, character, server, now = Date.now()) {
         { ...e, period_start:e.frequency === 'daily' ? p.day : p.week });
     }
   }
-  return { ...sums, wallet, counters:Array.from(counters.values()),
+  return { ...sums, wallet, wallets,
+    unboundNetToday:readingsUnboundToday>=2 ? lastUnboundToday-firstUnboundToday : null,
+    counters:Array.from(counters.values()),
     recent: filtered.slice(-8).reverse(), periods:p, eventCount:filtered.length };
 }
 module.exports = { normalizeEvent, addEvents, summarize, periods, charKey };

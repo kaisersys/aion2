@@ -6,7 +6,7 @@ A lightweight, **local-first character economy and daily/weekly summary** for th
 
 This version integrates a **read-only Npcap capture helper** with TCP stream reconstruction and a decoder for Aion 2 character identity and game-reported daily/weekly ticket snapshots. **Capture automatically starts when the companion opens** (unless the user previously paused it). The Windows driver still needs to be installed separately. The implementation is newly written and **has not been proven against a live Aion 2 Global session**; it has a small protocol parser self-test based on synthetic fixtures. Real game traffic is necessary to validate port differences, decoder coverage, character matching, and reset behavior before public release.
 
-**Kinah: only the known bound-Kinah item (ID 930100001) is decoded into a labeled balance snapshot**. Total Kinah, gross Kinah earned and gross Kinah spent are NOT automatically decoded yet. Manual economic entries remain available for testing and corrections. Do not treat bound-Kinah snapshots as full wallet totals or infer earnings/spending from changes in net wallet balance.
+**Kinah: ordinary/tradable Kina (Global item ID 930100031) and bound Kina (observed inventory item ID 930100001) are now decoded into separate labeled balance snapshots.** When both are observed, a combined balance is calculated locally. The "Regular net today" field is the change from the first observed unbound balance after the 07:00 UTC reset; it is NOT gross income from kills. Gross Kinah earned/spent are only available when explicit transaction events are supplied (e.g. manual entry); **do not treat inventory deltas as gross earnings or expenditures**. Live verification of ID 930100031 in Global inventory packets is required.
 
 The verified ticket-message research in MIT-licensed community projects is promising; the actual capture adapter must associate a login's ticket snapshots with the correct character and verify opcode coverage for Global. The Kinah earned/spent ledger must be based on independently observed transactions or explicitly marked estimates, never inferred from net wallet changes.
 
@@ -103,3 +103,71 @@ and a synthetic bundle containing a ticket and own-character record.
 
 Live Aion 2 Global compatibility is not yet proven; this remains an
 unofficial packet-capture beta with potential NCSOFT policy risk.
+
+## Automatic lobby character discovery
+
+The Aion 2 account lobby and in-world session use different network connections.
+The companion now includes the lobby fallback port 13700 (as observed in
+community captures) as well as discovery of current AION2.exe TCP endpoints.
+World port 13328 remains user-configurable.
+
+The lobby response opcode 0B39 provides the account-character roster. The
+companion validates name, server ID, and level using the wire layout documented
+by the MIT-licensed nuriland/a2kit project, ignores hidden $-prefixed
+placeholders, and builds a local roster. Login tokens, raw packet contents,
+account IDs, timestamps and character-selection masks are not exported.
+
+For first-time setup, OPEN THE COMPANION BEFORE LAUNCHING AION 2 and then
+start the game normally so the initial lobby response can be observed.
+If the character-selection lobby has already been exited, merely teleporting
+in the world will not re-send the lobby roster. Existing roster profiles stay
+saved locally between restarts.
+
+A lobby roster identifies the account characters; it does not itself prove
+which character is presently logged in. A roster with one playable character
+is selected for the mini window as a local profile, but account histories,
+tickets and wallets are only attributed from confirmed world records.
+
+The main app now displays lobby list packet and character counts separately
+from successfully parsed active-world identities. This remains unofficial
+passive packet analysis and may have NCSOFT account-policy implications.
+
+## Regular Kinah balance detection and validation
+
+- The companion now scans verified inventory slot records for **930100031**, the Global client item ID for **regular (tradable) Kina**. It keeps **930100001**, the bound Kina item observed in community capture data, as a separate wallet. The virtual combined-price item **930100030** is not treated as a third wallet.
+- Incoming full inventory snapshots (0x1156) and slot changes (0x1b56) are parsed for both currencies. A removal record (kind 2) resets the affected wallet to zero. Repeated unchanged readings are deduplicated.
+- The desktop dashboard and mini overlay separately show regular and bound Kina. A combined value is only shown after BOTH are observed. "Regular net today" is a net *balance* difference against the first observation since daily reset; it may include payments, market actions, storage movements, and other changes. **It is not gross earnings or mob-only income.**
+- Diagnostics expose inventory-frame count, regular-wallet readings, and bound-wallet readings. A player can record the before/after regular Kina balance while killing one mob to check whether the game sends an observable inventory update.
+- As with all passive packet analysis, this beta is unofficial and has not been verified against every Global server update. The protocol decoder never inspects game memory or sends packets.
+
+## Website syncing
+
+The new migration `supabase/migrations/20261109_companion_currency_kinds.sql` expands the allowed values of the `currency_kind` column to `bound` and `unbound`; it must be applied before optional Supabase sync of regular Kina snapshots. The base 20261108 telemetry migration should already be installed. Local capture and dashboards work without website configuration.
+
+## Currency UI: blue versus gold, and zero-balance handling
+
+The game's blue currency indicator is **Kina (All)**, not the separate bound-only balance. Kina (All) equals regular Kina plus bound Kina; for example, 462,000 regular and zero bound gives 462,000 All. The companion now uses a shared, unit-tested wallet calculator across full dashboard and mini overlay. It never treats a missing bound observation as a displayed zero: an incomplete capture shows **≥ 462,000** for All until the bound currency is observed. A complete and validated 0x1156 inventory snapshot that contains either currency can establish a missing currency's zero balance, while a partial 0x1b56 change cannot. This inference remains subject to live protocol validation.
+
+Testing: verify **Regular Kina**, **Bound Kina**, and **Kina (All)** against the individual wallet and combined currency displays. Because normal game UI may show only regular and combined totals, compare bound separately in the Cube or derive it from All minus regular.
+
+
+## Workspace tabs and automatic Kina movements (preview)
+
+The desktop app now opens on **Overview**: character balances, Kina (All), daily progression and a compact movement history. The detailed Npcap traffic and opcode counters, game port, start/pause capture and JSONL test-feed controls are in the separate **Diagnostics** tab in the sidebar. Moving the UI does **not** stop or reduce automatic game capture.
+
+**Observed Kina In / Out** is derived from *successive validated wallet snapshots* for each character, currency, and capture-session ID. A new capture session or character change establishes a fresh baseline: the first observation never counts as gain or expenditure. To avoid fabricated events after a long idle period, changes after >20 minutes between consecutive observations of a given currency also start a new baseline. Existing older observations without a capture-session ID remain visible as balances but are deliberately excluded from these new In/Out totals. The totals reset daily at 07:00 UTC; recent individual movements are retained in the local snapshot history.
+
+These are **observed wallet inflows and outflows**, not independently confirmed market sales, purchases or gross farming income. Positive regular-Kina movement following a Market Settlement claim may appear under In, and an item purchase under Out, but the game may also use the same wallet-update message for dungeon rewards, other expenses, transfers and combined events. Some offsetting actions can occur between snapshots and therefore be missed. Market listing fees may affect bound Kina; both currencies are tracked separately. We do not pretend to classify these balance changes by cause or report exact trading profit.
+
+The mini desktop panel also shows compact daily observed In and Out metrics. It does not display raw traffic.
+
+**Privacy**: capture session IDs are random, local provenance identifiers used solely to separate contiguous wallet observations. They are not account IDs, do not read game memory, and are **not sent to the website** by the optional Supabase synchronization. The movement summaries are calculated locally from existing snapshots; no new database migration is needed beyond the existing currency-kind migration.
+
+### Verify spending and settlement tracking
+
+1. Start the new companion before logging into a character to obtain an initial wallet baseline. The new movement fields can show zero after a baseline; they never invent movement from a missing baseline.
+2. Observe a **real** regular-Kina purchase or another purchase you were already planning. The regular wallet should decrease, the dashboard's Observed Out should increase, and a recent balance-change row should show the difference. Bound currency can also decrease for fees or other combined costs.
+3. If you have a completed Market sale to claim, open the game's Market → Settlement and claim the existing proceeds. A corresponding regular-Kina balance increase should appear under Observed In if the inventory update was captured. The app **cannot independently verify** this was a sale.
+4. If either action changes the in-game wallet but creates no movement, check the **Diagnostics** tab for inventory packets and wallet-reading counts and report those values. Do not share raw PCAPs or any credentials.
+
+Third-party packet capture remains an unofficial beta; consider NCSOFT's terms and any account risks.

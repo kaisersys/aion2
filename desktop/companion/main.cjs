@@ -230,8 +230,13 @@ function processCaptureMessage(message) {
       bundlesDecoded:value(message.bundlesDecoded),
       bundleFailures:value(message.bundleFailures), innerFrames:value(message.innerFrames),
       identities:value(message.identities),rosters:value(message.rosters),
+      lobbyRosterPackets:value(message.lobbyRosterPackets),
+      lobbyRosterCharacters:value(message.lobbyRosterCharacters),
       characterPackets:value(message.characterPackets),rosterPackets:value(message.rosterPackets),
       ticketPackets:value(message.ticketPackets),
+      inventoryFrames:value(message.inventoryFrames),
+      unboundWalletReadings:value(message.unboundWalletReadings),
+      boundWalletReadings:value(message.boundWalletReadings),
       popularOpcodes:Array.isArray(message.popularOpcodes)
         ? message.popularOpcodes.slice(0,8).filter(x=>/^[0-9a-f]{4}$/.test(x?.opcode) &&
             Number.isSafeInteger(x?.count) && x.count>=0)
@@ -261,6 +266,12 @@ function processCaptureMessage(message) {
       else if(h.identities===0 && h.rosters===0 && h.rosterPackets>0)
         captureStatus.message='Received '+h.rosterPackets+
           ' account-roster packet(s), but could not parse the character list. The roster decoder needs updating.';
+      else if(h.lobbyRosterCharacters>0 && h.identities===0)
+        captureStatus.message='Detected '+h.lobbyRosterCharacters+
+          ' character(s) in the account lobby. Waiting for an active world character record; existing characters are already in the list.';
+      else if(h.lobbyRosterPackets>0 && h.lobbyRosterCharacters===0)
+        captureStatus.message='Received '+h.lobbyRosterPackets+
+          ' lobby character-list message(s), but could not validate their fields. A lobby decoder update is needed.';
       else if(h.identities===0 && h.rosters===0 && h.bundlesDecoded>0)
         captureStatus.message='Expanded '+h.bundlesDecoded+' compressed bundle(s) and decoded '+
           h.innerFrames+' inner frames, but no identity record yet. The decoder is receiving more of the game protocol.';
@@ -281,6 +292,14 @@ function processCaptureMessage(message) {
       if(!discovered.profile)continue;
       found++;
       if(discovered.changed) {state.profiles=discovered.profiles;changed=true;}
+    }
+    // A single playable character on the account is unambiguous as a profile.
+    // Selection is NOT considered confirmation of a currently logged-in world character.
+    if(!state.activeCharacter && state.profiles.length===1 && found===1) {
+      const only=state.profiles[0];
+      state.activeCharacter={character:only.character,server:only.server,
+        serverId:Number(only.serverId)||null,selectionSource:'lobby-roster'};
+      changed=true;
     }
     if(changed){saveState();notify();}
     if(found>0 && captureStatus.state!=='connected')
@@ -362,7 +381,7 @@ function secureWindowContents(target) {
 function createOverlay() {
   if (overlay && !overlay.isDestroyed()) { overlay.showInactive(); return; }
   overlay = new BrowserWindow({
-    width:332, height:318, minWidth:332, minHeight:318,
+    width:332, height:440, minWidth:332, minHeight:440,
     backgroundColor:'#101a28', frame:false, transparent:false,
     show:false, skipTaskbar:true, alwaysOnTop:true, resizable:false, movable:true,
     webPreferences:{

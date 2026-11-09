@@ -30,6 +30,9 @@ public static class Program
                 if (int.TryParse(item, out int port) && port is > 0 and <= 65535) ports.Add(port);
         }
         if (ports.Count == 0) { Status("error", "Supply at least one valid Aion 2 server port."); return 2; }
+        // Lobby's observed server port (community capture). Game process TCP owners
+        // are also tracked for other regions; the port is a narrow fallback.
+        ports.Add(13700);
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; Stop.Cancel(); };
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Stop.Cancel();
         using var service = new ReadOnlyCapture(ports);
@@ -133,6 +136,11 @@ internal sealed class ReadOnlyCapture : IDisposable
                         characterPackets = _protocol.CharacterOpcodesSeen,
                         rosterPackets = _protocol.RosterOpcodesSeen,
                         ticketPackets = _protocol.TicketOpcodesSeen,
+                        inventoryFrames = _protocol.InventoryFramesSeen,
+                        unboundWalletReadings = _protocol.UnboundWalletReadings,
+                        boundWalletReadings = _protocol.BoundWalletReadings,
+                        lobbyRosterPackets = _protocol.LobbyRosterPackets,
+                        lobbyRosterCharacters = _protocol.LobbyRosterCharacters,
                         popularOpcodes = _observedOpcodes.OrderByDescending(x=>x.Value)
                             .Take(8).Select(x=>new { opcode = x.Key.ToString("x4"), count=x.Value }).ToArray(),
                         dropped = Interlocked.Read(ref _dropped),
@@ -202,7 +210,8 @@ internal sealed class ReadOnlyCapture : IDisposable
 
     private void RefreshGameConnections()
     {
-        _nextConnectionCheck=Environment.TickCount64+4000;
+        // Short-lived lobby flows can complete before the 4-second refresh.
+        _nextConnectionCheck=Environment.TickCount64+(_gameConnections>0?3000:750);
         var observed=GameConnections.Observe();
         _gameRunning=observed.Running;
         _gameConnections=observed.Endpoints.Count;
@@ -387,6 +396,163 @@ public static class SelfTest
             truncatedBundle[^1]=255;
             if (Aion2Bundles.TryExpand(truncatedBundle.AsMemory(0,truncatedBundle.Length-1),out _))
                 throw new Exception("Truncated LZ4 block incorrectly accepted.");
+
+            // Aion 2 lobby character-list fixture based on nuriland/a2kit's
+            // MIT-licensed game/parse_test.go record generator. Includes Unicode
+            // player names, four-character group masks and two distinct servers.
+            static byte[] LobbyMessage(params (string Name, ushort Server, uint Level)[] entries)
+            {
+                var b=new List<byte>{0x0b,0x39,0,0,(byte)entries.Length};
+                for(int j=0;j<entries.Length;j++)
+                {
+                    var ch=entries[j];
+                    byte[] bytes=System.Text.Encoding.UTF8.GetBytes(ch.Name);
+                    if(bytes.Length>80)throw new Exception("Lobby fixture name is too long.");
+                    b.AddRange(BitConverter.GetBytes(ch.Server));
+                    b.Add((byte)bytes.Length);
+                    b.AddRange(bytes);
+                    b.AddRange(BitConverter.GetBytes(ch.Level));
+                    b.AddRange(BitConverter.GetBytes(0u));  // experience
+                    b.AddRange(BitConverter.GetBytes(0u));  // reserved
+                    b.AddRange(BitConverter.GetBytes(6u));  // class code
+                    b.Add(1);                              // flags
+                    b.AddRange(BitConverter.GetBytes(1800000000000UL));
+                    b.AddRange(new byte[8]);
+                    if(j%4==0)b.Add(0);                    // group mask
+                }
+                b.Add(1);b.Add(1);
+                return b.ToArray();
+            }
+            byte[] lobbyMessage=LobbyMessage(("Aria",1301,45),("누리",1302,33));
+            var lobbyRoster=LobbyRoster.Parse(lobbyMessage);
+            if(lobbyRoster.Count!=2 || lobbyRoster[0].Name!="Aria" ||
+                lobbyRoster[0].ServerId!=1301 || lobbyRoster[1].Name!="누리" ||
+                lobbyRoster[1].ServerId!=1302)
+                throw new Exception("Aion 2 lobby character-list parser failed.");
+            var withPlaceholder=LobbyRoster.Parse(
+                LobbyMessage(("$hidden",1301,1),("Aria",1301,45)));
+            if(withPlaceholder.Count!=1 || withPlaceholder[0].Name!="Aria")
+                throw new Exception("Lobby placeholder was not excluded.");
+            var five=LobbyRoster.Parse(LobbyMessage(
+                ("A",1301,1),("B",1301,2),("C",1302,3),("D",1302,4),("E",2304,5)));
+            if(five.Count!=5)
+                throw new Exception("Lobby roster group mask boundaries failed.");
+            byte[] invalidLobby=(byte[])lobbyMessage.Clone();
+            invalidLobby[^1]=0;
+            if(LobbyRoster.Parse(invalidLobby).Count!=0)
+                throw new Exception("Corrupt lobby roster was accepted.");
+
+            var lobbyProtocolEvents=new List<object>();
+            var lobbyProtocol=new TicketProtocol(e=>lobbyProtocolEvents.Add(e));
+            lobbyProtocol.OnFrame(lobbyMessage,DateTime.UtcNow);
+            if(lobbyProtocol.LobbyRosterPackets!=1 ||
+               lobbyProtocol.LobbyRosterCharacters!=2 ||
+               lobbyProtocol.RosterRecords!=1 ||
+               !lobbyProtocolEvents.Any(e=>e.ToString()!.Contains("kind = roster")))
+                throw new Exception("Lobby character-list was not delivered as roster event.");
+
+            // Read-only framing must decode the lobby list even when followed by
+            // an incomplete next message on the same connection.
+            var lobbyWire=new List<byte>();
+            long encodedSize=lobbyMessage.Length+4;
+            do
+            {
+                byte part=(byte)(encodedSize&127);
+                encodedSize>>=7;
+                if(encodedSize>0)part|=128;
+                lobbyWire.Add(part);
+            }while(encodedSize>0);
+            lobbyWire.AddRange(lobbyMessage);
+            lobbyWire.AddRange(new byte[]{0x10,0x00});
+            var lobbyTcp=new TcpReassembler();
+            int lobbyFrames=0;
+            for(int offset=0;offset<lobbyWire.Count;offset+=17)
+            {
+                int chunk=Math.Min(17,lobbyWire.Count-offset);
+                var segment=new TcpSegment(DateTime.UtcNow,"lobby:13700","player:50444",
+                    (uint)(3000+offset),lobbyWire.ToArray().AsMemory(offset,chunk),true);
+                var bodies=lobbyTcp.Push(segment,new FrameLayout(),new HashSet<int>{0x0b39});
+                lobbyFrames+=bodies.Count;
+                if(bodies.Any(x=>!x.Span.SequenceEqual(lobbyMessage)))
+                    throw new Exception("Unexpected lobby frame after split TCP stream.");
+            }
+            if(lobbyFrames!=1)
+                throw new Exception("Lobby character list lost during TCP framing.");
+            // Both Kina wallets are independent items in the game. Ordinary
+            // (tradeable) Kina is 930100031; previously we only read 930100001.
+            static byte[] MakeWalletFrame(params (uint Item,long Balance,byte Kind)[] currency)
+            {
+                var result=new byte[2+currency.Length*34+12];
+                result[0]=0x1b;result[1]=0x56;
+                for(int j=0;j<currency.Length;j++)
+                {
+                    int i=12+j*34;
+                    result[i-10]=currency[j].Kind;
+                    System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(i),currency[j].Item);
+                    System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(result.AsSpan(i+4),(ulong)currency[j].Balance);
+                    result[i+12]=1; // inventory (not account storage)
+                    result[i+13]=(byte)j;
+                }
+                return result;
+            }
+            byte[] twoWallets=MakeWalletFrame(
+                (930100001u, 10000, (byte)1),
+                (930100031u, 4200, (byte)1));
+            if(!TicketProtocol.TryReadKinahWallets(twoWallets,out List<WalletReading> both) ||
+               both.Count!=2 || both.SingleOrDefault(x=>x.CurrencyKind=="bound").Balance!=10000 ||
+               both.SingleOrDefault(x=>x.CurrencyKind=="unbound").Balance!=4200)
+                throw new Exception("Both Kinah wallets were not decoded separately.");
+            byte[] removed=MakeWalletFrame((930100031u,4200,(byte)2));
+            if(!TicketProtocol.TryReadKinahWallets(removed,out List<WalletReading> emptied) ||
+               emptied.Count!=1 || emptied[0].Balance!=0)
+                throw new Exception("Removed regular-Kinah slot was not set to zero.");
+            if(TicketProtocol.TryReadKinahWallets(MakeWalletFrame(
+                 (930100030u,999999,(byte)1)),out _))
+                throw new Exception("Combined Kina cost token was interpreted as a wallet.");
+            var incomeEvents=new List<object>();
+            var walletDecoder=new TicketProtocol(x=>incomeEvents.Add(x));
+            walletDecoder.OnFrame(twoWallets,DateTime.UtcNow);
+            if(walletDecoder.UnboundWalletReadings!=1 || incomeEvents.Count!=0)
+                throw new Exception("Currency packets were wrongly attributed before login.");
+            walletDecoder.OnFrame(ownCharacter,DateTime.UtcNow);
+            if(incomeEvents.Count(x=>x.ToString()!.Contains("wallet_snapshot"))!=2 ||
+               !incomeEvents.Any(x=>x.ToString()!.Contains("currency_kind = unbound")))
+                throw new Exception("Both wallet snapshots did not publish after character identity.");
+            walletDecoder.OnFrame(twoWallets,DateTime.UtcNow);
+            if(incomeEvents.Count(x=>x.ToString()!.Contains("wallet_snapshot"))!=2)
+                throw new Exception("Identical wallet packet created duplicate events.");
+            walletDecoder.OnFrame(MakeWalletFrame((930100031u,4600,(byte)1)),DateTime.UtcNow);
+            if(incomeEvents.Count(x=>x.ToString()!.Contains("wallet_snapshot"))!=3)
+                throw new Exception("Regular Kina increase did not publish an updated balance.");
+            // Regression: Chanter has 462,000 regular Kina, 0 bound Kina,
+            // and therefore 462,000 total. The complete inventory snapshot
+            // carries only regular currency when the bound slot is absent.
+            byte[] chanterInventory = new byte[6000];
+            byte[] chanterCurrency = MakeWalletFrame((930100031u,462000,(byte)1));
+            Array.Copy(chanterCurrency,chanterInventory,chanterCurrency.Length);
+            chanterInventory[0]=0x11; chanterInventory[1]=0x56;
+            if (!TicketProtocol.TryReadKinahWallets(chanterInventory,
+                    out List<WalletReading> chanterBalances) ||
+                chanterBalances.Count!=2 ||
+                chanterBalances.Single(x=>x.CurrencyKind=="unbound").Balance!=462000 ||
+                chanterBalances.Single(x=>x.CurrencyKind=="bound").Balance!=0)
+                throw new Exception("Chanter zero-bound currency snapshot incorrectly decoded.");
+            // By contrast, absence of a currency in a PARTIAL slot change must
+            // not assume it is zero: its previous quantity is still unknown.
+            if (!TicketProtocol.TryReadKinahWallets(chanterCurrency,
+                    out List<WalletReading> chanterChange) ||
+                chanterChange.Count!=1 || chanterChange[0].CurrencyKind!="unbound")
+                throw new Exception("Partial slot update fabricated a zero bound-wallet balance.");
+            byte[] boundOnlyInventory = new byte[6000];
+            byte[] boundOnly = MakeWalletFrame((930100001u,900000,(byte)1));
+            Array.Copy(boundOnly,boundOnlyInventory,boundOnly.Length);
+            boundOnlyInventory[0]=0x11; boundOnlyInventory[1]=0x56;
+            if (!TicketProtocol.TryReadKinahWallets(boundOnlyInventory,
+                    out List<WalletReading> boundOnlyReadings) ||
+                boundOnlyReadings.Count!=2 ||
+                boundOnlyReadings.Single(x=>x.CurrencyKind=="bound").Balance!=900000 ||
+                boundOnlyReadings.Single(x=>x.CurrencyKind=="unbound").Balance!=0)
+                throw new Exception("Snapshot with only bound Kina failed to infer zero regular Kina.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }

@@ -348,7 +348,7 @@ public sealed class TcpReassembler
                 start + total <= b.Count) continue;
             int opcodeAt = start + prefix;
             int opcode = b[opcodeAt] << 8 | b[opcodeAt + 1];
-            if (opcode is 0x3336 or 0x2636 or 0x1536 or 0xffff) return start;
+            if (opcode is 0x3336 or 0x2636 or 0x1536 or 0x0b39 or 0xffff) return start;
         }
         return -1;
     }
@@ -419,7 +419,7 @@ public sealed class TcpReassembler
             // One complete large identity/roster frame is sufficient to establish sync
             // even when the server has already appended a PARTIAL next frame.
             // Otherwise the old 3-frame heuristic throws away an entire teleport record.
-            if (n == 0 && total >= 512 && opcode is 0x3336 or 0x2636 or 0x1536 or 0xffff)
+            if (n == 0 && total >= 40 && (opcode is 0x0b39 || total >= 512 && opcode is 0x3336 or 0x2636 or 0x1536 or 0xffff))
             {
                 return true;
             }
