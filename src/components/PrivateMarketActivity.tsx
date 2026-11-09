@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
 import {supabase} from '../lib/supabase';
+import './privateMarketActivity.css';
 
 type MarketRow={
  kind:string;item_name:string;quantity:number;unit_price:number|null;
