@@ -56,7 +56,7 @@ function reconcileFees(observations,events,now=Date.now()) {
   // The UI's exact fee and one unambiguous observed wallet debit agree.
   row.status='corroborated';
   row.currency_kind=currency;
-  row.wallet_event_ids=used.map(w=>w.id);
+  row.wallet_event_ids=used.map(w=>w.id).sort();
   row.synced=false; // updates previously-uploaded OCR observations
   for(const w of used)consumed.add(w.id);
   matched++;
