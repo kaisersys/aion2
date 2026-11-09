@@ -611,6 +611,64 @@ public static class SelfTest
             withIdentity.OnFrame(ItemUpdate(11,531060004,15),DateTime.UtcNow);
             if(captured.Count(x=>x.ToString()!.Contains("type = item_change"))!=1)
                 throw new Exception("Item-level changes did not reach character telemetry.");
+            // Source decoder uses three independent observations: spawn, own pickup,
+            // and an exact inventory addition. Neither an inventory change nor a
+            // nearby wallet change by itself is evidence of a transaction source.
+            var sourceAt=DateTime.UtcNow;
+            byte[] ground=new byte[47];
+            ground[0]=0x1e; ground[1]=0x56; ground[2]=1;
+            BinaryPrimitives.WriteUInt32LittleEndian(ground.AsSpan(35),700);
+            BinaryPrimitives.WriteUInt32LittleEndian(ground.AsSpan(39),531060004);
+            BinaryPrimitives.WriteUInt32LittleEndian(ground.AsSpan(43),7);
+            byte[] picked=new byte[24];
+            picked[0]=0x1f; picked[1]=0x56; picked[2]=1; picked[^1]=1;
+            BinaryPrimitives.WriteUInt32LittleEndian(picked.AsSpan(11),700);
+            var proven=new List<string>();
+            var sources=new TransactionSources((id,_,_,_)=>proven.Add(id));
+            sources.GroundAppeared(ground);
+            sources.GroundDisappeared(picked,sourceAt);
+            sources.InventoryAdded(531060004,7,"first",sourceAt.AddMilliseconds(200));
+            if(proven.Count!=1 || proven[0]!="first" ||
+               sources.MatchedPickups!=1 || sources.OwnPickupsSeen!=1)
+                throw new Exception("Matching own ground pickup was not corroborated.");
+            sources.InventoryAdded(531060004,7,"duplicate",sourceAt.AddMilliseconds(300));
+            if(proven.Count!=1)
+                throw new Exception("The same ground pickup was attributed twice.");
+            // Reverse arrival order must also work.
+            sources.Reset();
+            proven.Clear();
+            sources.InventoryAdded(531060004,7,"reverse",sourceAt);
+            sources.GroundAppeared(ground);
+            sources.GroundDisappeared(picked,sourceAt.AddMilliseconds(200));
+            if(proven.Count!=1 || proven[0]!="reverse")
+                throw new Exception("Pickup arriving after inventory failed to corroborate.");
+            // Disappearance without own-pickup flag and stale evidence are never proof.
+            sources.Reset();
+            proven.Clear();
+            picked[^1]=0;
+            sources.GroundAppeared(ground);
+            sources.GroundDisappeared(picked,sourceAt);
+            sources.InventoryAdded(531060004,7,"other-player",sourceAt);
+            if(proven.Count!=0)
+                throw new Exception("Another player's pickup was counted as ours.");
+            sources.Reset();
+            picked[^1]=1;
+            sources.GroundAppeared(ground);
+            sources.GroundDisappeared(picked,sourceAt);
+            sources.InventoryAdded(531060004,7,"late",sourceAt.AddSeconds(3));
+            if(proven.Count!=0)
+                throw new Exception("A stale pickup was falsely corroborated.");
+            // Full protocol route: the origin must refer to the emitted item event.
+            var originEvents=new List<object>();
+            var originProtocol=new TicketProtocol(e=>originEvents.Add(e));
+            originProtocol.OnFrame(itemsSnapshot,sourceAt);
+            originProtocol.OnFrame(ownCharacter,sourceAt);
+            originProtocol.OnFrame(ground,sourceAt);
+            originProtocol.OnFrame(picked,sourceAt);
+            originProtocol.OnFrame(ItemUpdate(33,531060004,7,0),sourceAt);
+            if(originEvents.Count(x=>x.ToString()!.Contains("type = item_origin"))!=1 ||
+               originProtocol.CorroboratedGroundPickups!=1)
+                throw new Exception("Source proof did not reach the local character ledger.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }
