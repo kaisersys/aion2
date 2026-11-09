@@ -16,12 +16,14 @@
    <div class="nav-title">YOUR CHARACTER</div>
    <label for="character-select" class="visually-hidden">Character</label>
    <select id="character-select" class="select-character"></select>
-   <button id="show-add" class="sidebar-link">＋ Add a character</button>
+   <div class="sidebar-caption">CHARACTERS ARE DETECTED AUTOMATICALLY</div>
+   <button id="show-add" class="sidebar-link">＋ Add manually (optional)</button>
    <form id="add-character" class="mini-form" hidden>
     <input id="character-name" placeholder="Character name" maxlength="40" required />
     <input id="character-server" placeholder="Server" maxlength="48" required />
     <button type="submit">Save character</button>
    </form>
+   <button id="overlay-toggle" class="sidebar-link">Hide mini overlay</button>
    <div class="sidebar-bottom">
     <div class="sidebar-caption">WEBSITE CONNECTION</div>
     <div id="connection-status" class="status-text">Local-only mode</div>
@@ -35,16 +37,16 @@
    <div class="header">
     <div><div class="eyebrow">YOUR PROGRESS, AT A GLANCE</div>
      <h1>Character <em>overview.</em></h1>
-     <p>Track your Kinah, limits, and daily progression. Detailed insights belong on the website.</p>
+     <p>Characters and progression appear automatically as you play. The mini overlay keeps essentials in view.</p>
     </div>
     <div class="sync-indicator"><span class="light"></span><span id="activity-status">Local history active</span></div>
    </div>
    <div id="alert" class="alert" role="status" hidden></div>
    <section class="panel source-panel">
     <div><span class="section-label">DATA SOURCE</span><h2>Decoded event feed</h2>
-      <p id="feed-label">Npcap not started. Add a character with their in-game name first.</p><p id="capture-detail" class="capture-detail">Only game-server TCP port 13328 is monitored.</p>
+      <p id="feed-label">Npcap starts automatically when the companion opens.</p><p id="capture-detail" class="capture-detail">Listening for Aion 2 — discovered characters appear in the sidebar.</p>
     </div>
-    <div class="source-actions"><label class="capture-port">GAME PORT <input id="game-port" aria-label="Aion 2 game server port" type="number" min="1" max="65535" value="13328" /></label><button id="capture-toggle" class="filled">Start Npcap capture</button><button id="choose-feed" class="outlined">JSONL test feed</button><button id="toggle-entry" class="filled">＋ Record entry</button></div>
+    <div class="source-actions"><label class="capture-port">GAME PORT <input id="game-port" aria-label="Aion 2 game server port" type="number" min="1" max="65535" value="13328" /></label><button id="capture-toggle" class="filled">Pause automatic tracking</button><button id="choose-feed" class="outlined">JSONL test feed</button><button id="toggle-entry" class="filled">＋ Record entry</button></div>
    </section>
    <section id="entry-panel" class="panel entry-panel" hidden>
     <div class="section-label">MANUAL ENTRY · FOR TESTING OR CORRECTIONS</div>
@@ -78,7 +80,7 @@
      <div class="section-top"><div><div class="section-label">YOUR LEDGER</div><h2>Recent activity</h2></div><span id="ledger-count" class="tag">0 records</span></div>
      <div id="activity-rows"></div>
    </section>
-   <div class="footnote">Only validated decoded events or your manual entries are recorded. Wallet changes are never assumed to be earnings or expenses. Raw packets are not stored or uploaded.</div>
+   <div class="footnote">Automatic capture begins when the companion opens. You may pause it at any time. Discovered characters are stored locally and shown after their first detected login. Only validated decoded events or your manual entries are recorded. Wallet changes are never assumed to be earnings or expenses. Raw packets are not stored or uploaded.</div>
   </main>
  </div>
  <div id="auth-backdrop" class="modal-backdrop" hidden>

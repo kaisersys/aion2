@@ -23,6 +23,11 @@ jobs:
       - run: dotnet run --project capture/AtreiaCapture.csproj -- --self-test
       - run: npm install
       - run: npm test
+      - run: node --check main.cjs
+      - run: node --check ui.js
+      - run: node --check overlay.js
+      - run: node --check overlay-preload.cjs
+      - run: node --check discovery.cjs
       - run: npm run capture:build
       - run: npm run dist:win
       - uses: actions/upload-artifact@v4

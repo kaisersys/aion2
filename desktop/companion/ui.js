@@ -1,7 +1,7 @@
 'use strict';
 const api=window.companion;
 const $=id=>document.getElementById(id);
-let state=null, active=null;
+let state=null, active=null, followedCapture=null, portLoaded=false;
 const labels={'nightmare':'Nightmare attempts','invasion':'Dimensional Invasion','shugo-server':'Shugo Festival · server','shugo-character':'Shugo Festival · character',
 'ascension':'Ascension Trial','subjugation':'Subjugation','duty':'Duty Missions','unknown-fissure':'Daeva Bio-Research',
 'raid-ludra':'Abyssal Forge · Ludra'};
@@ -31,8 +31,14 @@ function render(){
  if(!state)return;
  const combined=[...state.profiles];
  if(state.remote)for(const c of state.remote.characters){
-   if(!combined.some(p=>idOf(p)===idOf({character:c.name,server:c.server_name})))
+   if(!combined.some(p=>idOf(p)===idOf({character:c.name,server:c.server_name}) ||
+       (p.character.toLowerCase()===c.name.toLowerCase() &&
+        p.serverId && p.server.split(' - ').at(-1)?.toLowerCase()===c.server_name.toLowerCase())))
      combined.push({character:c.name,server:c.server_name});
+ }
+ const captured=state.activeCharacter ? idOf(state.activeCharacter):null;
+ if(captured && captured!==followedCapture && combined.some(p=>idOf(p)===captured)) {
+   active=captured; followedCapture=captured;
  }
  if(!active||!combined.some(p=>idOf(p)===active))active=combined.length?idOf(combined[0]):null;
  const select=$('character-select');select.replaceChildren();
@@ -41,14 +47,21 @@ function render(){
    option.textContent=p.character+' · '+p.server;select.appendChild(option);
  }
  if(active)select.value=active;
+ if(!combined.length) {
+  const placeholder=document.createElement('option');
+  placeholder.value=''; placeholder.textContent='Characters appear after login';
+  select.append(placeholder);
+ }
  const profile=combined.find(p=>idOf(p)===active)||null;
  $('connection-status').textContent=state.remote?'Connected · '+state.remote.email:'Local-only mode';
  $('show-login').textContent=state.remote?'Disconnect account':'Connect account';
  $('sync-now').disabled=!state.remote;
  $('feed-label').textContent=state.feedPath?'Also watching '+state.feedPath+' for decoded JSONL events':'Read-only Npcap capture; decoded events are stored locally.';
- $('capture-detail').textContent=state.capture?.message||'Npcap not started.';
+ $('capture-detail').textContent=state.capture?.message||'Npcap initializing...';
+ if(!portLoaded) { $('game-port').value=state.settings?.gamePort||13328; portLoaded=true; }
+ $('overlay-toggle').textContent=state.settings?.overlayEnabled?'Hide mini overlay':'Show mini overlay';
  const capturing=['starting','listening','connected','unmapped'].includes(state.capture?.state);
- $('capture-toggle').textContent=capturing?'Stop Npcap capture':'Start Npcap capture';
+ $('capture-toggle').textContent=capturing?'Pause automatic tracking':'Resume automatic tracking';
  $('capture-toggle').dataset.capturing=String(capturing);
  $('activity-status').textContent=state.capture?.state==='connected'?'Game connected':state.capture?.state==='listening'?'Listening for game':state.feedPath?'Test feed connected':'Local history active';
  const p=currentPeriods();
@@ -134,6 +147,10 @@ $('event-form').addEventListener('submit',async e=>{
     frequency:$('entry-frequency').value,scope:$('entry-scope').value});
  try{await api.addEvent(record);$('event-form').reset();entryKind();show('Entry saved locally.');await refresh();}
  catch(err){show(err.message,true);}
+});
+$('overlay-toggle').addEventListener('click',async()=>{
+ try {await api.toggleOverlay();await refresh();}
+ catch(e){show(e.message,true);}
 });
 $('capture-toggle').addEventListener('click',async()=>{
  try{

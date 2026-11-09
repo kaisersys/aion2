@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1" />
+ <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+ <title>Atreia Street · Mini</title>
+ <link rel="stylesheet" href="./overlay.css" />
+</head>
+<body>
+ <div class="mini">
+  <header class="topbar">
+   <div class="drag-title"><span class="star">✦</span> ATREIA STREET <span class="sub">MINI</span></div>
+   <div class="actions no-drag">
+     <button id="open-main" title="Open full companion" aria-label="Open full companion">↗</button>
+     <button id="hide-mini" title="Hide mini overlay" aria-label="Hide mini overlay">×</button>
+   </div>
+  </header>
+  <div class="body">
+   <div class="playerline"><div class="player-icon">◇</div>
+    <div class="player-copy"><strong id="character">Waiting for character</strong><span id="server">Open Aion 2 to detect your character</span></div>
+   </div>
+   <div class="status"><i id="status-dot"></i><span id="capture-status">Connecting to local capture…</span></div>
+   <div class="stats">
+     <div class="stat"><small>BOUND KINAH</small><strong id="bound">—</strong></div>
+     <div class="stat"><small>EARNED TODAY</small><strong id="earned">—</strong></div>
+     <div class="stat"><small>SPENT TODAY</small><strong id="spent">—</strong></div>
+   </div>
+   <div class="section-heading"><span>PROGRESSION</span><span id="counter-caption">Latest observations</span></div>
+   <div class="counters" id="counter-list"><div class="empty">No tracked counters yet</div></div>
+  </div>
+  <footer><span>DESKTOP COMPANION · READ ONLY</span><button id="view-details" class="no-drag">Full dashboard ↗</button></footer>
+ </div>
+ <script src="./overlay.js" defer></script>
+</body>
+</html>

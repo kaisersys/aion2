@@ -28,7 +28,12 @@
       "index.html",
       "ui.js",
       "styles.css",
-      "config.json"
+      "config.json",
+      "discovery.cjs",
+      "overlay.html",
+      "overlay.css",
+      "overlay.js",
+      "overlay-preload.cjs"
     ],
     "win": {
       "target": "nsis"
