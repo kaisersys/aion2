@@ -21,6 +21,7 @@ let capture = null;
 let marketOcrTimer=null, marketOcrBusy=false, marketOcrWorker=null;
 let marketSyncBusy=false;
 let lastMarketFrame=null;
+let lastMarketSeenAt=0;
 let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0};
 let marketObservations=[];
 let recentMarket=new Map();
@@ -229,7 +230,7 @@ async function marketOcrTick() {
   const result=await marketOcrWorker.recognize(games[0].thumbnail.toPNG());
   const parsed=readMarket(result.data?.text||'');
   if(parsed.status!=='observed') {
-   lastMarketFrame=null;
+   if(Date.now()-lastMarketSeenAt>10000)lastMarketFrame=null;
    marketOcrMessage('listening',
     parsed.status==='empty'?'Game window captured, but OCR saw no readable text. Try borderless/windowed mode.':
     parsed.status==='unrecognized'
@@ -251,14 +252,19 @@ async function marketOcrTick() {
   const evidence=parsed.evidence;
   const key=stableFingerprint(current.character,current.server,evidence);
   const now=Date.now();
+  lastMarketSeenAt=now;
   for(const [k,v] of recentMarket)if(now-v>120000)recentMarket.delete(k);
   // Re-reading the same open dialog is not another transaction.
   // Reset after a different screen; allow a new identical listing following
   // a confirmed debit and a later redraw.
-  if(lastMarketFrame===key && recentMarket.has(key)) {
-   marketOcrMessage('listening',evidence.fee!==null
-    ?'Registration fee read: '+evidence.fee+
-      ' Kina. Waiting for a matching bound or regular Kina decrease.'
+  if(lastMarketFrame===key) {
+   const last=marketObservations.findLast(x=>x.user_id===remote.user_id &&
+    x.character===current.character && x.server===current.server &&
+    stableFingerprint(x.character,x.server,x)===key);
+   const matched=last?.status==='corroborated';
+   marketOcrMessage(matched?'corroborated':'listening',evidence.fee!==null
+    ?('Registration fee: '+evidence.fee+' Kina. '+
+      (matched?'Matched a Kina decrease.':'Waiting for a matching bound or regular Kina decrease.'))
     :'Market settlement amount is visible; claiming it has not been verified.');
    return;
   }
@@ -321,7 +327,7 @@ function startMarketOcr() {
 async function stopMarketOcr() {
  if(marketOcrTimer){clearInterval(marketOcrTimer);marketOcrTimer=null;}
  if(marketOcrWorker){const worker=marketOcrWorker;marketOcrWorker=null;await worker.terminate();}
- recentMarket.clear();lastMarketFrame=null;
+ recentMarket.clear();lastMarketFrame=null;lastMarketSeenAt=0;
  marketOcrMessage('waiting','Sign in to resume Market reading.');
 }
 
@@ -667,6 +673,7 @@ app.whenReady().then(()=>{
   });
   ipcMain.handle('remote:logout',()=>{remote=null;void stopMarketOcr();notify();return true;});
   ipcMain.handle('remote:sync',sync);
+  ipcMain.handle('market:scan',async()=>{await marketOcrTick();return marketOcrStatus;});
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
   app.on('activate',()=>showMain());
   app.on('before-quit',()=>{if(marketOcrTimer)clearInterval(marketOcrTimer);});
