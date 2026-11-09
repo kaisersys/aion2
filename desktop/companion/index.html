@@ -34,7 +34,7 @@
    </div>
   </aside>
   <main class="main">
-   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1 · MVP</span></div>
+   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1.2 · MARKET DIAGNOSTICS</span></div>
    <div class="header">
     <div><div class="eyebrow">YOUR PROGRESS, AT A GLANCE</div>
      <h1><span id="page-title-prefix">Character </span><em id="page-title-topic">overview.</em></h1>
@@ -42,6 +42,7 @@
     </div>
     <div class="sync-indicator"><span class="light"></span><span id="activity-status">Local history active</span></div>
    </div>
+   <div id="market-header-status" class="alert" role="status" aria-live="polite">Market OCR: checking account and game window…</div>
    <div id="alert" class="alert" role="status" hidden></div>
    <section id="view-diagnostics" class="tab-view" hidden>
    <section class="panel source-panel">
@@ -75,6 +76,21 @@
       <p class="opcode-diagnostic">Frequent game opcodes: <span id="diagnostic-opcodes">Awaiting frames</span></p>
     </div>
     <div class="source-actions"><label class="capture-port">FALLBACK PORT <input id="game-port" aria-label="Aion 2 game server port" type="number" min="1" max="65535" value="13328" /></label><button id="capture-toggle" class="filled">Pause automatic tracking</button><button id="choose-feed" class="outlined">JSONL test feed</button></div>
+   </section>
+   <section class="panel">
+     <div class="section-top"><div><span class="section-label">MARKET OCR DIAGNOSTICS</span><h2>Game-window reading</h2></div><span class="tag" id="diagnostic-market-state">Not started</span></div>
+     <p class="capture-detail" id="diagnostic-market-message">Sign in to the companion to start Market scanning.</p>
+     <div class="detection-metrics">
+       <span>Game windows matched <strong id="diagnostic-market-windows">—</strong></span>
+       <span>Captured image <strong id="diagnostic-market-pixels">—</strong></span>
+       <span>OCR scans <strong id="diagnostic-market-scans">0</strong></span>
+       <span>OCR characters <strong id="diagnostic-market-chars">—</strong></span>
+       <span>Fee label recognized <strong id="diagnostic-market-fee">—</strong></span>
+       <span>Last attempt <strong id="diagnostic-market-time">—</strong></span>
+     </div>
+     <p class="movement-help">Only the named AION2 window is scanned. Screenshots and raw recognized text are not uploaded or saved. A fee quote is not counted as spent until a Kina decrease corroborates it.</p>
+     <p id="diagnostic-market-evidence" class="movement-help">No fee label recognized yet.</p>
+     <button class="outlined" id="market-scan-diagnostics" type="button">Scan visible Market now</button>
    </section>
    </section>
    <section id="view-overview" class="tab-view">
