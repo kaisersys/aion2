@@ -488,8 +488,8 @@ public static class SelfTest
                 {
                     int i=12+j*34;
                     result[i-10]=currency[j].Kind;
-                    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(i),currency[j].Item);
-                    BinaryPrimitives.WriteUInt64LittleEndian(result.AsSpan(i+4),(ulong)currency[j].Balance);
+                    System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(i),currency[j].Item);
+                    System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(result.AsSpan(i+4),(ulong)currency[j].Balance);
                     result[i+12]=1; // inventory (not account storage)
                     result[i+13]=(byte)j;
                 }
