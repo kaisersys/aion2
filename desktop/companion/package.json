@@ -2,7 +2,7 @@
   "name": "atreia-street-companion",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first Aion 2 economy and progression summary for Atreia Street",
+  "description": "Account-connected Aion 2 economy and progression companion for Atreia Street",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -10,7 +10,7 @@
     "dist:win": "electron-builder --win nsis --x64",
     "capture:build": "dotnet publish capture/AtreiaCapture.csproj -c Release -r win-x64 --self-contained true -o capture/publish"
   },
-  "devDependencies": {
+  "dependencies": {\n    "tesseract.js": "^6.0.1"\n  },\n  "devDependencies": {
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8"
   },
@@ -36,7 +36,7 @@
       "overlay-preload.cjs",
       "wallets.js",
       "item-catalog.js",
-      "item-economy.js"
+      "item-economy.js",\n      "market-ocr.cjs"
     ],
     "win": {
       "target": "nsis",
