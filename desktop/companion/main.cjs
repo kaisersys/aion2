@@ -7,13 +7,21 @@ const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const { normalizeEvent, addEvents, charKey, periods } = require('./ledger.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
+const { MarketObserver } = require('./market-observer.cjs');
+const { validateMarketObservation } = require('./market-ocr.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const FILE_LIMIT = 8 * 1024 * 1024;
 let win;
 let overlay;
 const DEFAULT_SETTINGS = { autoCapture:true, overlayEnabled:true, gamePort:13328 };
-let state = { profiles:[], events:[], settings:{...DEFAULT_SETTINGS}, activeCharacter:null };
+let state = { profiles:[], events:[], marketObservations:[], syncedEventHashes:[], settings:{...DEFAULT_SETTINGS}, activeCharacter:null };
 let feed = null;
+let marketObserver = null;
+let marketStatus = {state:'signed-out',message:'Connect your Atreia Street account to enable automatic Market tracking.'};
+let marketSyncTimer=null;
+let marketSyncQueued=null;
+let marketSyncBusy=false;
+let eventSyncBusy=false;
 let remote = null;
 let capture = null;
 let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
@@ -30,6 +38,10 @@ function loadState() {
     state = {
       profiles:Array.isArray(saved.profiles) ? saved.profiles.slice(0,80) : [],
       events:Array.isArray(saved.events) ? saved.events.slice(-50000) : [],
+      syncedEventHashes:Array.isArray(saved.syncedEventHashes) ?
+        saved.syncedEventHashes.filter(x=>typeof x==='string' && /^[a-f0-9]{64}$/.test(x)).slice(-50000) : [],
+      marketObservations:Array.isArray(saved.marketObservations) ?
+        saved.marketObservations.slice(-5000) : [],
       settings:{
         autoCapture:saved.settings?.autoCapture!==false,
         overlayEnabled:saved.settings?.overlayEnabled!==false,
@@ -39,7 +51,7 @@ function loadState() {
       },
       activeCharacter:saved.activeCharacter||null
     };
-  } catch { state = { profiles:[], events:[],settings:{...DEFAULT_SETTINGS},activeCharacter:null }; }
+  } catch { state = { profiles:[], events:[],marketObservations:[],syncedEventHashes:[],settings:{...DEFAULT_SETTINGS},activeCharacter:null }; }
 }
 function saveState() {
   fs.mkdirSync(path.dirname(storePath()), { recursive:true });
@@ -50,7 +62,9 @@ function saveState() {
 function captureState() {
   return { ...state, feedPath:feed ? path.basename(feed.path) : null,
     remote:remote ? {email:remote.email,characters:remote.characters} : null,
-    configured:Boolean(readConfig()), capture:captureStatus };
+    configured:Boolean(readConfig()), capture:captureStatus,
+    marketStatus,marketObservations:remote
+      ?state.marketObservations.filter(x=>x.account_user_id===remote.user_id).slice(-150):[] };
 }
 function insert(raw, fallbackId) {
   const event = normalizeEvent(raw, fallbackId);
@@ -112,6 +126,11 @@ async function characters() {
 }
 async function sync() {
   if (!remote) throw new Error('Sign in first.');
+  if(eventSyncBusy)return {uploaded:0,unmatched:0,ticketBalances:0};
+  eventSyncBusy=true;
+  try{ return await syncEventsImpl(); } finally {eventSyncBusy=false;}
+}
+async function syncEventsImpl() {
   await characters();
   const byKey = new Map();
   for (const profile of state.profiles) {
@@ -120,6 +139,7 @@ async function sync() {
   }
   for (const c of remote.characters) byKey.set(charKey(c.name,c.server_name),c.id);
   const rows = [];
+  const previouslySent=new Set(state.syncedEventHashes||[]);
   let unmatched = 0;
   for (const ev of state.events) {
     // Item-level movements are local-only: website telemetry schema intentionally
@@ -127,8 +147,14 @@ async function sync() {
     if (ev.type==='item_change' || ev.type==='item_origin') continue;
     const id=byKey.get(charKey(ev.character,ev.server));
     if (!id) { unmatched++; continue; }
+    const eventHash=crypto.createHash('sha256')
+      .update(ev.id+'|'+ev.character+'|'+ev.server).digest('hex');
+    // Upload bookkeeping is account-scoped, not shared across sign-ins.
+    const accountHash=crypto.createHash('sha256')
+      .update(remote.user_id+'|'+eventHash).digest('hex');
+    if(previouslySent.has(accountHash))continue;
     rows.push({user_id:remote.user_id, character_id:id,
-      event_hash:crypto.createHash('sha256').update(ev.id+'|'+ev.character+'|'+ev.server).digest('hex'),
+      event_hash:eventHash,
       kind:ev.type, occurred_at:ev.occurred_at, source:ev.source, currency_kind:ev.currency_kind??null,
       amount:ev.amount ?? null, balance:ev.balance ?? null,
       counter_key:ev.key ?? null, counter_frequency:ev.frequency ?? null,
@@ -137,8 +163,15 @@ async function sync() {
   }
   for (let i=0;i<rows.length;i+=150) {
     await refreshed();
+    const batch=rows.slice(i,i+150);
     await request('/rest/v1/player_companion_events?on_conflict=user_id,character_id,event_hash',
-      'POST',rows.slice(i,i+150),true,{prefer:'resolution=ignore-duplicates,return=minimal',noContent:true});
+      'POST',batch,true,{prefer:'resolution=ignore-duplicates,return=minimal',noContent:true});
+    // Mark only successfully uploaded records, including records that already
+    // existed in the server via ignore-duplicates.
+    for(const row of batch)previouslySent.add(
+      crypto.createHash('sha256').update(remote.user_id+'|'+row.event_hash).digest('hex'));
+    state.syncedEventHashes=[...previouslySent].slice(-50000);
+    saveState();
   }
   // Only actual decoded ticket snapshots update the website's existing balance
   // system. Manually entered/illustrative counters never overwrite website data.
@@ -166,6 +199,102 @@ async function sync() {
   }
   return { uploaded:rows.length, unmatched, ticketBalances:ticketRows.length };
 }
+// Market OCR results are never raw images or free-form screen text.
+function addMarketObservation(observation) {
+ if(!remote || observation.account_user_id!==remote.user_id ||
+    !validateMarketObservation(observation) ||
+    !/^[a-f0-9]{64}$/.test(observation.fingerprint||'') ||
+    !state.activeCharacter ||
+    charKey(observation.character,observation.server)!==
+      charKey(state.activeCharacter.character,state.activeCharacter.server)) return false;
+ const stamp=Date.parse(observation.occurred_at);
+ if(!Number.isFinite(stamp)||Math.abs(Date.now()-stamp)>5*60*1000)return false;
+ if(state.marketObservations.some(x=>x.account_user_id===remote.user_id &&
+    x.fingerprint===observation.fingerprint))return false;
+ const allowed=['kind','item_name','quantity','unit_price','gross','listing_fee',
+  'proceeds','evidence','currency_kind','occurred_at','character','server',
+  'account_user_id','fingerprint'];
+ const row=Object.fromEntries(allowed.map(k=>[k,observation[k]??null]));
+ row.uploaded=false;
+ state.marketObservations=[...(state.marketObservations||[]),row].slice(-5000);
+ saveState();notify();
+ queueMarketSync();
+ return true;
+}
+async function syncMarket() {
+ if(!remote||marketSyncBusy)return {uploaded:0};
+ marketSyncBusy=true;
+ try {
+  await characters();
+  const rows=[];
+  for(const observation of state.marketObservations) {
+   if(observation.account_user_id!==remote.user_id || observation.uploaded ||
+      !validateMarketObservation(observation))continue;
+   const matched=matchWebsiteCharacter(observation.character,observation.server);
+   if(!matched)continue;
+   rows.push({...observation,user_id:remote.user_id,character_id:matched.id});
+  }
+  let uploaded=0;
+  for(let i=0;i<rows.length;i+=100){
+   await refreshed();
+   const batch=rows.slice(i,i+100);
+   const payload=batch.map(({user_id,character_id,fingerprint,kind,item_name,quantity,
+    unit_price,gross,listing_fee,proceeds,evidence,currency_kind,occurred_at})=>({
+     user_id,character_id,fingerprint,kind,item_name,quantity,
+     unit_price,gross,listing_fee,proceeds,evidence,currency_kind,occurred_at
+   }));
+   await request('/rest/v1/player_market_observations?on_conflict=user_id,character_id,fingerprint',
+    'POST',payload,true,{prefer:'resolution=ignore-duplicates,return=minimal',noContent:true});
+   const hashes=new Set(batch.map(x=>x.fingerprint));
+   for(const record of state.marketObservations)
+    if(record.account_user_id===remote.user_id && hashes.has(record.fingerprint))record.uploaded=true;
+   uploaded+=batch.length;
+  }
+  if(uploaded)saveState();
+  marketStatus={...marketStatus,synced:uploaded,message:uploaded
+   ?'Market observations saved to your private account.':'Watching Aion 2 Market; account sync is current.'};
+  notify();
+  return {uploaded,pending:rows.length-uploaded};
+ } catch(err){
+  marketStatus={state:'sync-error',
+   message:'Market account sync failed. Private Market table may need its Supabase migration ('+
+    String(err?.message||'unknown').slice(0,110)+').'};
+  notify();
+  throw err;
+ } finally {marketSyncBusy=false;}
+}
+function queueMarketSync() {
+ if(!remote||marketSyncQueued)return;
+ marketSyncQueued=setTimeout(()=>{
+  marketSyncQueued=null;
+  void syncMarket().catch(()=>{});
+ },4000);
+}
+function ensureMarketObserver() {
+ if(!marketObserver)marketObserver=new MarketObserver({
+  getContext:()=>remote && state.activeCharacter && captureStatus.state==='connected'
+   ?{userId:remote.user_id,character:state.activeCharacter.character,
+     server:state.activeCharacter.server,gameRunning:captureStatus.health?.gameRunning===true}
+   :null,
+  onObservation:addMarketObservation,
+  onStatus:next=>{marketStatus={...marketStatus,...next};notify();}
+ });
+ marketObserver.start();
+ if(!marketSyncTimer)marketSyncTimer=setInterval(()=>{
+  void sync().catch(()=>{});
+  void syncMarket().catch(()=>{});
+ },60000);
+ queueMarketSync();
+ void sync().catch(()=>{});
+}
+function stopMarketObserver() {
+ if(marketSyncTimer){clearInterval(marketSyncTimer);marketSyncTimer=null;}
+ if(marketSyncQueued){clearTimeout(marketSyncQueued);marketSyncQueued=null;}
+ if(marketObserver)void marketObserver.stop();
+ marketStatus={state:'signed-out',message:'Account disconnected. Market screen tracking stopped.'};
+ notify();
+}
+
 function pollFeed() {
   if (!feed) return;
   try {
@@ -384,7 +513,11 @@ function stopCapture() {
 }
 
 function secureWindowContents(target) {
-  target.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  target.webContents.setWindowOpenHandler(({url})=>{
+    if(url==='https://atreiastreet.com/terms.html')
+      void shell.openExternal(url);
+    return {action:'deny'};
+  });
   target.webContents.on('will-navigate',e=>e.preventDefault());
 }
 function createOverlay() {
@@ -500,11 +633,20 @@ app.whenReady().then(()=>{
     const data=await res.json();
     remote={email,user_id:data.user.id,access_token:data.access_token,
       refresh_token:data.refresh_token,expires_at:Date.now()+data.expires_in*1000,characters:[]};
-    await characters();notify();
+    await characters();
+    ensureMarketObserver();
+    notify();
     return {email,characters:remote.characters};
   });
-  ipcMain.handle('remote:logout',()=>{remote=null;notify();return true;});
-  ipcMain.handle('remote:sync',sync);
+  ipcMain.handle('remote:logout',()=>{
+    stopMarketObserver();remote=null;notify();return true;
+  });
+  ipcMain.handle('remote:sync',async()=>{
+    const progress=await sync();
+    let market={uploaded:0};
+    try{market=await syncMarket();}catch{/* status is visible in diagnostics */}
+    return {...progress,marketUploaded:market.uploaded};
+  });
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
   app.on('activate',()=>showMain());
   createWindow();
@@ -515,4 +657,10 @@ app.whenReady().then(()=>{
   }
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
-app.on('before-quit',()=>{if(feed?.timer)clearInterval(feed.timer);stopCapture();});
+app.on('before-quit',()=>{
+ if(feed?.timer)clearInterval(feed.timer);
+ if(marketSyncTimer)clearInterval(marketSyncTimer);
+ if(marketSyncQueued)clearTimeout(marketSyncQueued);
+ if(marketObserver)void marketObserver.stop();
+ stopCapture();
+});

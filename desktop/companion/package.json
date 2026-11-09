@@ -1,8 +1,8 @@
 {
   "name": "atreia-street-companion",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local-first Aion 2 economy and progression summary for Atreia Street",
+  "description": "Aion 2 companion with account-linked, game-window Market OCR and passive economy tracking",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -36,7 +36,10 @@
       "overlay-preload.cjs",
       "wallets.js",
       "item-catalog.js",
-      "item-economy.js"
+      "item-economy.js",
+      "market-ocr.cjs",
+      "market-observer.cjs",
+      "node_modules/**/*"
     ],
     "win": {
       "target": "nsis",
@@ -53,7 +56,20 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz",
+        "to": "ocr/eng.traineddata.gz"
       }
+    ],
+    "asarUnpack": [
+      "node_modules/tesseract.js/**",
+      "node_modules/tesseract.js-core/**",
+      "node_modules/@tesseract.js-data/eng/**"
     ]
+  },
+  "dependencies": {
+    "tesseract.js": "^6.0.1",
+    "@tesseract.js-data/eng": "^1.0.0"
   }
 }

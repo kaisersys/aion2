@@ -99,7 +99,7 @@ export default function PlayerPortal({user,checklistItemsJson,guides,onBack,onGu
           {mode==='signin'?<><button onClick={()=>{setMode('signup');setError('');setNotice('');}}>Create an account</button><button onClick={()=>{setMode('forgot');setError('');setNotice('');}}>Forgot password?</button></>
            :<button onClick={()=>{setMode('signin');setError('');setNotice('');}}>Back to sign in</button>}
         </div>
-        <p className="player-fineprint">Accounts are free. Tracking is manual, not linked to your game account. Staff publishing access is separate.</p>
+        <p className="player-fineprint">Accounts are free. When you sign in to the Windows companion, it automatically analyzes the Aion 2 game window for Market details and syncs recognized fields privately to your account. No raw screenshots or game window text are uploaded. <a href="/terms.html" target="_blank" rel="noreferrer">Terms of Service and data use</a>. This companion is unofficial; staff publishing privileges are separate.</p>
       </div>
     </div>
   </main>;
