@@ -284,7 +284,7 @@ function render(){
  const todaysFees=marketRows.filter(e=>e.fee!==null&&e.fee!==undefined &&
   Date.parse(e.occurred_at)>=p.daily);
  $('market-fees-quoted').textContent=todaysFees.length?
-  num(todaysFees.reduce((sum,e)=>sum+e.fee,0)):'—';
+  num(todaysFees[0].fee):'—';
  const charged=todaysFees.filter(e=>e.status==='corroborated');
  $('market-fees-matched').textContent=charged.length?
   num(charged.reduce((sum,e)=>sum+e.fee,0)):'—';
@@ -408,6 +408,10 @@ $('auth-form').addEventListener('submit',async e=>{
  try{await api.login({email:$('auth-email').value.trim(),password:$('auth-password').value});
  $('auth-backdrop').hidden=true;$('auth-password').value='';await refresh();show('Website account connected. Game-window Market fee reading and private syncing are active.');}
  catch(err){show(err.message,true);$('auth-backdrop').hidden=true;$('auth-password').value='';}
+});
+$('market-scan').addEventListener('click',async()=>{
+ try {const result=await api.scanMarket();show(result.message||'Market scan completed.');await refresh();}
+ catch(err){show(err.message,true);}
 });
 $('sync-now').addEventListener('click',async()=>{
  try{const r=await api.sync();show('Synced '+r.uploaded+' local records and '+r.ticketBalances+
