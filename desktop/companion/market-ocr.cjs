@@ -21,7 +21,7 @@ function parseValue(raw) {
  if(typeof raw!=='string')return null;
  const remainder=raw.replace(/^[\s:：=]+/,'')
    .replace(/^\(\s*[0-9]+(?:\.[0-9]+)?\s*%\s*\)\s*/,'').trim();
- const match=remainder.match(/^(?:(?:kinah|kina)\s+)?([0-9][0-9,. ]{0,23})\s*(?:(?:kinah|kina))?$/i);
+ const match=remainder.match(/^(?:(?:kinah|kina)\s+)?([0-9][0-9,. ]{0,23})\s*(?:(?:kinah|kina))?(?:\s*(?:\p{So}|[oO]))?$/iu);
  return match?amount(match[1]):null;
 }
 function field(lines,label) {
