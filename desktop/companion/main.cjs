@@ -205,7 +205,7 @@ function marketOcrMessage(stateName,message) {
  notify();
 }
 async function marketOcrTick() {
- if(marketOcrBusy || !remote || !state.activeCharacter || !readConfig())return;
+ if(marketOcrBusy || !remote || !readConfig())return;
  marketOcrBusy=true;
  try {
   // Only capture the explicitly named game WINDOW. Never capture a display,
@@ -239,7 +239,7 @@ async function marketOcrTick() {
   }
   const current=state.activeCharacter;
   // A roster selection alone is not proof of an active world character.
-  if(!current.serverId || current.selectionSource==='lobby-roster') {
+  if(!current || !current.serverId || current.selectionSource==='lobby-roster') {
    marketOcrMessage('unmapped','Market fee visible, but the active in-world character has not been confirmed by capture.');
    return;
   }
@@ -256,8 +256,10 @@ async function marketOcrTick() {
   // Reset after a different screen; allow a new identical listing following
   // a confirmed debit and a later redraw.
   if(lastMarketFrame===key && recentMarket.has(key)) {
-   marketOcrMessage('listening','Registration fee read: '+evidence.fee+
-    ' Kina. Waiting for a matching bound or regular Kina decrease.');
+   marketOcrMessage('listening',evidence.fee!==null
+    ?'Registration fee read: '+evidence.fee+
+      ' Kina. Waiting for a matching bound or regular Kina decrease.'
+    :'Market settlement amount is visible; claiming it has not been verified.');
    return;
   }
   lastMarketFrame=key;
