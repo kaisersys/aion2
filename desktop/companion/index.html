@@ -66,6 +66,9 @@
         <span>Item stack updates <strong id="diagnostic-item-updates">—</strong></span>
         <span>Item quantity changes <strong id="diagnostic-item-deltas">—</strong></span>
         <span>Tracked inventory stacks <strong id="diagnostic-item-stacks">—</strong></span>
+        <span>Ground drops observed <strong id="diagnostic-ground-items">—</strong></span>
+        <span>Own ground pickups <strong id="diagnostic-ground-pickups">—</strong></span>
+        <span>Ground pickups matched to inventory <strong id="diagnostic-ground-matches">—</strong></span>
         <span>Regular Kina readings <strong id="diagnostic-wallet-regular">—</strong></span>
         <span>Bound Kina readings <strong id="diagnostic-wallet-bound">—</strong></span>
       </div>
@@ -111,6 +114,8 @@
      <div class="movement-list-title item-groups-title"><span>ITEM-LEVEL SPENDING / RECEIPTS</span><small>Possible association · not a verified Market receipt</small></div>
      <p class="movement-help">When one identifiable item changes near a Kina transfer, the companion can associate them. It will not guess a purchase when several items change together, and it cannot yet distinguish NPC shops from player Market transactions.</p>
      <div id="item-groups" class="item-groups"><div class="empty">No item-level associations yet.</div></div>
+     <div class="movement-list-title item-groups-title"><span>CORROBORATED GROUND PICKUPS</span><small>Ground spawn + own pickup + inventory update</small></div>
+     <div id="ground-groups" class="item-groups"><div class="empty">No ground pickups corroborated yet.</div></div>
    </section>
    <div class="main-grid">
     <section class="panel">
