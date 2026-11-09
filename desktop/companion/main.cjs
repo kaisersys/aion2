@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, screen, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen, desktopCapturer, safeStorage } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -23,7 +23,7 @@ let marketSyncBusy=false;
 let lastMarketSyncAttemptAt=0;
 let lastMarketFrame=null;
 let lastMarketSeenAt=0;
-let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0};
+let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0,scans:0,lastScanAt:null,windowCandidates:0,capturePixels:null,recognizedChars:0,feeLabelSeen:false,feeEvidence:[]};
 let marketObservations=[];
 let recentMarket=new Map();
 let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
@@ -35,6 +35,53 @@ function notify() {
 }
 function storePath() { return path.join(app.getPath('userData'), 'local-ledger.json'); }
 function marketPath() { return path.join(app.getPath('userData'),'market-observations.json'); }
+function sessionPath() { return path.join(app.getPath('userData'),'companion-session.enc.json'); }
+function saveSecureSession() {
+ try {
+  if(!remote||!safeStorage.isEncryptionAvailable())return false;
+  const payload={version:1,email:remote.email,user_id:remote.user_id,
+   sealed:safeStorage.encryptString(remote.refresh_token).toString('base64')};
+  fs.writeFileSync(sessionPath()+'.tmp',JSON.stringify(payload),{mode:0o600});
+  fs.renameSync(sessionPath()+'.tmp',sessionPath());
+  return true;
+ } catch { return false; }
+}
+function clearSecureSession() {
+ try {fs.rmSync(sessionPath(),{force:true});}catch {}
+}
+async function restoreSecureSession() {
+ if(!readConfig()) {marketOcrMessage('config-missing','Companion account connection is not configured; Market OCR cannot start.');return;}
+ if(!safeStorage.isEncryptionAvailable()) {
+  marketOcrMessage('sign-in','Sign in to Atreia Street in this companion to enable Market OCR. Secure login persistence unavailable on this PC.');return;
+ }
+ let saved;
+ try {saved=JSON.parse(fs.readFileSync(sessionPath(),'utf8'));}
+ catch {marketOcrMessage('sign-in','Sign in to Atreia Street in this companion; a website account alone does not start Market capture.');return;}
+ try {
+  if(saved.version!==1||!/^.{1,256}@.{1,256}$/.test(saved.email)||
+     typeof saved.sealed!=='string'||saved.sealed.length>10000)throw Error('Invalid saved session');
+  const token=safeStorage.decryptString(Buffer.from(saved.sealed,'base64'));
+  const config=readConfig();
+  const response=await fetch(config.url+'/auth/v1/token?grant_type=refresh_token',{
+   method:'POST',headers:{apikey:config.key,'Content-Type':'application/json'},
+   body:JSON.stringify({refresh_token:token}),signal:AbortSignal.timeout(12000)
+  });
+  if(!response.ok){
+   if(response.status===400||response.status===401){clearSecureSession();marketOcrMessage('sign-in','Saved account session expired; sign in again to start Market OCR.');}
+   else marketOcrMessage('network','Could not restore account session; connection failed ('+response.status+').');
+   return;
+  }
+  const data=await response.json();
+  if(!data.access_token||!data.refresh_token||!data.user?.id)throw Error('Invalid refresh response');
+  remote={email:saved.email,user_id:data.user.id,access_token:data.access_token,
+   refresh_token:data.refresh_token,expires_at:Date.now()+data.expires_in*1000,characters:[]};
+  saveSecureSession();
+  await characters();
+  startMarketOcr();notify();
+ } catch(err) {
+  marketOcrMessage('sign-in','Unable to restore secure account session: '+String(err.message).slice(0,100));
+ }
+}
 function saveMarket() {
  const file=marketPath()+'.tmp';
  fs.writeFileSync(file,JSON.stringify(marketObservations.slice(-2000)),{mode:0o600});
@@ -133,10 +180,11 @@ async function refreshed() {
     method:'POST', headers:{apikey:config.key,'Content-Type':'application/json'},
     body:JSON.stringify({refresh_token:remote.refresh_token}), signal:AbortSignal.timeout(15000)
   });
-  if (!res.ok) { remote=null; throw new Error('Your session expired. Sign in again.'); }
+  if (!res.ok) { remote=null;clearSecureSession();marketOcrMessage('sign-in','Your session expired. Sign in again to resume Market OCR.'); throw new Error('Your session expired. Sign in again.'); }
   const tokens=await res.json();
   Object.assign(remote,{access_token:tokens.access_token, refresh_token:tokens.refresh_token,
     expires_at:Date.now()+tokens.expires_in*1000});
+  saveSecureSession();
 }
 async function characters() {
   await refreshed();
@@ -203,25 +251,40 @@ async function sync() {
 }
 
 function marketOcrMessage(stateName,message) {
- marketOcrStatus={state:stateName,message,observations:marketObservations.length};
+ marketOcrStatus={...marketOcrStatus,state:stateName,message,observations:marketObservations.length};
  notify();
 }
 async function marketOcrTick() {
- if(marketOcrBusy || !remote || !readConfig())return;
+ if(marketOcrBusy){marketOcrMessage('busy','OCR is already reading the game window; check the last scan time below.');return;}
+ if(!readConfig()){marketOcrMessage('config-missing','Supabase configuration missing from this installer. Account login and Market reading are unavailable.');return;}
+ if(!remote){marketOcrMessage('sign-in','Sign in to Atreia Street in the companion to start Market screen reading.');return;}
  marketOcrBusy=true;
+ marketOcrStatus.scans++;
+ marketOcrStatus.lastScanAt=new Date().toISOString();
+ marketOcrStatus.feeLabelSeen=false;
+ marketOcrStatus.feeEvidence=[];
+ marketOcrStatus.recognizedChars=0;
  try {
   // Only capture the explicitly named game WINDOW. Never capture a display,
   // desktop, companion window, browser, or a user-selected arbitrary source.
   const sources=await desktopCapturer.getSources({
-   types:['window'],thumbnailSize:{width:1920,height:1080},
+   types:['window'],thumbnailSize:{width:2560,height:1440},
    fetchWindowIcons:false
   });
-  const games=sources.filter(x=>/^AION\s*2(?:\s|$|[.:-])/i.test(x.name) &&
-   !x.thumbnail.isEmpty() && x.thumbnail.getSize().width>=640);
+  const titled=sources.filter(x=>/^AION\s*2(?:\s|$|[.:-])/i.test(x.name));
+  marketOcrStatus.windowCandidates=titled.length;
+  const games=titled.filter(x=>!x.thumbnail.isEmpty() && x.thumbnail.getSize().width>=640);
   if(games.length!==1) {
-   marketOcrMessage('waiting','Cannot capture exactly one visible AION2 game window. Use borderless/windowed mode if the game is in exclusive fullscreen.');
+   marketOcrStatus.capturePixels=null;
+   marketOcrMessage('waiting',titled.length===0
+    ?'No AION2 game window found. Run the game on this PC (borderless/windowed mode recommended).'
+    :titled.length>1?'Multiple AION2 windows detected; cannot select safely.'
+    :'AION2 window found but its thumbnail is blank or too small. Try borderless/windowed mode.');
    return;
   }
+  const dimensions=games[0].thumbnail.getSize();
+  marketOcrStatus.capturePixels=dimensions.width+' × '+dimensions.height;
+  marketOcrMessage('scanning','Game window captured ('+marketOcrStatus.capturePixels+'); running on-device OCR.');
   // Screenshot remains in RAM; OCR is performed on this machine.
   // Only whitelisted structured fields can enter the account ledger.
   if(!marketOcrWorker) {
@@ -229,14 +292,20 @@ async function marketOcrTick() {
    marketOcrWorker=await createWorker('eng');
   }
   const result=await marketOcrWorker.recognize(games[0].thumbnail.toPNG());
-  const parsed=readMarket(result.data?.text||'');
+  const recognized=result.data?.text||'';
+  marketOcrStatus.recognizedChars=recognized.length;
+  marketOcrStatus.feeLabelSeen=/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(recognized);
+  marketOcrStatus.feeEvidence=recognized.split(/\r?\n/)
+   .filter(x=>/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(x))
+   .slice(0,3).map(x=>x.replace(/[^\x20-\x7e]/g,' ').trim().slice(0,100));
+  const parsed=readMarket(recognized);
   if(parsed.status!=='observed') {
    if(Date.now()-lastMarketSeenAt>10000)lastMarketFrame=null;
    marketOcrMessage('listening',
     parsed.status==='empty'?'Game window captured, but OCR saw no readable text. Try borderless/windowed mode.':
     parsed.status==='unrecognized'
-    ?'Game window captured. Open the Market List panel to read the registration fee.'
-    :'Market panel detected, but the registration fee or settlement amount was unreadable.');
+    ?'Game window captured. OCR read '+recognized.length+' characters; registration fee label '+(marketOcrStatus.feeLabelSeen?'found':'not found')+'. Open the Market List panel.'
+    :'Market text detected, but the fee amount was unreadable. Check recognized fee line in Diagnostics.');
    return;
   }
   const current=state.activeCharacter;
@@ -679,16 +748,18 @@ app.whenReady().then(()=>{
     remote={email,user_id:data.user.id,access_token:data.access_token,
       refresh_token:data.refresh_token,expires_at:Date.now()+data.expires_in*1000,characters:[]};
     await characters();
+    saveSecureSession();
     startMarketOcr();notify();
     return {email,characters:remote.characters};
   });
-  ipcMain.handle('remote:logout',()=>{remote=null;void stopMarketOcr();notify();return true;});
+  ipcMain.handle('remote:logout',()=>{remote=null;clearSecureSession();void stopMarketOcr();notify();return true;});
   ipcMain.handle('remote:sync',sync);
   ipcMain.handle('market:scan',async()=>{await marketOcrTick();return marketOcrStatus;});
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
   app.on('activate',()=>showMain());
   app.on('before-quit',()=>{if(marketOcrTimer)clearInterval(marketOcrTimer);});
   createWindow();
+  void restoreSecureSession();
   if (state.settings.overlayEnabled)createOverlay();
   if (state.settings.autoCapture) {
     try { startCapture(state.settings.gamePort); }

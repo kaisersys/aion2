@@ -72,7 +72,27 @@ function render(){
   select.append(placeholder);
  }
  const profile=combined.find(p=>idOf(p)===active)||null;
- $('connection-status').textContent=state.remote?'Connected · '+state.remote.email:'Local-only mode';
+ $('connection-status').textContent=state.remote?'Connected · '+state.remote.email:
+  state.configured?'Account not connected':'Account configuration missing';
+ const market=state.marketOcr||{};
+ $('market-header-status').textContent='MARKET READER · '+
+  (market.message||'Sign in to enable Market reading.');
+ $('market-header-status').style.borderColor=market.state==='error'||market.state==='config-missing'?
+   '#be7578':market.state==='corroborated'?'#60987e':'#6180a5';
+ $('diagnostic-market-state').textContent=market.state||'idle';
+ $('diagnostic-market-message').textContent=market.message||'No Market scan started.';
+ $('diagnostic-market-windows').textContent=market.windowCandidates===undefined?'—':String(market.windowCandidates);
+ $('diagnostic-market-pixels').textContent=market.capturePixels||'—';
+ $('diagnostic-market-scans').textContent=String(market.scans||0);
+ $('diagnostic-market-chars').textContent=String(market.recognizedChars||0);
+ $('diagnostic-market-fee').textContent=market.feeLabelSeen?'Yes':'No';
+ $('diagnostic-market-time').textContent=market.lastScanAt?
+  new Date(market.lastScanAt).toLocaleTimeString():'Never';
+ $('diagnostic-market-evidence').textContent=Array.isArray(market.feeEvidence)&&market.feeEvidence.length?
+  'OCR fee-label line (not uploaded): '+market.feeEvidence.join(' / '):
+  'No recognized fee-label line available. If the game window is captured, the on-screen fee may be too small or obscured for OCR.';
+ $('market-scan').disabled=!state.remote;
+ $('market-scan-diagnostics').disabled=!state.remote;
  $('show-login').textContent=state.remote?'Disconnect account':'Connect account';
  $('sync-now').disabled=!state.remote;
  $('feed-label').textContent=state.feedPath?'Also watching '+state.feedPath+' for decoded JSONL events':'Read-only Npcap capture; decoded events are stored locally.';
@@ -409,10 +429,12 @@ $('auth-form').addEventListener('submit',async e=>{
  $('auth-backdrop').hidden=true;$('auth-password').value='';await refresh();show('Website account connected. Game-window Market fee reading and private syncing are active.');}
  catch(err){show(err.message,true);$('auth-backdrop').hidden=true;$('auth-password').value='';}
 });
-$('market-scan').addEventListener('click',async()=>{
+async function scanMarketNow(){
  try {const result=await api.scanMarket();show(result.message||'Market scan completed.');await refresh();}
  catch(err){show(err.message,true);}
-});
+}
+$('market-scan').addEventListener('click',scanMarketNow);
+$('market-scan-diagnostics').addEventListener('click',scanMarketNow);
 $('sync-now').addEventListener('click',async()=>{
  try{const r=await api.sync();show('Synced '+r.uploaded+' local records and '+r.ticketBalances+
  ' decoded ticket snapshots. '+r.unmatched+' records had no matching website character.');}
