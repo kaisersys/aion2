@@ -1,11 +1,12 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen, desktopCapturer } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const { normalizeEvent, addEvents, charKey, periods } = require('./ledger.cjs');
+const { readMarket,stableFingerprint } = require('./market-ocr.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const FILE_LIMIT = 8 * 1024 * 1024;
@@ -16,6 +17,10 @@ let state = { profiles:[], events:[], settings:{...DEFAULT_SETTINGS}, activeChar
 let feed = null;
 let remote = null;
 let capture = null;
+let marketOcrTimer=null, marketOcrBusy=false, marketOcrWorker=null;
+let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0};
+let marketObservations=[];
+let recentMarket=new Map();
 let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
 function captureMessage(state,message){captureStatus={state,message,health:captureStatus.health};notify();}
 
@@ -24,6 +29,12 @@ function notify() {
   if (overlay && !overlay.isDestroyed()) overlay.webContents.send('state:changed');
 }
 function storePath() { return path.join(app.getPath('userData'), 'local-ledger.json'); }
+function marketPath() { return path.join(app.getPath('userData'),'market-observations.json'); }
+function saveMarket() {
+ const file=marketPath()+'.tmp';
+ fs.writeFileSync(file,JSON.stringify(marketObservations.slice(-2000)),{mode:0o600});
+ fs.renameSync(file,marketPath());
+}
 function loadState() {
   try {
     const saved = JSON.parse(fs.readFileSync(storePath(), 'utf8'));
@@ -40,6 +51,12 @@ function loadState() {
       activeCharacter:saved.activeCharacter||null
     };
   } catch { state = { profiles:[], events:[],settings:{...DEFAULT_SETTINGS},activeCharacter:null }; }
+  try {
+   const parsed=JSON.parse(fs.readFileSync(marketPath(),'utf8'));
+   marketObservations=Array.isArray(parsed)?parsed.slice(-2000).filter(x=>
+    x&&typeof x.id==='string'&&typeof x.character==='string'&&
+    typeof x.server==='string'&&typeof x.kind==='string'):[];
+  } catch { marketObservations=[]; }
 }
 function saveState() {
   fs.mkdirSync(path.dirname(storePath()), { recursive:true });
@@ -50,7 +67,9 @@ function saveState() {
 function captureState() {
   return { ...state, feedPath:feed ? path.basename(feed.path) : null,
     remote:remote ? {email:remote.email,characters:remote.characters} : null,
-    configured:Boolean(readConfig()), capture:captureStatus };
+    configured:Boolean(readConfig()), capture:captureStatus,
+    marketOcr:marketOcrStatus,
+    marketObservations:remote?marketObservations.filter(x=>x.user_id===remote.user_id).slice(-30).reverse():[] };
 }
 function insert(raw, fallbackId) {
   const event = normalizeEvent(raw, fallbackId);
@@ -164,8 +183,102 @@ async function sync() {
     await request('/rest/v1/player_ticket_balances?on_conflict=user_id,owner_scope,owner_key,task_key',
       'POST',ticketRows,true,{prefer:'resolution=merge-duplicates,return=minimal',noContent:true});
   }
-  return { uploaded:rows.length, unmatched, ticketBalances:ticketRows.length };
+  const marketUploaded=await syncMarket();
+  return { uploaded:rows.length, unmatched, ticketBalances:ticketRows.length,marketUploaded };
 }
+
+function marketOcrMessage(stateName,message) {
+ marketOcrStatus={state:stateName,message,observations:marketObservations.length};
+ notify();
+}
+async function marketOcrTick() {
+ if(marketOcrBusy || !remote || !state.activeCharacter || !readConfig())return;
+ marketOcrBusy=true;
+ try {
+  // Only capture the explicitly named game WINDOW. Never capture a display,
+  // desktop, companion window, browser, or a user-selected arbitrary source.
+  const sources=await desktopCapturer.getSources({
+   types:['window'],thumbnailSize:{width:1920,height:1080},
+   fetchWindowIcons:false
+  });
+  const games=sources.filter(x=>/^AION2(?:\\s|$|[.:-])/i.test(x.name) &&
+   !x.thumbnail.isEmpty() && x.thumbnail.getSize().width>=640);
+  if(games.length!==1) {
+   marketOcrMessage('waiting','Waiting for one visible AION2 game window.');
+   return;
+  }
+  // Screenshot remains in RAM; OCR is performed on this machine.
+  // Only whitelisted structured fields can enter the account ledger.
+  if(!marketOcrWorker) {
+   const {createWorker}=require('tesseract.js');
+   marketOcrWorker=await createWorker('eng');
+  }
+  const result=await marketOcrWorker.recognize(games[0].thumbnail.toPNG());
+  const parsed=readMarket(result.data?.text||'');
+  if(parsed.status!=='observed') {
+   marketOcrMessage('listening',parsed.status==='unrecognized'
+    ?'Watching the Aion 2 window for Market listing and Settlement panels.'
+    :'Market text detected, but the transaction fields are incomplete or ambiguous.');
+   return;
+  }
+  const current=state.activeCharacter;
+  // A roster selection alone is not proof of an active world character.
+  if(!current.serverId || current.selectionSource==='lobby-roster')return;
+  const match=matchWebsiteCharacter(current.character,current.server);
+  if(!match)return;
+  const evidence=parsed.evidence;
+  const key=stableFingerprint(current.character,current.server,evidence);
+  const now=Date.now();
+  for(const [k,v] of recentMarket)if(now-v>600000)recentMarket.delete(k);
+  if(recentMarket.has(key))return;
+  recentMarket.set(key,now);
+  marketObservations.push({
+   id:crypto.randomUUID(),user_id:remote.user_id,
+   character:current.character,server:current.server,
+   character_id:match.id,occurred_at:new Date().toISOString(),
+   kind:evidence.kind,amount:evidence.amount,fee:evidence.fee,
+   quantity:evidence.quantity,item_name:evidence.item_name,
+   evidence:'screen_ocr',status:'unverified',synced:false
+  });
+  marketObservations=marketObservations.slice(-2000);
+  saveMarket();
+  marketOcrMessage('observed','Market fields read. Observation pending account synchronization.');
+  // Failures remain queued; no raw OCR text or screenshot is sent.
+  await syncMarket();
+ } catch(err) {
+  marketOcrMessage('error','Market reading unavailable: '+String(err.message).slice(0,120));
+ } finally {marketOcrBusy=false;}
+}
+async function syncMarket() {
+ if(!remote)return 0;
+ const unsynced=marketObservations.filter(x=>!x.synced && x.user_id===remote.user_id).slice(0,100);
+ if(!unsynced.length)return 0;
+ await refreshed();
+ const rows=unsynced.map(x=>({
+  user_id:x.user_id,character_id:x.character_id,observation_id:x.id,
+  occurred_at:x.occurred_at,kind:x.kind,amount:x.amount,fee:x.fee,
+  quantity:x.quantity,item_name:x.item_name,
+  evidence:x.evidence,status:x.status
+ }));
+ await request('/rest/v1/player_market_observations?on_conflict=user_id,observation_id',
+  'POST',rows,true,{prefer:'resolution=ignore-duplicates,return=minimal',noContent:true});
+ for(const x of unsynced)x.synced=true;
+ saveMarket();
+ notify();
+ return unsynced.length;
+}
+function startMarketOcr() {
+ if(marketOcrTimer)return;
+ marketOcrTimer=setInterval(()=>{void marketOcrTick();},8000);
+ void marketOcrTick();
+}
+async function stopMarketOcr() {
+ if(marketOcrTimer){clearInterval(marketOcrTimer);marketOcrTimer=null;}
+ if(marketOcrWorker){const worker=marketOcrWorker;marketOcrWorker=null;await worker.terminate();}
+ recentMarket.clear();
+ marketOcrMessage('waiting','Sign in to resume Market reading.');
+}
+
 function pollFeed() {
   if (!feed) return;
   try {
@@ -500,13 +613,15 @@ app.whenReady().then(()=>{
     const data=await res.json();
     remote={email,user_id:data.user.id,access_token:data.access_token,
       refresh_token:data.refresh_token,expires_at:Date.now()+data.expires_in*1000,characters:[]};
-    await characters();notify();
+    await characters();
+    startMarketOcr();notify();
     return {email,characters:remote.characters};
   });
-  ipcMain.handle('remote:logout',()=>{remote=null;notify();return true;});
+  ipcMain.handle('remote:logout',()=>{remote=null;void stopMarketOcr();notify();return true;});
   ipcMain.handle('remote:sync',sync);
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
   app.on('activate',()=>showMain());
+  app.on('before-quit',()=>{if(marketOcrTimer)clearInterval(marketOcrTimer);});
   createWindow();
   if (state.settings.overlayEnabled)createOverlay();
   if (state.settings.autoCapture) {
