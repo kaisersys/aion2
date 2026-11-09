@@ -1,18 +1,27 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { spawn } = require('node:child_process');
+const readline = require('node:readline');
 const { normalizeEvent, addEvents, charKey, periods } = require('./ledger.cjs');
+const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const FILE_LIMIT = 8 * 1024 * 1024;
 let win;
-let state = { profiles:[], events:[] };
+let overlay;
+const DEFAULT_SETTINGS = { autoCapture:true, overlayEnabled:true, gamePort:13328 };
+let state = { profiles:[], events:[], settings:{...DEFAULT_SETTINGS}, activeCharacter:null };
 let feed = null;
 let remote = null;
+let capture = null;
+let captureStatus = {state:'idle',message:'Npcap capture not started.'};
+function captureMessage(state,message){captureStatus={state,message};notify();}
 
 function notify() {
   if (win && !win.isDestroyed()) win.webContents.send('state:changed');
+  if (overlay && !overlay.isDestroyed()) overlay.webContents.send('state:changed');
 }
 function storePath() { return path.join(app.getPath('userData'), 'local-ledger.json'); }
 function loadState() {
@@ -20,9 +29,17 @@ function loadState() {
     const saved = JSON.parse(fs.readFileSync(storePath(), 'utf8'));
     state = {
       profiles:Array.isArray(saved.profiles) ? saved.profiles.slice(0,80) : [],
-      events:Array.isArray(saved.events) ? saved.events.slice(-50000) : []
+      events:Array.isArray(saved.events) ? saved.events.slice(-50000) : [],
+      settings:{
+        autoCapture:saved.settings?.autoCapture!==false,
+        overlayEnabled:saved.settings?.overlayEnabled!==false,
+        gamePort:Number.isInteger(saved.settings?.gamePort) &&
+          saved.settings.gamePort>0 && saved.settings.gamePort<=65535
+          ? saved.settings.gamePort : DEFAULT_SETTINGS.gamePort
+      },
+      activeCharacter:saved.activeCharacter||null
     };
-  } catch { state = { profiles:[], events:[] }; }
+  } catch { state = { profiles:[], events:[],settings:{...DEFAULT_SETTINGS},activeCharacter:null }; }
 }
 function saveState() {
   fs.mkdirSync(path.dirname(storePath()), { recursive:true });
@@ -33,7 +50,7 @@ function saveState() {
 function captureState() {
   return { ...state, feedPath:feed ? path.basename(feed.path) : null,
     remote:remote ? {email:remote.email,characters:remote.characters} : null,
-    configured:Boolean(readConfig()) };
+    configured:Boolean(readConfig()), capture:captureStatus };
 }
 function insert(raw, fallbackId) {
   const event = normalizeEvent(raw, fallbackId);
@@ -41,7 +58,7 @@ function insert(raw, fallbackId) {
   if (!merged.added.length) return false;
   state.events = merged.events;
   const key = charKey(event.character, event.server);
-  if (!state.profiles.some(p => charKey(p.character,p.server) === key)) {
+  if (!state.profiles.some(p => charKey(p.character,p.server) === key) && state.profiles.length<80) {
     state.profiles.push({character:event.character,server:event.server});
   }
   saveState();
@@ -96,7 +113,12 @@ async function characters() {
 async function sync() {
   if (!remote) throw new Error('Sign in first.');
   await characters();
-  const byKey = new Map(remote.characters.map(c=>[charKey(c.name,c.server_name),c.id]));
+  const byKey = new Map();
+  for (const profile of state.profiles) {
+    const matched=matchWebsiteCharacter(profile.character,profile.server);
+    if (matched) byKey.set(charKey(profile.character,profile.server),matched.id);
+  }
+  for (const c of remote.characters) byKey.set(charKey(c.name,c.server_name),c.id);
   const rows = [];
   let unmatched = 0;
   for (const ev of state.events) {
@@ -104,7 +126,7 @@ async function sync() {
     if (!id) { unmatched++; continue; }
     rows.push({user_id:remote.user_id, character_id:id,
       event_hash:crypto.createHash('sha256').update(ev.id+'|'+ev.character+'|'+ev.server).digest('hex'),
-      kind:ev.type, occurred_at:ev.occurred_at, source:ev.source,
+      kind:ev.type, occurred_at:ev.occurred_at, source:ev.source, currency_kind:ev.currency_kind??null,
       amount:ev.amount ?? null, balance:ev.balance ?? null,
       counter_key:ev.key ?? null, counter_frequency:ev.frequency ?? null,
       counter_scope:ev.scope ?? null, counter_current:ev.current ?? null,
@@ -175,20 +197,175 @@ function pollFeed() {
     }
   } catch { /* deleted/replaced file; retain previously observed data */ }
 }
+
+
+// Automatic discovery: local roster is populated on the first live character-login record.
+// No website login or manual character setup is needed for local tracking.
+function resolveCapturedCharacter(packetCharacter,serverId) {
+  const discovered=discoverProfile(state.profiles,packetCharacter,serverId);
+  if (!discovered.profile) {
+    captureMessage('unmapped','Unable to identify the game character and server safely.');
+    return null;
+  }
+  if(discovered.changed)state.profiles=discovered.profiles;
+  const profile=discovered.profile;
+  const active={character:profile.character,server:profile.server,serverId:Number(serverId)};
+  const changedActive=!state.activeCharacter ||
+    charKey(state.activeCharacter.character,state.activeCharacter.server)!==charKey(active.character,active.server);
+  if(changedActive)state.activeCharacter=active;
+  if(discovered.changed || changedActive) { saveState(); notify(); }
+  return profile;
+}
+function processCaptureMessage(message) {
+  if (!message || typeof message!=='object') return;
+  if (message.kind==='status') {
+    captureMessage(message.state==='error'?'error':message.state, String(message.message||''));
+    return;
+  }
+  if (message.kind==='roster' && Array.isArray(message.characters)) {
+    let changed=false, found=0;
+    for(const c of message.characters.slice(0,80)) {
+      if(!c || typeof c.Name!=='string' || !Number.isInteger(c.ServerId))continue;
+      const discovered=discoverProfile(state.profiles,c.Name,c.ServerId);
+      if(!discovered.profile)continue;
+      found++;
+      if(discovered.changed) {state.profiles=discovered.profiles;changed=true;}
+    }
+    if(changed){saveState();notify();}
+    if(found>0 && captureStatus.state!=='connected')
+      captureMessage('listening','Discovered '+found+' account characters; waiting for active character.');
+    return;
+  }
+  if (message.kind==='character') {
+    const found=resolveCapturedCharacter(message.name,message.serverId);
+    if (found) captureMessage('connected','Tracking '+found.character+' · '+found.server);
+    return;
+  }
+  if (message.kind==='event' && message.event && typeof message.event==='object') {
+    const e=message.event;
+    const found=resolveCapturedCharacter(e.character,e.serverId);
+    if (!found) return;
+    try { insert({...e,server:found.server,source:'decoded'},e.id); }
+    catch { /* Invalid or unverified frame data is never accepted as a trusted ledger event. */ }
+  }
+}
+function profileServerId(character, server) {
+  const match=state.profiles.find(p=>charKey(p.character,p.server)===charKey(character,server));
+  return Number(match?.serverId)||null;
+}
+function matchWebsiteCharacter(character,server) {
+  if (!remote) return null;
+  const serverId=profileServerId(character,server);
+  const matches=remote.characters.filter(c=>
+    sameName(c.name,character) && (
+      charKey(c.name,c.server_name)===charKey(character,server) ||
+      (serverId && serverMatches(c.server_name,serverId))
+    ));
+  return matches.length===1?matches[0]:null;
+}
+
+function startCapture(gamePort=13328) {
+  if (capture) return captureStatus;
+  const port=Number(gamePort);
+  if (!Number.isInteger(port) || port<1 || port>65535) throw new Error('A valid Aion 2 TCP server port is required.');
+  const exe = app.isPackaged
+    ? path.join(process.resourcesPath,'capture','AtreiaCapture.exe')
+    : path.join(__dirname,'capture','publish','AtreiaCapture.exe');
+  if (!fs.existsSync(exe)) throw new Error('Capture helper missing. Build capture/AtreiaCapture.csproj first.');
+  const child=spawn(exe,['--ports',String(port)],{windowsHide:true,stdio:['ignore','pipe','pipe']});
+  capture=child;
+  captureMessage('starting','Initializing Npcap · server port '+port+'…');
+  const output=readline.createInterface({input:child.stdout});
+  output.on('line',line=>{
+    if (line.length>4000) return;
+    try { processCaptureMessage(JSON.parse(line)); } catch { /* malformed status line */ }
+  });
+  let errorText='';
+  child.stderr.on('data',b=>{errorText=(errorText+String(b)).slice(-1200);});
+  child.on('error',err=>{
+    if(capture===child)capture=null;
+    captureMessage('error','Capture helper failed: '+err.message);
+  });
+  child.on('exit',code=>{
+    if(capture===child){
+      capture=null;
+      captureMessage('stopped',code===0?'Capture stopped.':'Capture exited ('+code+'). '+errorText.slice(-160));
+    }
+  });
+  return captureStatus;
+}
+function stopCapture() {
+  if (capture) {
+    const child=capture;capture=null;
+    child.kill();
+  }
+  captureMessage('idle','Capture stopped.');
+  return captureStatus;
+}
+
+function secureWindowContents(target) {
+  target.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  target.webContents.on('will-navigate',e=>e.preventDefault());
+}
+function createOverlay() {
+  if (overlay && !overlay.isDestroyed()) { overlay.showInactive(); return; }
+  overlay = new BrowserWindow({
+    width:332, height:318, minWidth:332, minHeight:318,
+    backgroundColor:'#101a28', frame:false, transparent:false,
+    show:false, skipTaskbar:true, alwaysOnTop:true, resizable:false, movable:true,
+    webPreferences:{
+      preload:path.join(__dirname,'overlay-preload.cjs'),contextIsolation:true,
+      nodeIntegration:false,sandbox:true,webSecurity:true
+    }
+  });
+  // Keep the mini where the user dragged it, as long as a screen still contains it.
+  const saved=state.settings.overlayPosition;
+  if(saved && Number.isInteger(saved.x) && Number.isInteger(saved.y) &&
+     screen.getAllDisplays().some(d=>{
+       const b=d.workArea;
+       return saved.x>=b.x-100 && saved.x<b.x+b.width-90 &&
+              saved.y>=b.y-100 && saved.y<b.y+b.height-80;
+     }))overlay.setPosition(saved.x,saved.y);
+  overlay.on('moved',()=>{
+    if(overlay && !overlay.isDestroyed()){
+      const [x,y]=overlay.getPosition();
+      state.settings.overlayPosition={x,y};
+      saveState();
+    }
+  });
+  overlay.removeMenu();
+  secureWindowContents(overlay);
+  overlay.loadFile(path.join(__dirname,'overlay.html'));
+  overlay.once('ready-to-show',()=>{ if(state.settings.overlayEnabled)overlay.showInactive(); });
+  overlay.on('closed',()=>{overlay=null;});
+}
+function showMain() {
+  if (!win || win.isDestroyed()) createWindow();
+  else { win.show(); win.focus(); }
+}
+function setOverlayVisible(show) {
+  state.settings.overlayEnabled=Boolean(show);
+  if (show) createOverlay();
+  else {
+    if (!win || win.isDestroyed())showMain();
+    if (overlay && !overlay.isDestroyed())overlay.close();
+  }
+  saveState();notify();
+  return state.settings.overlayEnabled;
+}
+
 function createWindow() {
   win = new BrowserWindow({width:1120,height:760,minWidth:800,minHeight:580,
     backgroundColor:'#090f18',show:false,
     webPreferences:{preload:path.join(__dirname,'preload.cjs'),
       contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
   win.removeMenu();
+  secureWindowContents(win);
   win.loadFile(path.join(__dirname,'index.html'));
   win.once('ready-to-show',()=>win.show());
-  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
-  win.webContents.on('will-navigate',e=>e.preventDefault());
 }
 app.whenReady().then(()=>{
   loadState();
-  createWindow();
   ipcMain.handle('state:get',()=>captureState());
   ipcMain.handle('profile:add',(_,{character,server})=>{
     if (typeof character!=='string'||typeof server!=='string'||!character.trim()||
@@ -201,6 +378,22 @@ app.whenReady().then(()=>{
     return captureState();
   });
   ipcMain.handle('event:add',(_,data)=>insert({...data,source:'manual',id:crypto.randomUUID()}));
+  ipcMain.handle('capture:start',(_,gamePort)=>{
+    const port=Number(gamePort);
+    if(!Number.isInteger(port)||port<1||port>65535)throw new Error('Invalid server port.');
+    state.settings.gamePort=port;
+    state.settings.autoCapture=true;
+    saveState();
+    return startCapture(port);
+  });
+  ipcMain.handle('capture:stop',()=>{
+    state.settings.autoCapture=false;
+    saveState();
+    return stopCapture();
+  });
+  ipcMain.handle('overlay:toggle',()=>setOverlayVisible(!state.settings.overlayEnabled));
+  ipcMain.handle('overlay:hide',()=>setOverlayVisible(false));
+  ipcMain.handle('overlay:show-main',()=>showMain());
   ipcMain.handle('feed:choose',async()=>{
     const result=await dialog.showOpenDialog(win,{
       title:'Choose a decoded Atreia JSONL event feed',
@@ -233,7 +426,13 @@ app.whenReady().then(()=>{
   ipcMain.handle('remote:logout',()=>{remote=null;notify();return true;});
   ipcMain.handle('remote:sync',sync);
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
-  app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)createWindow();});
+  app.on('activate',()=>showMain());
+  createWindow();
+  if (state.settings.overlayEnabled)createOverlay();
+  if (state.settings.autoCapture) {
+    try { startCapture(state.settings.gamePort); }
+    catch (err) { captureMessage('error',err.message); }
+  }
 });
 app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});
-app.on('before-quit',()=>{if(feed?.timer)clearInterval(feed.timer);});
+app.on('before-quit',()=>{if(feed?.timer)clearInterval(feed.timer);stopCapture();});

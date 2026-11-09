@@ -33,6 +33,7 @@ function normalizeEvent(input, fallbackId) {
   } else if (ev.type === 'wallet_snapshot') {
     if (!validInt(input.balance)) throw new Error('Invalid wallet balance');
     ev.balance = input.balance;
+    if (input.currency_kind === 'bound') ev.currency_kind = 'bound';
   } else {
     ev.key = safeText(input.key, 90);
     ev.frequency = input.frequency;
