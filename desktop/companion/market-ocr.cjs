@@ -42,36 +42,38 @@ function parseMarketText(raw) {
  const text=raw.slice(0,7500).normalize('NFKC');
  const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,120);
  if(!MARKET_RE.test(text) || !CURRENCY_RE.test(text))return null;
- const listing=/\b(?:register(?: item)?|list(?: item)?|sell(?: item)?|listing|registration)\b/i.test(text);
- const settlement=/\b(?:settlement|sale proceeds|sales history)\b/i.test(text);
- const purchase=/\b(?:purchase|buy item|buy now)\b/i.test(text);
- // Conflicting tabs/views are not proof of any particular action.
- if(Number(listing)+Number(settlement)+Number(purchase)!==1)return null;
  const item_name=itemName(lines);
  const quantity=amount(lines,['quantity','qty','amount of items','count']);
  if(!item_name || !quantity || quantity>1_000_000_000)return null;
  let kind,unit_price=null,gross=null,listing_fee=null,proceeds=null;
- if(listing) {
-  kind=/\b(?:listed successfully|registration complete|listing completed)\b/i.test(text)
+ // Recognize field combinations rather than tab names: Market navigation can
+ // show "Buy", "Sell" and "Settlement" at the same time.
+ const fee=amount(lines,['registration fee','listing fee','registration cost']);
+ const settlementAmount=amount(lines,['proceeds','settlement amount','net received','amount to receive']);
+ const isListing=fee!==null && /\\b(?:register|listing|registration|sell)\\b/i.test(text);
+ const isSettlement=settlementAmount!==null && /\\b(?:settlement|sale proceeds|sales history)\\b/i.test(text);
+ if(isListing && isSettlement)return null;
+ if(isListing) {
+  kind=/\\b(?:listed successfully|registration complete|listing completed)\\b/i.test(text)
    ?'listing_confirmed_screen':'listing_preview';
   unit_price=amount(lines,['unit price','price per item','price each','sale price']);
   gross=amount(lines,['total price','total sale price','gross(?: value)?','total amount']);
-  listing_fee=amount(lines,['registration fee','listing fee','registration cost']);
-  if(!listing_fee || !(unit_price||gross))return null;
- } else if(settlement) {
-  kind=/\b(?:claimed successfully|claim completed|proceeds claimed)\b/i.test(text)
+  listing_fee=fee;
+  if(!(unit_price||gross))return null;
+ } else if(isSettlement) {
+  kind=/\\b(?:claimed successfully|claim completed|proceeds claimed)\\b/i.test(text)
    ?'settlement_claimed_screen':'settlement_visible';
-  proceeds=amount(lines,['proceeds','settlement amount','received(?: amount)?','net received','amount to receive']);
+  proceeds=settlementAmount;
   gross=amount(lines,['gross sales?','sale total','total sale price']);
-  if(!proceeds)return null;
- } else {
+ } else if(/\\b(?:purchase|buy now|buy item)\\b/i.test(text) &&
+           fee===null && settlementAmount===null) {
   kind='purchase_preview';
   unit_price=amount(lines,['unit price','price per item','price each']);
   gross=amount(lines,['total price','total cost','purchase price']);
   if(!gross && !unit_price)return null;
- }
+ } else return null;
  return {kind,item_name,quantity,unit_price,gross,listing_fee,proceeds,
-  evidence:'screen_observed',currency_kind:'unbound'};
+  evidence:'screen_observed',currency_kind:'unknown'};
 }
 function signature(observation,character,server,day) {
  const fields=['kind','item_name','quantity','unit_price','gross','listing_fee','proceeds'];
@@ -83,7 +85,7 @@ function validateMarketObservation(raw) {
   'listing_preview','listing_confirmed_screen','settlement_visible',
   'settlement_claimed_screen','purchase_preview'
  ].includes(raw.kind))return false;
- if(raw.evidence!=='screen_observed' || raw.currency_kind!=='unbound' ||
+ if(raw.evidence!=='screen_observed' || raw.currency_kind!=='unknown' ||
     typeof raw.item_name!=='string' || raw.item_name.length<2 || raw.item_name.length>80 ||
     !Number.isSafeInteger(raw.quantity) || raw.quantity<1 || raw.quantity>1_000_000_000)return false;
  for(const k of ['unit_price','gross','listing_fee','proceeds'])
