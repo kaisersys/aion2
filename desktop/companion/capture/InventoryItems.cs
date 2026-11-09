@@ -43,7 +43,11 @@ public sealed class InventoryItems
         for(int i=10;i+12<=frame.Length;i++)
         {
             uint item=BinaryPrimitives.ReadUInt32LittleEndian(frame[i..]);
-            if(!RealItem(item) || !frame.Slice(i-4,4).SequenceEqual(reservedZero))
+            // A shifting 4-byte window in a raw 0x1156 scan can look like a
+            // plausible 9-digit item ID. Validate against known client item IDs
+            // before accepting a slot handle. Real updates use fixed offsets.
+            if(!RealItem(item) || !KnownItemIds.Contains(item) ||
+               !frame.Slice(i-4,4).SequenceEqual(reservedZero))
                 continue;
             uint handle=BinaryPrimitives.ReadUInt32LittleEndian(frame[(i-8)..]);
             ulong count=BinaryPrimitives.ReadUInt64LittleEndian(frame[(i+4)..]);
