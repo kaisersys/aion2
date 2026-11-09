@@ -24,7 +24,7 @@ function field(lines,names) {
 }
 function amount(lines,names) {
  const raw=field(lines,names);
- const first=raw.match(new RegExp('^\\s*'+NUMBER+'\\s*(?:kina|kinah)?\b','i'));
+ const first=raw.match(new RegExp('^\\s*'+NUMBER+'\\s*(?:kina|kinah)?\\b','i'));
  return first?positive(first[1]):null;
 }
 function itemName(lines) {
