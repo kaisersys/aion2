@@ -192,3 +192,17 @@ The offline item-name lookup covers 9,450 English client-derived names; unknown 
 4. Report the item ID (or name), currency differences, and counters if the grouping is inaccurate—no raw PCAP files are needed.
 
 This is unofficial passive packet capture and may pose an account-policy risk under NCSOFT terms.
+
+
+## Transaction-source decoding: corroborated ground pickups
+
+The capture helper now recognizes three separate, read-only Aion 2 Global messages:
+- `0x1E56`: item stack appears on the ground (opaque ground ID, item ID, quantity)
+- `0x1F56`: that same ground ID leaves the ground with the **own-pickup** flag
+- `0x1B56`: a matching **positive** change in a validated inventory stack
+
+The companion marks an item gain as a **corroborated ground pickup** only when the item ID and quantity match across all three observations within 1.5 seconds (pickup and inventory may arrive in either order). Unknown ground IDs, another player's pickup, missing inventory baseline, conflicting quantities, simultaneous ambiguous matches, duplicate pickup packets, and stale evidence do not qualify. Ground IDs stay in the decoder's memory, are capped, and are never logged or exported. Source records link only to a local item-event ID and remain excluded from optional website synchronization.
+
+**Overview** displays these pickups in their own section and excludes them from the nearby-wallet **possible purchase** model. **Diagnostics** displays ground drops, own pickups, and exact matches, without dumping game traffic. This helps avoid labeling looted items as NPC or Market purchases.
+
+This is **not** a Market/NPC transaction parser. The known inventory and wallet opcodes contain no verified Market order ID, seller, buyer, gross proceeds, fees, shop price, or transaction cause. An apparent purchase remains *possible*; delayed Market settlements, NPC sales, crafting, storage transfers and inventory consumption remain unassigned. No gross market revenue or itemized Market receipt is claimed. Additional packet mappings require evidence from controlled Global sessions. Passive capture is unofficial and has potential account-policy risk.
