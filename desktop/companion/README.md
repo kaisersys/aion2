@@ -217,3 +217,20 @@ Only structured observations (account, matched character, timestamp, type, obser
 **Important:** A visible Market listing is not proof of submission, and Settlement text is not proof of claiming the funds. No transaction is automatically marked as verified. OCR layouts and English UI labels need controlled testing against actual Aion 2 Global screenshots before general release. The OCR language model may download on first use; screenshots are processed locally. Tesseract OCR is not an NCSOFT-supported interface. Users must be told about continuous game-window reading and private structured-data upload before account connection. An account signup or Terms of Service alone should not be used to conceal this collection.
 
 Apply `supabase/migrations/20261109_market_observations.sql` to the matching Supabase project before distributing this build. The companion does not enable a public leaderboard or cross-account access to these observations.
+
+
+## Market fee capture troubleshooting (v0.1.1 preview)
+
+The OCR Market listener starts automatically when an Atreia Street account signs in. The user can also click **Scan visible Market now** to inspect the current visible AION2 window immediately; this is a diagnostic shortcut, not a required opt-in. OCR checks the game window every 3 seconds rather than every 8 seconds.
+
+The List panel can show a **Registration Fee** even if OCR cannot read its asking price. That value is stored as a listing_fee_observation (quoted fee, *not* an expense). It is visible in **Latest Registration Fee Shown**. When a separately decoded **bound or regular Kina** wallet decrease matches the fee's exact amount within the narrow observation window, the record advances to **corroborated**; combined debits from the two wallets must sum to that fee and be within 3 seconds of each other. The **Fees Matched to Kina Out** field sums only those corroborated records. A wallet match corroborates a payment amount, not a game-server listing receipt; never describe it as a verified successful listing.
+
+Common reasons nothing appears:
+- The installed companion is an older preview (before v0.1.1). Installing an updated Windows installer is required; updating the website does not update desktop binaries.
+- Only one *visible* game window titled AION2 or AION 2 is supported. Exclusive fullscreen or graphics capture restrictions can produce blank thumbnails. Try borderless/windowed mode.
+- The account has not been signed in or the character/server is not linked to the signed-in Atreia Street account. The Market status now reports this instead of silently discarding the fee.
+- The Market listing panel was open only briefly and the OCR did not read the displayed fee. Open the List screen, wait until **Registration fee quote captured** is displayed, or click **Scan visible Market now**, before submitting.
+- Kina balance packets were missing, so the fee remains an OCR-only quote. This is deliberately not booked as an expense. Revisit Npcap diagnostics and baseline/active character identity if wallet readings are absent.
+- OCR can read labels on a separate line from the amount and ignores the always-visible "Settlement" navigation tab while listing. Other languages or game client layouts may need additional parser rules.
+
+No screenshots or raw recognized text are uploaded. Only the structured fee/price, user/character, and reconciliation status sync to the account owner's RLS-protected Supabase rows. Upload failures remain queued and retry. All OCR source attribution is provisional until validated against actual Global game screens.

@@ -30,3 +30,41 @@ test('stable fingerprints differ by character and evidence',()=>{
  assert.notEqual(stableFingerprint('Ceti','S1',a),stableFingerprint('Ceti','S2',a));
  assert.notEqual(stableFingerprint('Ceti','S1',a),stableFingerprint('Ceti','S1',{...a,fee:6}));
 });
+
+
+test('recognizes Global listing with a separate settlement tab label',()=>{
+ const screenshot=[
+  'Market','Main  List  Settlement','Sale Quantity: 1',
+  'Sale Price Per Item: 71,775','Total Sale Price: 71,775',
+  'Registration Fee: 1,435'
+ ].join('\n');
+ const r=readMarket(screenshot);
+ assert.equal(r.status,'observed');
+ assert.equal(r.evidence.kind,'listing_observation');
+ assert.equal(r.evidence.amount,71775);
+ assert.equal(r.evidence.fee,1435);
+});
+test('captures a fee without total asking price and when value is on next line',()=>{
+ const r=readMarket('Market\nList\nSettlement\nRegistration Fee\nKina 1,435');
+ assert.equal(r.status,'observed');
+ assert.deepEqual(r.evidence,{
+  kind:'listing_fee_observation',amount:1435,fee:1435,quantity:null,item_name:null
+ });
+});
+test('never attributes fee amount to a sale when listing confirmation was not observed',()=>{
+ const r=readMarket('Market\nList\nRegistration Fee 250\nSale Price Per Item: unclear');
+ assert.equal(r.status,'observed');
+ assert.equal(r.evidence.kind,'listing_fee_observation');
+ assert.equal(r.evidence.amount,250);
+});
+test('computes total from explicitly labelled per-item price and quantity',()=>{
+ const r=readMarket('Market\nList\nSale Quantity: 3\nSale Price Per Item: 900\nRegistration Fee 54');
+ assert.equal(r.status,'observed');
+ assert.equal(r.evidence.amount,2700);
+ assert.equal(r.evidence.fee,54);
+});
+test('does not accept contradictory fees, total prices or mixed listing and settlement',()=>{
+ assert.equal(readMarket('Market\nList\nRegistration Fee 100\nRegistration Fee 900').status,'incomplete');
+ assert.equal(readMarket('Market\nTotal Price 500\nTotal Price 1000\nRegistration Fee 30').status,'incomplete');
+ assert.equal(readMarket('Market\nRegistration Fee 100\nSettlement Amount 300').status,'ambiguous');
+});

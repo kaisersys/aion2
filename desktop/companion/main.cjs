@@ -7,6 +7,7 @@ const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const { normalizeEvent, addEvents, charKey, periods } = require('./ledger.cjs');
 const { readMarket,stableFingerprint } = require('./market-ocr.cjs');
+const { reconcileFees } = require('./market-fees.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const FILE_LIMIT = 8 * 1024 * 1024;
@@ -18,6 +19,10 @@ let feed = null;
 let remote = null;
 let capture = null;
 let marketOcrTimer=null, marketOcrBusy=false, marketOcrWorker=null;
+let marketSyncBusy=false;
+let lastMarketSyncAttemptAt=0;
+let lastMarketFrame=null;
+let lastMarketSeenAt=0;
 let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0};
 let marketObservations=[];
 let recentMarket=new Map();
@@ -81,6 +86,16 @@ function insert(raw, fallbackId) {
     state.profiles.push({character:event.character,server:event.server});
   }
   saveState();
+  if(event.type==='wallet_snapshot' && event.source==='decoded') {
+    const n=reconcileFees(marketObservations,state.events);
+    if(n) {
+      saveMarket();
+      marketOcrMessage('corroborated',
+        n+' listing fee'+(n===1?'':'s')+' matched an observed Kina decrease.');
+      if(remote)void syncMarket().catch(err=>marketOcrMessage('sync-error',
+        'Fee matched locally; cloud sync failed: '+String(err.message).slice(0,100)));
+    }
+  }
   notify();
   return true;
 }
@@ -192,7 +207,7 @@ function marketOcrMessage(stateName,message) {
  notify();
 }
 async function marketOcrTick() {
- if(marketOcrBusy || !remote || !state.activeCharacter || !readConfig())return;
+ if(marketOcrBusy || !remote || !readConfig())return;
  marketOcrBusy=true;
  try {
   // Only capture the explicitly named game WINDOW. Never capture a display,
@@ -201,10 +216,10 @@ async function marketOcrTick() {
    types:['window'],thumbnailSize:{width:1920,height:1080},
    fetchWindowIcons:false
   });
-  const games=sources.filter(x=>/^AION2(?:\s|$|[.:-])/i.test(x.name) &&
+  const games=sources.filter(x=>/^AION\s*2(?:\s|$|[.:-])/i.test(x.name) &&
    !x.thumbnail.isEmpty() && x.thumbnail.getSize().width>=640);
   if(games.length!==1) {
-   marketOcrMessage('waiting','Waiting for one visible AION2 game window.');
+   marketOcrMessage('waiting','Cannot capture exactly one visible AION2 game window. Use borderless/windowed mode if the game is in exclusive fullscreen.');
    return;
   }
   // Screenshot remains in RAM; OCR is performed on this machine.
@@ -216,21 +231,45 @@ async function marketOcrTick() {
   const result=await marketOcrWorker.recognize(games[0].thumbnail.toPNG());
   const parsed=readMarket(result.data?.text||'');
   if(parsed.status!=='observed') {
-   marketOcrMessage('listening',parsed.status==='unrecognized'
-    ?'Watching the Aion 2 window for Market listing and Settlement panels.'
-    :'Market text detected, but the transaction fields are incomplete or ambiguous.');
+   if(Date.now()-lastMarketSeenAt>10000)lastMarketFrame=null;
+   marketOcrMessage('listening',
+    parsed.status==='empty'?'Game window captured, but OCR saw no readable text. Try borderless/windowed mode.':
+    parsed.status==='unrecognized'
+    ?'Game window captured. Open the Market List panel to read the registration fee.'
+    :'Market panel detected, but the registration fee or settlement amount was unreadable.');
    return;
   }
   const current=state.activeCharacter;
   // A roster selection alone is not proof of an active world character.
-  if(!current.serverId || current.selectionSource==='lobby-roster')return;
+  if(!current || !current.serverId || current.selectionSource==='lobby-roster') {
+   marketOcrMessage('unmapped','Market fee visible, but the active in-world character has not been confirmed by capture.');
+   return;
+  }
   const match=matchWebsiteCharacter(current.character,current.server);
-  if(!match)return;
+  if(!match) {
+   marketOcrMessage('unmapped','Market fee visible, but no matching character and server exist in the signed-in website account.');
+   return;
+  }
   const evidence=parsed.evidence;
   const key=stableFingerprint(current.character,current.server,evidence);
   const now=Date.now();
-  for(const [k,v] of recentMarket)if(now-v>600000)recentMarket.delete(k);
-  if(recentMarket.has(key))return;
+  lastMarketSeenAt=now;
+  for(const [k,v] of recentMarket)if(now-v>120000)recentMarket.delete(k);
+  // Re-reading the same open dialog is not another transaction.
+  // Reset after a different screen; allow a new identical listing following
+  // a confirmed debit and a later redraw.
+  if(lastMarketFrame===key) {
+   const last=marketObservations.findLast(x=>x.user_id===remote.user_id &&
+    x.character===current.character && x.server===current.server &&
+    stableFingerprint(x.character,x.server,x)===key);
+   const matched=last?.status==='corroborated';
+   marketOcrMessage(matched?'corroborated':'listening',evidence.fee!==null
+    ?('Registration fee: '+evidence.fee+' Kina. '+
+      (matched?'Matched a Kina decrease.':'Waiting for a matching bound or regular Kina decrease.'))
+    :'Market settlement amount is visible; claiming it has not been verified.');
+   return;
+  }
+  lastMarketFrame=key;
   recentMarket.set(key,now);
   marketObservations.push({
    id:crypto.randomUUID(),user_id:remote.user_id,
@@ -242,40 +281,64 @@ async function marketOcrTick() {
   });
   marketObservations=marketObservations.slice(-2000);
   saveMarket();
-  marketOcrMessage('observed','Market fields read. Observation pending account synchronization.');
+  const n=reconcileFees(marketObservations,state.events);
+  if(n)saveMarket();
+  marketOcrMessage(n?'corroborated':'observed',
+   evidence.fee!==null
+    ?(n?'Registration fee corroborated by a Kina decrease.':
+      'Registration fee quote captured ('+evidence.fee+' Kina); awaiting wallet confirmation.')
+    :'Settlement amount observed; collection is not yet verified.');
   // Failures remain queued; no raw OCR text or screenshot is sent.
-  await syncMarket();
+  try {await syncMarket();}
+  catch(err){marketOcrMessage('sync-error',
+   'Fee stored locally, but account sync failed: '+String(err.message).slice(0,100));}
  } catch(err) {
   marketOcrMessage('error','Market reading unavailable: '+String(err.message).slice(0,120));
  } finally {marketOcrBusy=false;}
 }
 async function syncMarket() {
- if(!remote)return 0;
- const unsynced=marketObservations.filter(x=>!x.synced && x.user_id===remote.user_id).slice(0,100);
- if(!unsynced.length)return 0;
- await refreshed();
- const rows=unsynced.map(x=>({
-  user_id:x.user_id,character_id:x.character_id,observation_id:x.id,
-  occurred_at:x.occurred_at,kind:x.kind,amount:x.amount,fee:x.fee,
-  quantity:x.quantity,item_name:x.item_name,
-  evidence:x.evidence,status:x.status
- }));
- await request('/rest/v1/player_market_observations?on_conflict=user_id,observation_id',
-  'POST',rows,true,{prefer:'resolution=ignore-duplicates,return=minimal',noContent:true});
- for(const x of unsynced)x.synced=true;
- saveMarket();
- notify();
- return unsynced.length;
+ if(!remote || marketSyncBusy)return 0;
+ marketSyncBusy=true;
+ try {
+  const unsynced=marketObservations.filter(x=>!x.synced && x.user_id===remote.user_id).slice(0,100);
+  if(!unsynced.length)return 0;
+  lastMarketSyncAttemptAt=Date.now();
+  await refreshed();
+  const rows=unsynced.map(x=>({
+   user_id:x.user_id,character_id:x.character_id,observation_id:x.id,
+   occurred_at:x.occurred_at,kind:x.kind,amount:x.amount,fee:x.fee,
+   quantity:x.quantity,item_name:x.item_name,
+   evidence:x.evidence,status:x.status,currency_kind:x.currency_kind??null
+  }));
+  await request('/rest/v1/player_market_observations?on_conflict=user_id,observation_id',
+   'POST',rows,true,{prefer:'resolution=merge-duplicates,return=minimal',noContent:true});
+  for(const row of rows) {
+   const matching=marketObservations.find(x=>x.id===row.observation_id);
+   // Do not falsely mark a record synced if a wallet update arrived mid-request.
+   if(matching && matching.status===row.status)matching.synced=true;
+  }
+  saveMarket();notify();
+  return rows.length;
+ } finally {marketSyncBusy=false;}
 }
 function startMarketOcr() {
  if(marketOcrTimer)return;
- marketOcrTimer=setInterval(()=>{void marketOcrTick();},8000);
+ marketOcrTimer=setInterval(()=>{
+  void marketOcrTick();
+  if(remote && Date.now()-lastMarketSyncAttemptAt>30000 &&
+     marketObservations.some(x=>!x.synced&&x.user_id===remote.user_id)) {
+   void syncMarket().catch(err=>marketOcrMessage('sync-error',
+    'Fee saved locally; retrying account sync: '+String(err.message).slice(0,100)));
+  }
+ },3000);
  void marketOcrTick();
+ void syncMarket().catch(err=>marketOcrMessage('sync-error',
+  'Pending fee upload failed: '+String(err.message).slice(0,100)));
 }
 async function stopMarketOcr() {
  if(marketOcrTimer){clearInterval(marketOcrTimer);marketOcrTimer=null;}
  if(marketOcrWorker){const worker=marketOcrWorker;marketOcrWorker=null;await worker.terminate();}
- recentMarket.clear();
+ recentMarket.clear();lastMarketFrame=null;lastMarketSeenAt=0;
  marketOcrMessage('waiting','Sign in to resume Market reading.');
 }
 
@@ -327,7 +390,9 @@ function resolveCapturedCharacter(packetCharacter,serverId) {
   const profile=discovered.profile;
   const active={character:profile.character,server:profile.server,serverId:Number(serverId)};
   const changedActive=!state.activeCharacter ||
-    charKey(state.activeCharacter.character,state.activeCharacter.server)!==charKey(active.character,active.server);
+    charKey(state.activeCharacter.character,state.activeCharacter.server)!==charKey(active.character,active.server) ||
+    state.activeCharacter.selectionSource==='lobby-roster' ||
+    Number(state.activeCharacter.serverId)!==Number(serverId);
   if(changedActive)state.activeCharacter=active;
   if(discovered.changed || changedActive) { saveState(); notify(); }
   return profile;
@@ -619,6 +684,7 @@ app.whenReady().then(()=>{
   });
   ipcMain.handle('remote:logout',()=>{remote=null;void stopMarketOcr();notify();return true;});
   ipcMain.handle('remote:sync',sync);
+  ipcMain.handle('market:scan',async()=>{await marketOcrTick();return marketOcrStatus;});
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
   app.on('activate',()=>showMain());
   app.on('before-quit',()=>{if(marketOcrTimer)clearInterval(marketOcrTimer);});

@@ -281,6 +281,13 @@ function render(){
  const marketHolder=$('market-observations');
  marketHolder.replaceChildren();
  const marketRows=(state.marketObservations||[]).filter(e=>match(e,profile));
+ const todaysFees=marketRows.filter(e=>e.fee!==null&&e.fee!==undefined &&
+  Date.parse(e.occurred_at)>=p.daily);
+ $('market-fees-quoted').textContent=todaysFees.length?
+  num(todaysFees[0].fee):'—';
+ const charged=todaysFees.filter(e=>e.status==='corroborated');
+ $('market-fees-matched').textContent=charged.length?
+  num(charged.reduce((sum,e)=>sum+e.fee,0)):'—';
  if(!marketRows.length){
   const empty=document.createElement('div');empty.className='empty';
   empty.textContent='No Market observations for this character yet.';
@@ -291,20 +298,28 @@ function render(){
   const info=document.createElement('div');
   const name=document.createElement('strong');
   name.textContent=entry.item_name||(
+   entry.kind==='listing_fee_observation'?'Registration fee':
    entry.kind==='listing_observation'?'Market listing':'Market settlement');
   const desc=document.createElement('span');desc.className='movement-source';
-  desc.textContent=(entry.kind==='listing_observation'?'Listing observed':'Settlement observed')+
-   ' · '+new Date(entry.occurred_at).toLocaleString()+
-   ' · OCR unverified'+(entry.synced?' · account synced':' · pending sync');
+  const caption=entry.kind==='settlement_observation'?'Settlement shown':
+   entry.kind==='listing_fee_observation'?'Registration fee shown':'Listing shown';
+  const verified=entry.status==='corroborated';
+  const currency=entry.currency_kind==='mixed'?'bound + regular':
+   entry.currency_kind==='bound'?'bound':entry.currency_kind==='unbound'?'regular':null;
+  desc.textContent=caption+' · '+new Date(entry.occurred_at).toLocaleString()+
+   (verified?' · Fee matched to '+currency+' Kina debit':' · OCR only, not charged')+
+   (entry.synced?' · account synced':' · pending sync');
   info.append(name,desc);
   const qty=document.createElement('span');qty.className='item-group-qty';
   qty.textContent=entry.quantity?'×'+num(entry.quantity):'—';
   const details=document.createElement('div');
-  const total=document.createElement('strong');total.textContent=num(entry.amount)+' Kina';
+  const total=document.createElement('strong');
+  total.textContent=(entry.kind==='listing_fee_observation'?'Fee ':'')+
+   num(entry.amount)+' Kina';
   details.append(total);
-  if(entry.fee!==null&&entry.fee!==undefined){
+  if(entry.kind==='listing_observation' && entry.fee!==null&&entry.fee!==undefined){
    const fee=document.createElement('small');fee.className='item-group-caption';
-   fee.textContent='Listing fee '+num(entry.fee)+' Kina';details.append(fee);
+   fee.textContent='Registration fee '+num(entry.fee)+' Kina';details.append(fee);
   }
   row.append(info,qty,details);marketHolder.append(row);
  }
@@ -391,8 +406,12 @@ $('close-login').addEventListener('click',()=>{$('auth-backdrop').hidden=true;$(
 $('auth-form').addEventListener('submit',async e=>{
  e.preventDefault();
  try{await api.login({email:$('auth-email').value.trim(),password:$('auth-password').value});
- $('auth-backdrop').hidden=true;$('auth-password').value='';await refresh();show('Website account connected. Sync is optional.');}
+ $('auth-backdrop').hidden=true;$('auth-password').value='';await refresh();show('Website account connected. Game-window Market fee reading and private syncing are active.');}
  catch(err){show(err.message,true);$('auth-backdrop').hidden=true;$('auth-password').value='';}
+});
+$('market-scan').addEventListener('click',async()=>{
+ try {const result=await api.scanMarket();show(result.message||'Market scan completed.');await refresh();}
+ catch(err){show(err.message,true);}
 });
 $('sync-now').addEventListener('click',async()=>{
  try{const r=await api.sync();show('Synced '+r.uploaded+' local records and '+r.ticketBalances+

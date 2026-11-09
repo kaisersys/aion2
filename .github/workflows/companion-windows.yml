@@ -41,6 +41,7 @@ jobs:
       - run: node --check item-catalog.js
       - run: node --check item-economy.js
       - run: node --check market-ocr.cjs
+      - run: node --check market-fees.cjs
       - run: npm run capture:build
       - name: Package Windows preview (retry transient CDN errors)
         shell: pwsh

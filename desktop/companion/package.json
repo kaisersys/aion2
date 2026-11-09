@@ -1,6 +1,6 @@
 {
   "name": "atreia-street-companion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Account-connected Aion 2 economy and progression companion for Atreia Street",
   "main": "main.cjs",
@@ -40,7 +40,8 @@
       "wallets.js",
       "item-catalog.js",
       "item-economy.js",
-      "market-ocr.cjs"
+      "market-ocr.cjs",
+      "market-fees.cjs"
     ],
     "win": {
       "target": "nsis",
