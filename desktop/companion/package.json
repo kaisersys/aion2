@@ -41,7 +41,8 @@
       "item-catalog.js",
       "item-economy.js",
       "market-ocr.cjs",
-      "market-fees.cjs"
+      "market-fees.cjs",
+      "market-attribution.js"
     ],
     "win": {
       "target": "nsis",
