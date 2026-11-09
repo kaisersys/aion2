@@ -22,6 +22,12 @@ public sealed class TicketProtocol
     private string? _currentName;
     private int _currentServerId;
 
+    public int CharacterRecords { get; private set; }
+    public int RosterRecords { get; private set; }
+    public int CharacterOpcodesSeen { get; private set; }
+    public int RosterOpcodesSeen { get; private set; }
+    public int TicketOpcodesSeen { get; private set; }
+
     public TicketProtocol(Action<object> emit) => _emit = emit;
 
     // The only emitted counters are those that can safely be mapped to the site's existing
@@ -61,6 +67,7 @@ public sealed class TicketProtocol
         switch (opcode)
         {
             case 0x0b61:
+                TicketOpcodesSeen++;
                 if (TryReadList(frame, out List<TicketReading> entries))
                 {
                     _awaitingCharacter = true;
@@ -69,6 +76,7 @@ public sealed class TicketProtocol
                 }
                 break;
             case 0x0c61:
+                TicketOpcodesSeen++;
                 if (TryReadUpdate(frame, out TicketReading update))
                 {
                     if (_awaitingCharacter) _pendingTickets[update.Id] = update;
@@ -77,13 +85,19 @@ public sealed class TicketProtocol
                 break;
             case 0x2636: // own-account character roster after switching to character selection
             case 0x1536 when frame.Length > 500: // some initial-login roster frames
+                RosterOpcodesSeen++;
                 var roster = AccountRoster.Parse(frame);
                 if (roster.Count > 0)
+                {
+                    RosterRecords++;
                     _emit(new { kind = "roster", characters = roster });
+                }
                 break;
             case 0x3336:
+                CharacterOpcodesSeen++;
                 if (TryReadCharacter(frame, out string name, out int serverId))
                 {
+                    CharacterRecords++;
                     bool changed = _currentName != name || _currentServerId != serverId;
                     _currentName = name;
                     _currentServerId = serverId;

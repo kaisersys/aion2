@@ -21,7 +21,16 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: dotnet run --project capture/AtreiaCapture.csproj -- --self-test
-      - run: npm install
+      - name: Install dependencies (retry transient download errors)
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            npm install
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "Electron dependency download failed (attempt $attempt of 3)."
+            Start-Sleep -Seconds (5 * $attempt)
+          }
+          exit 1
       - run: npm test
       - run: node --check main.cjs
       - run: node --check ui.js
@@ -29,7 +38,16 @@ jobs:
       - run: node --check overlay-preload.cjs
       - run: node --check discovery.cjs
       - run: npm run capture:build
-      - run: npm run dist:win
+      - name: Package Windows preview (retry transient CDN errors)
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            npm run dist:win
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "Windows preview package download failed (attempt $attempt of 3)."
+            Start-Sleep -Seconds (5 * $attempt)
+          }
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: atreiastreet-companion-windows-preview

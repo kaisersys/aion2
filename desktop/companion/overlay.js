@@ -17,7 +17,18 @@ function render(s){
  $('server').textContent=active?.server||'Open Aion 2 to detect your character';
  const capture=s.capture?.state||'idle';
  const ok=capture==='connected', running=['starting','listening','connected','unmapped'].includes(capture);
- $('capture-status').textContent=ok?'Reading character data':capture==='listening'?'Listening for Aion 2':capture==='error'?'Npcap unavailable — open companion':running?'Starting capture':s.settings?.autoCapture===false?'Tracking paused':'Waiting for capture';
+ const health=s.capture?.health;
+ $('capture-status').textContent=ok?'Reading character data':capture==='listening'
+  ?health?.gameRunning===false?'Waiting for AION2.exe'
+   :health?.packets===0?'No packets · open full diagnostics'
+   :health?.frames===0?'Packets only · decoder needs attention'
+   :health?.characterPackets>0 && health?.identities===0?'Character packet parse mismatch'
+   :health?.bundles>0 && health?.bundlesDecoded===0?'Compressed data needs updating'
+   :health?.identities===0 && health?.bundlesDecoded>0?'Compressed frames · identity pending'
+   :health?.identities===0?'Frames decoded · identity not seen'
+   :'Checking character identity'
+  :capture==='error'?'Capture error · open full companion'
+   :running?'Initializing Npcap':s.settings?.autoCapture===false?'Tracking paused':'Waiting for capture';
  $('status-dot').className=ok?'ok':capture==='error'?'fail':'';
  const events=(s.events||[]).filter(e=>active&&idOf(e)===idOf(active)&&Date.parse(e.occurred_at)<=Date.now())
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));

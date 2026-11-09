@@ -65,3 +65,41 @@ Validate against a real Global login and controlled task changes, including tick
 - A mini, moveable always-on-top Electron window shows the active captured character's concise economy and progress snapshot. It does not draw into the game process and may not appear above exclusive fullscreen games; borderless windowed mode is preferable.
 - Capture starts when the companion itself starts, **not on Windows sign-in**. Users may manually pause/resume from the main dashboard; the setting is remembered. No automatic background upload occurs without website sign-in and the explicit Sync action.
 - If the game client was already running before capture began, discovery may require relogging or switching characters. No memory inspection or injection is attempted.
+
+## Updated detection diagnostics (automatic game endpoint discovery)
+
+Teleporting across zones may send a fresh own-character frame but does not repair a broken driver or decoder. The Windows capture helper now observes **Windows TCP owner metadata** for `AION2.exe` with the IP Helper API, then includes only the current game-owned IPv4 endpoints in the inbound Npcap filter. This never accesses game memory or sends network data to the website.
+
+- **Game not running:** Launch AION2.exe locally; local capture does not work for cloud-streamed game traffic.
+- **Game detected but no TCP connections:** Enter the game world. VPN/accelerators, proxy processes or IPv6-only paths may hide relevant connections.
+- **Process connected, packets 0:** The driver cannot see the game flow. Verify Npcap installation, admin-only access settings, and networking adapters. Teleporting repeatedly is unlikely to help.
+- **Packets above 0, decoded frames 0:** Npcap sees data, but the current protocol decoder may not match the traffic format, or a VPN tunnel may be interfering.
+- **Frames above 0, identity 0:** Some Aion 2 game messages decode, but the character/roster has not been observed. Changing zones or opening character selection can trigger another relevant record.
+- **Identity above 0, character missing:** Local character association requires repair.
+
+The main panel now shows the game process, TCP-connection count, Npcap adapter count, captured game packets, decoded frames, and identity records. These are aggregate diagnostics; raw packets, credentials, network addresses and process-memory contents are not recorded or uploaded. The fallback server port is still configurable.
+
+A synthetic test verifies reassembly of a fragmented 40 KB identity frame and Win32 TCP remote-port byte order. Neither proves live Global compatibility. Third-party traffic capture remains unofficial, may violate NCSOFT rules, and can carry account risk.
+
+## Opcode-only diagnostics
+
+This preview distinguishes **character-related opcode received** from **successfully parsed character identity**. The diagnostic panel displays counters for character and roster frames, parsed identities, ticket frames, and a top-8 opcode histogram. Only opcode values and occurrence counts are shown; no game message bytes, player names, IP addresses, credentials, or other packet content are logged. If a 0x3336 frame is received but parsing fails, the current parser likely needs updating for this game release. If no character-related opcodes are received despite many other frames, the capture/framing path or protocol version needs investigation. Do not keep teleporting when the panel explicitly identifies a decoder mismatch.
+
+## LZ4-compressed Aion 2 message bundles
+
+Aion 2 Global inbound 0xFFFF envelopes contain a little-endian uncompressed
+size followed by an LZ4 block of varint-framed inner messages. Login, zone,
+roster and ticket records can be nested in those bundles. The companion now
+decompresses the envelope locally and validates every inner frame boundary
+before forwarding messages to the strict character and counter decoder.
+No raw traffic or compressed payloads are stored or uploaded. The LZ4 block
+decompressor is adapted from the MIT-licensed SkeeveTV/Aion-DPS-Meter project
+(see capture/THIRD-PARTY-NOTICES.md). Maximum output is limited to 1 MB and
+no nested compression is followed.
+
+Diagnostics now separately count bundles seen, bundles unpacked, failures,
+and inner frames. Automated tests use a real 20-message LZ4 bundle fixture
+and a synthetic bundle containing a ticket and own-character record.
+
+Live Aion 2 Global compatibility is not yet proven; this remains an
+unofficial packet-capture beta with potential NCSOFT policy risk.
