@@ -121,7 +121,7 @@ function captureState() {
     remote:remote ? {email:remote.email,characters:remote.characters} : null,
     configured:Boolean(readConfig()), capture:captureStatus,
     marketOcr:marketOcrStatus,
-    marketObservations:remote?marketObservations.filter(x=>x.user_id===remote.user_id).slice(-30).reverse():[] };
+    marketObservations:remote?marketObservations.filter(x=>x.user_id===remote.user_id).slice(-200).reverse():[] };
 }
 function insert(raw, fallbackId) {
   const event = normalizeEvent(raw, fallbackId);
@@ -368,6 +368,16 @@ async function marketOcrTick() {
   // A preview of the same proposed listing is not a second fee.
   // When the confirmation dialog appears, promote the local proposal instead
   // of charging twice. Its time becomes the confirmation observation time.
+  if(parsed.screen_phase==='listing_form' &&
+    marketObservations.some(x=>x.user_id===remote.user_id &&
+     x.character===current.character && x.server===current.server &&
+     x.screen_phase==='confirmation' && x.fee===evidence.fee &&
+     x.amount===evidence.amount &&
+     Date.parse(x.occurred_at)>now-30000)) {
+    marketOcrMessage('pending',
+      'Listing confirmation was shown; returned to Market form. Awaiting a matching Kina decrease (cancel is possible).');
+    return;
+  }
   const existing=parsed.screen_phase==='confirmation'?
    marketObservations.findLast(x=>x.user_id===remote.user_id &&
     x.character===current.character && x.server===current.server &&
