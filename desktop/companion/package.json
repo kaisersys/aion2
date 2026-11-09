@@ -40,7 +40,8 @@
       "wallets.js",
       "item-catalog.js",
       "item-economy.js",
-      "market-ocr.cjs"
+      "market-ocr.cjs",
+      "market-fees.cjs"
     ],
     "win": {
       "target": "nsis",
