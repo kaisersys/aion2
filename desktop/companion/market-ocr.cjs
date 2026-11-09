@@ -55,9 +55,9 @@ function readMarket(text) {
  const hasProceeds=lines.some(s=>PROCEEDS.test(s));
  // The tab named "Settlement" is visible even while listing an item. Do not
  // treat that tab alone as a conflicting sale-settlement event.
- if(!hasMarket && !(hasFeeLabel&&hasQuantityLabel) && !hasProceeds)
+ if(!hasMarket && !(hasFeeLabel&&(hasQuantityLabel||confirmation)) && !hasProceeds)
   return {status:'unrecognized'};
- const listing=hasFeeLabel && (hasMarket||hasQuantityLabel);
+ const listing=hasFeeLabel && (hasMarket||hasQuantityLabel||confirmation);
  const settlement=hasProceeds;
  if(listing&&settlement)return {status:'ambiguous'};
  if(!listing&&!settlement)return {status:'incomplete'};
