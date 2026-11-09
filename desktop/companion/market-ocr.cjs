@@ -45,6 +45,10 @@ function field(lines,label) {
 function readMarket(text) {
  const lines=clean(text);
  if(!lines.length)return {status:'empty'};
+ const confirmation=lines.some(s=>/are\s+you\s+sure\s+you\s+wish\s+to\s+list\s+for\s+sale/i.test(s)) ||
+  (lines.some(s=>/\b(?:confirm|confirmation)\b/i.test(s)) &&
+   lines.some(s=>/\bcancel\b/i.test(s)) &&
+   lines.some(s=>/\b(?:total sale price|registration fee)\b/i.test(s)));
  const hasMarket=lines.some(s=>/\b(?:market|marketplace|world\s+market|trade\s+broker|auction\s+house|sales\s+registration)\b/i.test(s));
  const hasFeeLabel=lines.some(s=>FEE.test(s));
  const hasQuantityLabel=lines.some(s=>/\b(?:sale\s+quantity|sale\s+price\s+per\s+item|total\s+sale\s+price)\b/i.test(s));
@@ -57,14 +61,22 @@ function readMarket(text) {
  const settlement=hasProceeds;
  if(listing&&settlement)return {status:'ambiguous'};
  if(!listing&&!settlement)return {status:'incomplete'};
- const qty=field(lines,QUANTITY);
+ let qty=field(lines,QUANTITY);
  if(Number.isNaN(qty)||(qty!==null&&qty>1000000))return {status:'incomplete'};
  const names=lines.map(s=>s.match(ITEM)).filter(Boolean);
- const item=names.length===1?names[0][1].trim():null;
+ let item=names.length===1?names[0][1].trim():null;
+ if(!item && confirmation) {
+  const beforeTotal=lines.findIndex(x=>TOTAL.test(x));
+  const pool=lines.slice(Math.max(0,beforeTotal-5),Math.max(0,beforeTotal));
+  const candidate=pool.filter(line=>
+   /^[\p{L}][\p{L}\p{M}\p{N}' -]{2,60}$/u.test(line) &&
+   !/\b(?:confirm|cancel|market|funds|price|sale|fee|registration|total|quantity|are you|wish to|list for)\b/i.test(line));
+  if(candidate.length===1)item=candidate[0];
+ }
  if(settlement) {
   const proceeds=field(lines,PROCEEDS);
   if(proceeds===null||Number.isNaN(proceeds))return {status:'incomplete',kind:'settlement_observation'};
-  return {status:'observed',evidence:{
+  return {status:'observed',screen_phase:'settlement',evidence:{
    kind:'settlement_observation',amount:proceeds,fee:null,quantity:qty,item_name:item
   }};
  }
@@ -79,7 +91,12 @@ function readMarket(text) {
    price=unit*qty;
  }
  if(price!==null&&price<fee)return {status:'incomplete',kind:'listing_observation'};
- return {status:'observed',evidence:{
+ if(qty===null&&confirmation&&price!==null) {
+  const unit=field(lines,UNIT);
+  if(unit!==null && Number.isFinite(unit) && unit>0 && price%unit===0 &&
+     price/unit<=1000000)qty=price/unit;
+ }
+ return {status:'observed',screen_phase:confirmation?'confirmation':'listing_form',evidence:{
   kind:price===null?'listing_fee_observation':'listing_observation',
   amount:price===null?fee:price,fee,quantity:qty,item_name:item
  }};
