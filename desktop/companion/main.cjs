@@ -149,7 +149,10 @@ async function syncEventsImpl() {
     if (!id) { unmatched++; continue; }
     const eventHash=crypto.createHash('sha256')
       .update(ev.id+'|'+ev.character+'|'+ev.server).digest('hex');
-    if(previouslySent.has(eventHash))continue;
+    // Upload bookkeeping is account-scoped, not shared across sign-ins.
+    const accountHash=crypto.createHash('sha256')
+      .update(remote.user_id+'|'+eventHash).digest('hex');
+    if(previouslySent.has(accountHash))continue;
     rows.push({user_id:remote.user_id, character_id:id,
       event_hash:eventHash,
       kind:ev.type, occurred_at:ev.occurred_at, source:ev.source, currency_kind:ev.currency_kind??null,
@@ -165,7 +168,8 @@ async function syncEventsImpl() {
       'POST',batch,true,{prefer:'resolution=ignore-duplicates,return=minimal',noContent:true});
     // Mark only successfully uploaded records, including records that already
     // existed in the server via ignore-duplicates.
-    for(const row of batch)previouslySent.add(row.event_hash);
+    for(const row of batch)previouslySent.add(
+      crypto.createHash('sha256').update(remote.user_id+'|'+row.event_hash).digest('hex'));
     state.syncedEventHashes=[...previouslySent].slice(-50000);
     saveState();
   }
