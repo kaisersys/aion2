@@ -22,7 +22,8 @@ function render(s){
   ?health?.gameRunning===false?'Waiting for AION2.exe'
    :health?.packets===0?'No packets · open full diagnostics'
    :health?.frames===0?'Packets only · decoder needs attention'
-   :health?.identities===0?'Frames detected · identity pending'
+   :health?.characterPackets>0 && health?.identities===0?'Character packet parse mismatch'
+   :health?.identities===0?'Frames decoded · identity not seen'
    :'Checking character identity'
   :capture==='error'?'Capture error · open full companion'
    :running?'Initializing Npcap':s.settings?.autoCapture===false?'Tracking paused':'Waiting for capture';

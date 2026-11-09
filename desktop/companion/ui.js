@@ -66,6 +66,10 @@ function render(){
  $('diagnostic-packets').textContent=h?String(h.packets):'—';
  $('diagnostic-frames').textContent=h?String(h.frames):'—';
  $('diagnostic-identity').textContent=h?String(h.identities+h.rosters):'—';
+ $('diagnostic-identity-packets').textContent=h?String(h.characterPackets+h.rosterPackets):'—';
+ $('diagnostic-ticket-packets').textContent=h?String(h.ticketPackets):'—';
+ $('diagnostic-opcodes').textContent=h?.popularOpcodes?.length
+   ? h.popularOpcodes.map(x=>x.opcode+' ('+x.count+')').join(' · ') : 'Awaiting frames';
  $('detection-instructions').hidden=hasIdentity;
  $('detection-instructions').textContent=state.capture?.state==='error'
    ?'Capture error. Check the exact message above. Npcap may need reinstalling without administrator-only access.'
@@ -77,7 +81,13 @@ function render(){
    ?'The companion sees no game packets. Check Npcap, administrator-only capture settings, and VPN/loopback routing; teleporting repeatedly will not help.'
    :h && h.frames===0
    ?'Packets are arriving, but the decoder has not produced game frames. This indicates a capture/protocol mismatch that requires investigation.'
-   :'If frames are arriving but no character appears, switch to character selection or load a different zone once.';
+   :h && h.characterPackets>0 && h.identities===0
+   ?'Character packets are reaching us but the parser is rejecting them. No additional teleport is necessary; the decoder must be updated.'
+   :h && h.rosterPackets>0 && h.rosters===0
+   ?'Account roster packets are reaching us, but their layout is not being recognized by this build.'
+   :h && h.frames>0
+   ?'Frame decoding is working. The opcode counts below show whether character messages are present in this game build.'
+   :'Listening for Aion 2 data…';
  if(!portLoaded) { $('game-port').value=state.settings?.gamePort||13328; portLoaded=true; }
  $('overlay-toggle').textContent=state.settings?.overlayEnabled?'Hide mini overlay':'Show mini overlay';
  const capturing=['starting','listening','connected','unmapped'].includes(state.capture?.state);

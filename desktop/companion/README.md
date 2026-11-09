@@ -80,3 +80,7 @@ Teleporting across zones may send a fresh own-character frame but does not repai
 The main panel now shows the game process, TCP-connection count, Npcap adapter count, captured game packets, decoded frames, and identity records. These are aggregate diagnostics; raw packets, credentials, network addresses and process-memory contents are not recorded or uploaded. The fallback server port is still configurable.
 
 A synthetic test verifies reassembly of a fragmented 40 KB identity frame and Win32 TCP remote-port byte order. Neither proves live Global compatibility. Third-party traffic capture remains unofficial, may violate NCSOFT rules, and can carry account risk.
+
+## Opcode-only diagnostics
+
+This preview distinguishes **character-related opcode received** from **successfully parsed character identity**. The diagnostic panel displays counters for character and roster frames, parsed identities, ticket frames, and a top-8 opcode histogram. Only opcode values and occurrence counts are shown; no game message bytes, player names, IP addresses, credentials, or other packet content are logged. If a 0x3336 frame is received but parsing fails, the current parser likely needs updating for this game release. If no character-related opcodes are received despite many other frames, the capture/framing path or protocol version needs investigation. Do not keep teleporting when the panel explicitly identifies a decoder mismatch.

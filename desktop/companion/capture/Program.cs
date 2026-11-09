@@ -49,6 +49,7 @@ internal sealed class ReadOnlyCapture : IDisposable
     private long _segments;
     private long _frames;
     private long _dropped;
+    private readonly Dictionary<int, long> _observedOpcodes = new();
     private HashSet<string> _autoEndpoints = new(StringComparer.Ordinal);
     private bool _gameRunning;
     private int _gameConnections;
@@ -107,6 +108,14 @@ internal sealed class ReadOnlyCapture : IDisposable
                         foreach (ReadOnlyMemory<byte> frame in _reassembler.Push(segment, _layout, _knownOpcodes))
                         {
                             _frames++;
+                            if (frame.Length >= 2) {
+                                int opcode = frame.Span[0] << 8 | frame.Span[1];
+                                // Aggregate opcode counts only. Never export payloads or names.
+                                if (_observedOpcodes.TryGetValue(opcode, out long previous))
+                                    _observedOpcodes[opcode] = previous + 1;
+                                else if (_observedOpcodes.Count < 512)
+                                    _observedOpcodes[opcode] = 1;
+                            }
                             _protocol.OnFrame(frame, segment.Timestamp.ToUniversalTime());
                         }
                     }
@@ -121,6 +130,11 @@ internal sealed class ReadOnlyCapture : IDisposable
                         kind = "health", packets = Interlocked.Read(ref _segments),
                         frames = _frames, identities = _protocol.CharacterRecords,
                         rosters = _protocol.RosterRecords,
+                        characterPackets = _protocol.CharacterOpcodesSeen,
+                        rosterPackets = _protocol.RosterOpcodesSeen,
+                        ticketPackets = _protocol.TicketOpcodesSeen,
+                        popularOpcodes = _observedOpcodes.OrderByDescending(x=>x.Value)
+                            .Take(8).Select(x=>new { opcode = x.Key.ToString("x4"), count=x.Value }).ToArray(),
                         dropped = Interlocked.Read(ref _dropped),
                         gaps = _reassembler.Gaps, desyncs = _reassembler.Desyncs,
                         port = string.Join(",", _ports.OrderBy(x=>x)),
@@ -279,6 +293,18 @@ public static class SelfTest
                 throw new Exception($"Large teleport identity frame lost (received {emitted}).");
             if (GameConnections.RemotePort(0x00001034u)!=13328)
                 throw new Exception("TCP owner table remote-port endianness failed.");
+            byte[] ownCharacter = new byte[96];
+            ownCharacter[0]=0x33; ownCharacter[1]=0x36; ownCharacter[2]=1; // local combat id
+            ownCharacter[6]=4; // name length
+            System.Text.Encoding.UTF8.GetBytes("Ceti",ownCharacter.AsSpan(7));
+            int ownAfter=11;
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(ownCharacter.AsSpan(ownAfter),1204);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(ownCharacter.AsSpan(ownAfter+2),9);
+            ownCharacter[ownAfter+6]=1;
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(ownCharacter.AsSpan(ownAfter+7),45);
+            if (!TicketProtocol.TryReadCharacter(ownCharacter,out string ownName,out int ownServer) ||
+                ownName!="Ceti" || ownServer!=1204)
+                throw new Exception("Own-character identification parser self-test failed.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }
