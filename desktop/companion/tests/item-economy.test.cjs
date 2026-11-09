@@ -71,3 +71,40 @@ test('old and unverified manual item events are ignored',()=>{
  const r=attribute([item('a',20,0,{source:'manual'})],{changes:[mov('w',-1000,0)]},day);
  assert.equal(r.matches.length,0);
 });
+
+const origin=(id,itemEventId,qty,sec,opts={})=>({
+ id,type:'item_origin',item_event_id:itemEventId,item_id:531060004,
+ quantity:qty,origin:'ground_pickup',source:'decoded',
+ observation_session:session,occurred_at:time(sec),...opts
+});
+test('corroborated ground pickups are excluded from possible Kina purchases',()=>{
+ const r=attribute([
+  item('loot-a',20,0),
+  origin('source-a','loot-a',20,0.3)
+ ],{changes:[mov('w',-10000,0.5)]},day);
+ assert.equal(r.verifiedGround,1);
+ assert.equal(r.groundGroups[0].totalQuantity,20);
+ assert.equal(r.matches.length,0);
+ assert.equal(r.unmatched.length,1);
+});
+test('a ground source for the wrong session, quantity or item is ignored',()=>{
+ const r=attribute([
+  item('loot-a',20,0),
+  origin('wrong-session','loot-a',20,0.3,{observation_session:newSession}),
+  origin('wrong-quantity','loot-a',21,0.3),
+  origin('wrong-id','loot-a',20,0.3,{item_id:511060016}),
+  origin('late','loot-a',20,2)
+ ],{changes:[mov('w',-10000,0.5)]},day);
+ assert.equal(r.verifiedGround,0);
+ assert.equal(r.matches.length,1);
+ assert.equal(r.matches[0].confidence,'possible');
+});
+test('one item event cannot be confirmed as two ground pickups',()=>{
+ const r=attribute([
+  item('loot-a',20,0),
+  origin('a','loot-a',20,0.2),
+  origin('b','loot-a',20,0.3)
+ ],{changes:[]},day);
+ assert.equal(r.verifiedGround,1);
+ assert.equal(r.groundGroups[0].observations,1);
+});
