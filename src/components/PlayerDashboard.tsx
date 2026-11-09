@@ -6,6 +6,7 @@ import {ensurePlayerProfile} from '../lib/playerProfile';
 import WeeklyTaskRow from './WeeklyTaskRow';
 import DailyTaskRow from './DailyTaskRow';
 import TicketBalanceDialog from './TicketBalanceDialog';
+import PrivateMarketActivity from './PrivateMarketActivity';
 import {Wallet} from 'lucide-react';
 import {PLAYER_CLASSES,recommendedGuides,type PlayerProfile,type SuggestedGuide} from '../lib/playerData';
 import {globalResetSnapshot,countdown,completionKey,visibleTasks,
@@ -363,6 +364,7 @@ export default function PlayerDashboard({user,checklistItemsJson,guides,onGuide,
        {renderList('Daily cooldowns',characterDaily,dailyDone,'daily')}
        {renderList('Weekly cooldowns',characterWeekly,weeklyDone,'weekly')}
      </div>
+     <PrivateMarketActivity key={selected.id} userId={user.id} characterId={selected.id}/>
      <section className="player-panel player-guides-section">
        <div className="player-guides-head"><div><div className="section-kicker left">YOUR FIELD LIBRARY</div><h2>Guides for your journey</h2></div>
          <div className="player-guide-tabs" role="tablist" aria-label="Guide views">
