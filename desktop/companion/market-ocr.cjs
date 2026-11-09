@@ -105,7 +105,7 @@ function stableFingerprint(character,server,evidence) {
  const crypto=require('node:crypto');
  return crypto.createHash('sha256').update(JSON.stringify([
   character,server,evidence.kind,evidence.amount,evidence.fee,
-  evidence.quantity,evidence.item_name
+  evidence.quantity,evidence.item_name,evidence.screen_phase||null
  ])).digest('hex');
 }
 module.exports={readMarket,amount,stableFingerprint};
