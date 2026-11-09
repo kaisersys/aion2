@@ -14,7 +14,7 @@ create table if not exists public.player_market_observations (
  gross bigint check (gross between 1 and 100000000000000),
  listing_fee bigint check (listing_fee between 1 and 100000000000000),
  proceeds bigint check (proceeds between 1 and 100000000000000),
- currency_kind text not null default 'unbound' check (currency_kind = 'unbound'),
+ currency_kind text not null default 'unknown' check (currency_kind = 'unknown'),
  evidence text not null default 'screen_observed' check(evidence='screen_observed'),
  occurred_at timestamptz not null,
  recorded_at timestamptz not null default now(),
