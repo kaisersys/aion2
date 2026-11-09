@@ -149,3 +149,25 @@ The new migration `supabase/migrations/20261109_companion_currency_kinds.sql` ex
 The game's blue currency indicator is **Kina (All)**, not the separate bound-only balance. Kina (All) equals regular Kina plus bound Kina; for example, 462,000 regular and zero bound gives 462,000 All. The companion now uses a shared, unit-tested wallet calculator across full dashboard and mini overlay. It never treats a missing bound observation as a displayed zero: an incomplete capture shows **≥ 462,000** for All until the bound currency is observed. A complete and validated 0x1156 inventory snapshot that contains either currency can establish a missing currency's zero balance, while a partial 0x1b56 change cannot. This inference remains subject to live protocol validation.
 
 Testing: verify **Regular Kina**, **Bound Kina**, and **Kina (All)** against the individual wallet and combined currency displays. Because normal game UI may show only regular and combined totals, compare bound separately in the Cube or derive it from All minus regular.
+
+
+## Workspace tabs and automatic Kina movements (preview)
+
+The desktop app now opens on **Overview**: character balances, Kina (All), daily progression and a compact movement history. The detailed Npcap traffic and opcode counters, game port, start/pause capture and JSONL test-feed controls are in the separate **Diagnostics** tab in the sidebar. Moving the UI does **not** stop or reduce automatic game capture.
+
+**Observed Kina In / Out** is derived from *successive validated wallet snapshots* for each character, currency, and capture-session ID. A new capture session or character change establishes a fresh baseline: the first observation never counts as gain or expenditure. To avoid fabricated events after a long idle period, changes after >20 minutes between consecutive observations of a given currency also start a new baseline. Existing older observations without a capture-session ID remain visible as balances but are deliberately excluded from these new In/Out totals. The totals reset daily at 07:00 UTC; recent individual movements are retained in the local snapshot history.
+
+These are **observed wallet inflows and outflows**, not independently confirmed market sales, purchases or gross farming income. Positive regular-Kina movement following a Market Settlement claim may appear under In, and an item purchase under Out, but the game may also use the same wallet-update message for dungeon rewards, other expenses, transfers and combined events. Some offsetting actions can occur between snapshots and therefore be missed. Market listing fees may affect bound Kina; both currencies are tracked separately. We do not pretend to classify these balance changes by cause or report exact trading profit.
+
+The mini desktop panel also shows compact daily observed In and Out metrics. It does not display raw traffic.
+
+**Privacy**: capture session IDs are random, local provenance identifiers used solely to separate contiguous wallet observations. They are not account IDs, do not read game memory, and are **not sent to the website** by the optional Supabase synchronization. The movement summaries are calculated locally from existing snapshots; no new database migration is needed beyond the existing currency-kind migration.
+
+### Verify spending and settlement tracking
+
+1. Start the new companion before logging into a character to obtain an initial wallet baseline. The new movement fields can show zero after a baseline; they never invent movement from a missing baseline.
+2. Observe a **real** regular-Kina purchase or another purchase you were already planning. The regular wallet should decrease, the dashboard's Observed Out should increase, and a recent balance-change row should show the difference. Bound currency can also decrease for fees or other combined costs.
+3. If you have a completed Market sale to claim, open the game's Market → Settlement and claim the existing proceeds. A corresponding regular-Kina balance increase should appear under Observed In if the inventory update was captured. The app **cannot independently verify** this was a sale.
+4. If either action changes the in-game wallet but creates no movement, check the **Diagnostics** tab for inventory packets and wallet-reading counts and report those values. Do not share raw PCAPs or any credentials.
+
+Third-party packet capture remains an unofficial beta; consider NCSOFT's terms and any account risks.

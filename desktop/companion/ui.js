@@ -2,6 +2,24 @@
 const api=window.companion;
 const $=id=>document.getElementById(id);
 let state=null, active=null, followedCapture=null, portLoaded=false;
+let activeView='overview';
+function setView(view) {
+ activeView=view==='diagnostics'?'diagnostics':'overview';
+ $('view-overview').hidden=activeView!=='overview';
+ $('view-diagnostics').hidden=activeView!=='diagnostics';
+ for(const name of ['overview','diagnostics']) {
+   const button=$('nav-'+name);
+   const selected=name===activeView;
+   button.classList.toggle('nav-active',selected);
+   if(selected)button.setAttribute('aria-current','page');
+   else button.removeAttribute('aria-current');
+ }
+ $('page-title-prefix').textContent=activeView==='overview'?'Character ':'Capture ';
+ $('page-title-topic').textContent=activeView==='overview'?'overview.':'diagnostics.';
+ $('page-description').textContent=activeView==='overview'
+  ?'Your Kina, observed wallet movements and daily progression at a glance.'
+  :'Npcap network health, packet decoding and capture controls.';
+}
 const labels={'nightmare':'Nightmare attempts','invasion':'Dimensional Invasion','shugo-server':'Shugo Festival · server','shugo-character':'Shugo Festival · character',
 'ascension':'Ascension Trial','subjugation':'Subjugation','duty':'Duty Missions','unknown-fissure':'Daeva Bio-Research',
 'raid-ludra':'Abyssal Forge · Ludra'};
@@ -116,6 +134,7 @@ function render(){
  const events=(state.events||[]).filter(e=>match(e,profile) && Date.parse(e.occurred_at)<=Date.now())
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
  const walletView=window.AtreiaWallets.calculate(events,p.daily);
+ const money=window.AtreiaWallets.movements(events,p.daily);
  const regularWallet=walletView.regular, boundWallet=walletView.bound;
  const t={dayEarned:0,daySpent:0};
  let hasEarned=false,hasSpent=false;
@@ -156,6 +175,42 @@ function render(){
  $('regular-day-note').textContent=net===null?'Awaiting a second reading today':'Net vs first reading today · not gross earnings';
  $('today-earned').textContent=hasEarned?num(t.dayEarned):'—';
  $('today-spent').textContent=hasSpent?num(t.daySpent):'—';
+ $('observed-in').textContent=money.observations>0?num(money.inToday):'—';
+ $('observed-out').textContent=money.observations>0?num(money.outToday):'—';
+ $('observed-net').textContent=money.observations>0?
+   (money.netToday>0?'+':'')+num(money.netToday):'—';
+ $('observed-net').className=money.netToday<0?'down':money.netToday>0?'up':'';
+ $('observed-in-breakdown').textContent=money.observations>0
+  ?'Regular +'+num(money.byCurrency.unbound.in)+' · Bound +'+num(money.byCurrency.bound.in)
+  :'Awaiting a captured Kina balance';
+ $('observed-out-breakdown').textContent=money.observations>0
+  ?'Regular −'+num(money.byCurrency.unbound.out)+' · Bound −'+num(money.byCurrency.bound.out)
+  :'Awaiting a captured Kina balance';
+ const movementRows=$('movement-rows');
+ movementRows.replaceChildren();
+ if(!money.changes.length) {
+   const empty=document.createElement('div');empty.className='empty';
+   empty.textContent=money.observations===0
+    ?'No capture-session wallet readings yet. Open Aion 2 to establish a baseline.'
+    :'No changes observed after the first reading. Spending or claiming a payout can produce a new wallet update.';
+   movementRows.append(empty);
+ }
+ for(const movement of money.changes.slice(0,9)) {
+   const row=document.createElement('div');row.className='movement-row';
+   const info=document.createElement('div');
+   const label=document.createElement('span');label.className='activity-name';
+   label.textContent=(movement.currency==='unbound'?'Regular':'Bound')+' Kina '+(movement.direction==='in'?'in':'out');
+   const details=document.createElement('span');details.className='movement-source';
+   details.textContent='Balance '+num(movement.before)+' → '+num(movement.after)+' · source unknown';
+   info.append(label,details);
+   const amount=document.createElement('strong');
+   amount.className=movement.direction==='in'?'up':'down';
+   amount.textContent=(movement.direction==='in'?'+':'−')+num(movement.amount);
+   const when=document.createElement('time');
+   when.dateTime=movement.occurred_at;
+   when.textContent=new Date(movement.occurred_at).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+   row.append(info,amount,when);movementRows.append(row);
+ }
  for(const period of ['daily','weekly']){
   const holder=$(period+'-counters');holder.replaceChildren();
   const matching=[...counters.values()].filter(e=>e.frequency===period);
@@ -187,6 +242,9 @@ function render(){
  }
 }
 async function refresh(){try{state=await api.state();render();}catch(e){show(e.message,true);}}
+for(const name of ['overview','diagnostics']) {
+ $('nav-'+name).addEventListener('click',()=>setView(name));
+}
 $('character-select').addEventListener('change',e=>{active=e.target.value;render();});
 $('show-add').addEventListener('click',()=>{$('add-character').hidden=!$('add-character').hidden;});
 $('add-character').addEventListener('submit',async e=>{
@@ -245,5 +303,5 @@ $('sync-now').addEventListener('click',async()=>{
  catch(err){show(err.message,true);}
 });
 $('open-website').addEventListener('click',()=>api.openWebsite());
-api.onChange(refresh);entryKind();refresh();
+api.onChange(refresh);entryKind();setView('overview');refresh();
 setInterval(refresh,60000);

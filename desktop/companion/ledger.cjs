@@ -35,6 +35,11 @@ function normalizeEvent(input, fallbackId) {
     ev.balance = input.balance;
     if (input.currency_kind === 'bound' || input.currency_kind === 'unbound')
       ev.currency_kind = input.currency_kind;
+    // Session boundaries are local provenance only. Never upload the session
+    // identifier, and never infer purchases/sales across separate game logins.
+    if (ev.source === 'decoded' && typeof input.observation_session === 'string' &&
+        /^[0-9a-f]{32}$/.test(input.observation_session))
+      ev.observation_session = input.observation_session;
   } else {
     ev.key = safeText(input.key, 90);
     ev.frequency = input.frequency;

@@ -81,3 +81,17 @@ test('one unbound reading is a baseline, not an invented gain',()=>{
  assert.equal(s.unboundNetToday,null);
  assert.equal(s.wallets.unbound.balance,1000);
 });
+
+test('observation session is preserved for decoded wallet snapshots only',()=>{
+ const session='1234567890abcdef1234567890abcdef';
+ const decoded=normalizeEvent({
+  id:'s1',character:'Ceti',server:'NA West',type:'wallet_snapshot',
+  balance:1200,currency_kind:'unbound',source:'decoded',
+  observation_session:session,occurred_at:'2026-11-08T12:00:00Z'
+ });
+ assert.equal(decoded.observation_session,session);
+ const manual=normalizeEvent({...decoded,id:'s2',source:'manual'});
+ assert.equal(manual.observation_session,undefined);
+ const malformed=normalizeEvent({...decoded,id:'s3',observation_session:'not-a-session'});
+ assert.equal(malformed.observation_session,undefined);
+});

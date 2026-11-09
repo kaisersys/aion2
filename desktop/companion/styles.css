@@ -11,3 +11,29 @@
 @media(max-width:580px){.metrics{grid-template-columns:1fr}}
 
 .wallet-equation{font-size:11px;color:#9db3cb;margin:-5px 2px 15px;line-height:1.5}
+
+/* The command center is concise; network metrics live only in Diagnostics. */
+.nav-tab{display:block;text-align:left;width:100%;border:1px solid transparent;background:transparent;color:#9fb0c8;padding:13px 10px;border-radius:9px;font-size:13px}
+.nav-tab:hover{color:#e1ebfa;background:#192738}
+.nav-tab.nav-active{border-color:#2b3c52;background:linear-gradient(90deg,#1d2a3c,#151e2a);color:#dbe6f7}
+.tab-view[hidden]{display:none!important}
+.overview-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.overview-actions .outlined{padding:8px 13px}
+.money-movement{margin:17px 0;background:linear-gradient(145deg,#111e30,#101a28)}
+.money-movement .section-top{margin-bottom:10px}
+.movement-help{font-size:11px;line-height:1.65;max-width:950px}
+.movement-help strong{font-weight:650;color:#c0d0e4}
+.movement-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}
+.movement-metric{padding:16px;border:1px solid #344459;border-radius:9px;background:#172437}
+.movement-metric small{font-size:10px;font-weight:700;color:#91aac6;letter-spacing:.11em}
+.movement-metric strong{font-size:25px;display:block;margin:9px 0 4px;word-break:break-word;font-variant-numeric:tabular-nums}
+.movement-metric p{font-size:10px;margin:4px 0;color:#8099b3}
+.movement-list-title{font-size:10px;letter-spacing:.13em;color:#a5b8cf;border-bottom:1px solid #2b3d53;padding-bottom:10px;display:flex;justify-content:space-between;gap:10px}
+.movement-list-title small{font-size:10px;color:#7f95af;letter-spacing:0}
+.movement-row{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;border-bottom:1px solid #293a4e;padding:11px 3px;font-size:12px}
+.movement-row:last-child{border-bottom:0}
+.movement-row strong{font-variant-numeric:tabular-nums;font-size:14px}
+.movement-row .movement-source{color:#8199b2;font-size:10px;display:block;margin-top:3px}
+.movement-row time{color:#849bb4;font-size:11px}
+@media(max-width:950px){.movement-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.movement-metrics{grid-template-columns:1fr}.movement-row{gap:7px}}

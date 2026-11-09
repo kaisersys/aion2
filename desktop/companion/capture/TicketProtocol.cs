@@ -16,6 +16,7 @@ public sealed record CounterDef(string Key, string Frequency, string Scope, int 
 public sealed class TicketProtocol
 {
     private readonly Action<object> _emit;
+    private string _observationSession = Guid.NewGuid().ToString("N");
     private readonly Dictionary<uint, TicketReading> _pendingTickets = new();
     private readonly Dictionary<uint, TicketReading> _latestTickets = new();
     private bool _awaitingCharacter;
@@ -117,7 +118,13 @@ public sealed class TicketProtocol
                 {
                     CharacterRecords++;
                     bool changed = _currentName != name || _currentServerId != serverId;
-                    if (changed) _latestWallets.Clear();
+                    if (changed)
+                    {
+                        _latestWallets.Clear();
+                        // A new character is a new wallet-observation session.
+                        // Never infer financial movement across logins.
+                        _observationSession=Guid.NewGuid().ToString("N");
+                    }
                     _currentName = name;
                     _currentServerId = serverId;
                     _emit(new { kind = "character", name, serverId });
@@ -168,6 +175,7 @@ public sealed class TicketProtocol
                 id = Guid.NewGuid().ToString("N"), type = "wallet_snapshot",
                 character = _currentName, serverId = _currentServerId,
                 balance = amount, currency_kind = currencyKind,
+                observation_session = _observationSession,
                 occurred_at = at.ToUniversalTime().ToString("O"), source = "decoded"
             }
         });

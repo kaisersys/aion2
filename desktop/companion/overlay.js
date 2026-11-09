@@ -35,6 +35,7 @@ function render(s){
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
  const periods=periodStarts(), counters=new Map();
  const wallets=window.AtreiaWallets.calculate(events,periods.daily);
+ const changes=window.AtreiaWallets.movements(events,periods.daily);
  for (const e of events) {
    const when=Date.parse(e.occurred_at);
    if(e.type==='counter'&&when>=(e.frequency==='weekly'?periods.weekly:periods.daily))
@@ -46,6 +47,8 @@ function render(s){
    wallets.minimumAll!==null?'≥ '+fmt(wallets.minimumAll):'—';
  $('net').textContent=wallets.netToday===null?'—':
    (wallets.netToday>0?'+':'')+fmt(wallets.netToday);
+ $('mini-in').textContent=changes.observations?fmt(changes.inToday):'—';
+ $('mini-out').textContent=changes.observations?fmt(changes.outToday):'—';
  $('counter-caption').textContent=counters.size?'Live / last seen':'Awaiting game data';
  const holder=$('counter-list');holder.replaceChildren();
  const preferred=['nightmare','odyle-energy','ascension','subjugation','invasion','unknown-fissure','shugo-server'];
