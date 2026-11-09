@@ -4,11 +4,11 @@
 // was submitted. Do not create a "Kinah spent" event from OCR alone.
 const {charKey}=require('./ledger.cjs');
 const {movements}=require('./wallets.js');
-const WINDOW_BEFORE_MS=15000;
-const WINDOW_AFTER_MS=90000;
+const WINDOW_BEFORE_MS=1500;
+const WINDOW_AFTER_MS=45000;
 const SPLIT_MS=3000;
 function validCandidate(x) {
- return x && x.status==='unverified' &&
+ return x && x.status==='unverified' && x.screen_phase==='confirmation' &&
   (x.kind==='listing_observation'||x.kind==='listing_fee_observation') &&
   Number.isSafeInteger(x.fee)&&x.fee>0 &&
   Number.isFinite(Date.parse(x.occurred_at)) &&
@@ -53,7 +53,9 @@ function reconcileFees(observations,events,now=Date.now()) {
    if(pairs.length!==1)continue;
    used=pairs[0];currency='mixed';
   }
-  // The UI's exact fee and one unambiguous observed wallet debit agree.
+  // The game displayed a Confirm/Cancel dialog, and the exact fee matches
+  // one subsequently decoded debit. This is evidence of payment, not a
+  // definitive server acknowledgement. A canceled prompt alone cannot count.
   row.status='corroborated';
   row.currency_kind=currency;
   row.wallet_event_ids=used.map(w=>w.id).sort();
