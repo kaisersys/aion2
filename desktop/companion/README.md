@@ -234,3 +234,16 @@ Common reasons nothing appears:
 - OCR can read labels on a separate line from the amount and ignores the always-visible "Settlement" navigation tab while listing. Other languages or game client layouts may need additional parser rules.
 
 No screenshots or raw recognized text are uploaded. Only the structured fee/price, user/character, and reconciliation status sync to the account owner's RLS-protected Supabase rows. Upload failures remain queued and retry. All OCR source attribution is provisional until validated against actual Global game screens.
+
+
+## Market OCR setup and failure diagnostics (v0.1.2)
+
+A Windows preview must ship a real **public Supabase project URL and publishable key**. The prior build excluded the required `config.json`, so website account login and account-triggered Market OCR could not start from a fresh preview installer. This build includes only the public `sb_publishable_...` key for the Atreia Street project, never a service-role/secret key.
+
+The companion **must** be signed in once, separate from simply creating an account on the website. It now stores only an encrypted refresh token using Windows/Electron `safeStorage`; the password is never written to disk. The session resumes automatically on subsequent launches. If Windows secure storage is unavailable, the player must sign in again on launch. Signing out clears the encrypted token and stops OCR.
+
+The Market reader status is displayed **near the top of the desktop companion**, and again on the **Diagnostics** tab under Game-window reading. The diagnostics show the number of AION2 windows matching the title, capture dimensions, OCR scan count, OCR character count, last attempt time, fee-label detection and at most three recognized fee-label lines. This is ephemeral local UI data, not stored to disk, transmitted to Supabase, or uploaded with telemetry. A **Scan visible Market now** button is available on both the overview and Diagnostics tabs after account sign-in.
+
+If the scanner reports *No AION2 game window found*, try borderless/windowed mode and verify the game has a visible AION2 window. If it reports *window found but blank*, Windows game capture may be restricted. If OCR sees text but does not see *Registration Fee*, check Aion 2 language/layout and game UI scale. If the fee label is recognized but its amount is not, its exact text/placement needs a validated, user-supplied **direct screenshot** (a Lightshot shortlink may not be accessible to automated tooling).
+
+The screen reader still records **fee quotes** rather than completed transactions unless wallet reductions corroborate them. It does not reconstruct missed historical fees. Live testing in a genuine Global Market listing screen is necessary before public release.
