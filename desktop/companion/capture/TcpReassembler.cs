@@ -166,8 +166,24 @@ public sealed class TcpReassembler
                 int offset = FindSyncOffset(stream.Buffer, layout, syncOpcodes);
                 if (offset < 0)
                 {
-                    // Nothing lines up yet. Keep only the tail (a real frame start can still be in
-                    // it) so a stream that never syncs cannot grow without bound.
+                    // The own-character and roster messages can be tens of kilobytes.
+                    // A capture that starts at one of these records will not have a COMPLETE
+                    // frame until much more than SyncGiveUpBytes has arrived. Preserve a
+                    // plausible, explicitly known identity-frame header rather than discarding
+                    // the character name before a zone change has finished loading.
+                    int partialAt = FindPartialIdentityFrame(stream.Buffer, layout);
+                    if (partialAt >= 0)
+                    {
+                        if (partialAt > 0)
+                        {
+                            Desyncs++;
+                            stream.Buffer.RemoveRange(0, partialAt);
+                        }
+                        return;
+                    }
+
+                    // Nothing recognizable. Keep only a short tail and hunt for the next
+                    // real frame header rather than retaining unrelated TCP payloads.
                     if (stream.Buffer.Count > SyncGiveUpBytes)
                     {
                         Desyncs++;
@@ -303,6 +319,40 @@ public sealed class TcpReassembler
     private const int SyncSearchWindow = 4096;
     private const int SyncGiveUpBytes = 8192;
 
+    /// <summary>
+    /// A partial own-character or account-roster frame can exceed the usual 8 KB
+    /// sync search buffer. Hold such an incomplete record only when its length prefix
+    /// and known identity opcode both match; never retain arbitrary unknown traffic.
+    /// Once the declared frame arrives, normal ChainFits validation takes over.
+    /// </summary>
+    private static int FindPartialIdentityFrame(List<byte> b, FrameLayout layout)
+    {
+        if (!layout.IsVarint || !layout.OpcodeBigEndian) return -1;
+        int last = Math.Min(SyncSearchWindow, b.Count - 4);
+        for (int start = 0; start <= last; start++)
+        {
+            long length = 0;
+            int prefix = 0;
+            bool complete = false;
+            while (prefix < 5 && start + prefix < b.Count)
+            {
+                byte value = b[start + prefix++];
+                length |= (long)(value & 0x7f) << (7 * (prefix - 1));
+                if ((value & 0x80) == 0) { complete = true; break; }
+            }
+            if (!complete || start + prefix + 2 > b.Count) continue;
+            long total = length + prefix + layout.LengthBias;
+            // A small frame is handled by normal sync. The bigger range is only
+            // reserved for character/roster frames known to appear during login/teleport.
+            if (total < 512 || total > MaxKnownFrameLength ||
+                start + total <= b.Count) continue;
+            int opcodeAt = start + prefix;
+            int opcode = b[opcodeAt] << 8 | b[opcodeAt + 1];
+            if (opcode is 0x3336 or 0x2636 or 0x1536) return start;
+        }
+        return -1;
+    }
+
     /// <summary>First offset (within the search window) at which <see cref="SyncChainLength"/>
     /// complete, plausible varint frames follow each other inside the buffer; -1 if none.</summary>
     private static int FindSyncOffset(List<byte> buffer, FrameLayout layout, IReadOnlySet<int>? syncOpcodes)
@@ -351,10 +401,11 @@ public sealed class TcpReassembler
             }
 
             // The frame's opcode must be one seen in real traffic (when such a list exists).
+            int opcode = -1;
             if (syncOpcodes is { Count: > 0 })
             {
                 int opcodeAt = pos + prefix + layout.OpcodeOffset;
-                int opcode = layout.OpcodeBigEndian
+                opcode = layout.OpcodeBigEndian
                     ? buffer[opcodeAt] << 8 | buffer[opcodeAt + 1]
                     : buffer[opcodeAt + 1] << 8 | buffer[opcodeAt];
                 if (!syncOpcodes.Contains(opcode))
@@ -364,6 +415,14 @@ public sealed class TcpReassembler
             }
 
             pos += (int)total;
+
+            // One complete large identity/roster frame is sufficient to establish sync
+            // even when the server has already appended a PARTIAL next frame.
+            // Otherwise the old 3-frame heuristic throws away an entire teleport record.
+            if (n == 0 && total >= 512 && opcode is 0x3336 or 0x2636 or 0x1536)
+            {
+                return true;
+            }
 
             // Frames that tile the buffer exactly - the usual case when the server sends one
             // message - are as convincing as a chain of three, even for a single frame.

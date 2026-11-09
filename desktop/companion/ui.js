@@ -58,6 +58,26 @@ function render(){
  $('sync-now').disabled=!state.remote;
  $('feed-label').textContent=state.feedPath?'Also watching '+state.feedPath+' for decoded JSONL events':'Read-only Npcap capture; decoded events are stored locally.';
  $('capture-detail').textContent=state.capture?.message||'Npcap initializing...';
+ const h=state.capture?.health;
+ const hasIdentity=state.capture?.state==='connected';
+ $('diagnostic-process').textContent=!h?'Checking':h.gameRunning?'Detected':'Not running';
+ $('diagnostic-connections').textContent=h?String(h.connections):'—';
+ $('diagnostic-adapters').textContent=h?String(h.adapters):'—';
+ $('diagnostic-packets').textContent=h?String(h.packets):'—';
+ $('diagnostic-frames').textContent=h?String(h.frames):'—';
+ $('diagnostic-identity').textContent=h?String(h.identities+h.rosters):'—';
+ $('detection-instructions').hidden=hasIdentity;
+ $('detection-instructions').textContent=state.capture?.state==='error'
+   ?'Capture error. Check the exact message above. Npcap may need reinstalling without administrator-only access.'
+   :state.settings?.autoCapture===false
+   ?'Tracking is paused. Resume automatic tracking to receive game data.'
+   :h && !h.gameRunning
+   ?'Launch Aion 2 on this PC and enter the game world. If you play through cloud streaming, the game traffic may not be accessible locally.'
+   :h && h.packets===0
+   ?'The companion sees no game packets. Check Npcap, administrator-only capture settings, and VPN/loopback routing; teleporting repeatedly will not help.'
+   :h && h.frames===0
+   ?'Packets are arriving, but the decoder has not produced game frames. This indicates a capture/protocol mismatch that requires investigation.'
+   :'If frames are arriving but no character appears, switch to character selection or load a different zone once.';
  if(!portLoaded) { $('game-port').value=state.settings?.gamePort||13328; portLoaded=true; }
  $('overlay-toggle').textContent=state.settings?.overlayEnabled?'Hide mini overlay':'Show mini overlay';
  const capturing=['starting','listening','connected','unmapped'].includes(state.capture?.state);

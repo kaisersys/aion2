@@ -16,8 +16,8 @@ let state = { profiles:[], events:[], settings:{...DEFAULT_SETTINGS}, activeChar
 let feed = null;
 let remote = null;
 let capture = null;
-let captureStatus = {state:'idle',message:'Npcap capture not started.'};
-function captureMessage(state,message){captureStatus={state,message};notify();}
+let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
+function captureMessage(state,message){captureStatus={state,message,health:captureStatus.health};notify();}
 
 function notify() {
   if (win && !win.isDestroyed()) win.webContents.send('state:changed');
@@ -222,6 +222,35 @@ function processCaptureMessage(message) {
     captureMessage(message.state==='error'?'error':message.state, String(message.message||''));
     return;
   }
+  if (message.kind==='health') {
+    const value = n => Number.isSafeInteger(n) && n>=0 ? n : 0;
+    const h = {
+      packets:value(message.packets),frames:value(message.frames),
+      identities:value(message.identities),rosters:value(message.rosters),
+      dropped:value(message.dropped),gaps:value(message.gaps),
+      desyncs:value(message.desyncs),port:String(message.port||'').slice(0,50),
+      gameRunning:message.gameRunning===true,
+      connections:value(message.connections),loopback:message.loopback===true,
+      adapters:value(message.adapters),osLookupError:String(message.osLookupError||'').slice(0,100)
+    };
+    captureStatus.health=h;
+    if(captureStatus.state==='listening' || captureStatus.state==='starting'){
+      if(!h.gameRunning && h.packets===0)
+        captureStatus.message='AION2.exe is not running or was not detected by Windows. Npcap is listening on '+h.adapters+' adapter(s).';
+      else if(h.gameRunning && h.connections===0 && h.packets===0)
+        captureStatus.message='AION2.exe detected, but Windows reports no established IPv4 TCP connection yet. Enter the game world; a VPN/accelerator may obscure it.';
+      else if(h.packets===0)
+        captureStatus.message='AION2.exe detected with '+h.connections+' TCP connection(s), but Npcap has captured ZERO game packets. Check driver access and VPN/loopback adapters; teleporting will not fix this.';
+      else if(h.frames===0)
+        captureStatus.message='Received '+h.packets+' TCP packets but decoded ZERO Aion 2 frames. The protocol decoder or traffic path needs fixing, not another teleport.';
+      else if(h.identities===0 && h.rosters===0)
+        captureStatus.message='Decoded '+h.frames+' frames, but no character or account roster yet. Try character selection or a zone-loading transition.';
+      else
+        captureStatus.message='Game traffic and identity records detected. Verifying the active character.';
+    }
+    notify();
+    return;
+  }
   if (message.kind==='roster' && Array.isArray(message.characters)) {
     let changed=false, found=0;
     for(const c of message.characters.slice(0,80)) {
@@ -274,6 +303,7 @@ function startCapture(gamePort=13328) {
   if (!fs.existsSync(exe)) throw new Error('Capture helper missing. Build capture/AtreiaCapture.csproj first.');
   const child=spawn(exe,['--ports',String(port)],{windowsHide:true,stdio:['ignore','pipe','pipe']});
   capture=child;
+  captureStatus.health=null;
   captureMessage('starting','Initializing Npcap · server port '+port+'…');
   const output=readline.createInterface({input:child.stdout});
   output.on('line',line=>{

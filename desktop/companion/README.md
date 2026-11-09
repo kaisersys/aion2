@@ -65,3 +65,18 @@ Validate against a real Global login and controlled task changes, including tick
 - A mini, moveable always-on-top Electron window shows the active captured character's concise economy and progress snapshot. It does not draw into the game process and may not appear above exclusive fullscreen games; borderless windowed mode is preferable.
 - Capture starts when the companion itself starts, **not on Windows sign-in**. Users may manually pause/resume from the main dashboard; the setting is remembered. No automatic background upload occurs without website sign-in and the explicit Sync action.
 - If the game client was already running before capture began, discovery may require relogging or switching characters. No memory inspection or injection is attempted.
+
+## Updated detection diagnostics (automatic game endpoint discovery)
+
+Teleporting across zones may send a fresh own-character frame but does not repair a broken driver or decoder. The Windows capture helper now observes **Windows TCP owner metadata** for `AION2.exe` with the IP Helper API, then includes only the current game-owned IPv4 endpoints in the inbound Npcap filter. This never accesses game memory or sends network data to the website.
+
+- **Game not running:** Launch AION2.exe locally; local capture does not work for cloud-streamed game traffic.
+- **Game detected but no TCP connections:** Enter the game world. VPN/accelerators, proxy processes or IPv6-only paths may hide relevant connections.
+- **Process connected, packets 0:** The driver cannot see the game flow. Verify Npcap installation, admin-only access settings, and networking adapters. Teleporting repeatedly is unlikely to help.
+- **Packets above 0, decoded frames 0:** Npcap sees data, but the current protocol decoder may not match the traffic format, or a VPN tunnel may be interfering.
+- **Frames above 0, identity 0:** Some Aion 2 game messages decode, but the character/roster has not been observed. Changing zones or opening character selection can trigger another relevant record.
+- **Identity above 0, character missing:** Local character association requires repair.
+
+The main panel now shows the game process, TCP-connection count, Npcap adapter count, captured game packets, decoded frames, and identity records. These are aggregate diagnostics; raw packets, credentials, network addresses and process-memory contents are not recorded or uploaded. The fallback server port is still configurable.
+
+A synthetic test verifies reassembly of a fragmented 40 KB identity frame and Win32 TCP remote-port byte order. Neither proves live Global compatibility. Third-party traffic capture remains unofficial, may violate NCSOFT rules, and can carry account risk.

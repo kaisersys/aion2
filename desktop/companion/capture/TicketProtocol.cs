@@ -22,6 +22,9 @@ public sealed class TicketProtocol
     private string? _currentName;
     private int _currentServerId;
 
+    public int CharacterRecords { get; private set; }
+    public int RosterRecords { get; private set; }
+
     public TicketProtocol(Action<object> emit) => _emit = emit;
 
     // The only emitted counters are those that can safely be mapped to the site's existing
@@ -79,11 +82,15 @@ public sealed class TicketProtocol
             case 0x1536 when frame.Length > 500: // some initial-login roster frames
                 var roster = AccountRoster.Parse(frame);
                 if (roster.Count > 0)
+                {
+                    RosterRecords++;
                     _emit(new { kind = "roster", characters = roster });
+                }
                 break;
             case 0x3336:
                 if (TryReadCharacter(frame, out string name, out int serverId))
                 {
+                    CharacterRecords++;
                     bool changed = _currentName != name || _currentServerId != serverId;
                     _currentName = name;
                     _currentServerId = serverId;

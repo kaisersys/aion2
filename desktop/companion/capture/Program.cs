@@ -49,6 +49,13 @@ internal sealed class ReadOnlyCapture : IDisposable
     private long _segments;
     private long _frames;
     private long _dropped;
+    private HashSet<string> _autoEndpoints = new(StringComparer.Ordinal);
+    private bool _gameRunning;
+    private int _gameConnections;
+    private bool _gameViaLoopback;
+    private string? _osLookupError;
+    private string _appliedFilter = "";
+    private long _nextConnectionCheck;
     public ReadOnlyCapture(HashSet<int> ports)
     {
         _ports = ports;
@@ -65,6 +72,7 @@ internal sealed class ReadOnlyCapture : IDisposable
         {
             var available = CaptureDeviceList.Instance;
             if (available.Count == 0) { Program.Status("error", "Npcap driver not found. Install Npcap separately and enable its service."); return 3; }
+            RefreshGameConnections();
             int opened = 0;
             foreach (ILiveDevice device in available.Cast<ILiveDevice>())
             {
@@ -73,8 +81,9 @@ internal sealed class ReadOnlyCapture : IDisposable
                     device.Open(new DeviceConfiguration {
                         ReadTimeout = 250, Mode = DeviceModes.None, KernelBufferSize = 16 * 1024 * 1024
                     });
-                    // IMPORTANT: the driver drops non-Aion ports before the app sees their payloads.
-                    device.Filter = "tcp and (" + string.Join(" or ", _ports.Select(p => $"src port {p}")) + ")";
+                    // Default game port plus only AION2.exe-owned TCP remote endpoints.
+                    // This avoids indiscriminate capture of unrelated applications.
+                    device.Filter = CaptureFilter();
                     device.OnPacketArrival += OnPacket;
                     device.StartCapture();
                     _devices.Add(device);
@@ -86,9 +95,12 @@ internal sealed class ReadOnlyCapture : IDisposable
                 }
             }
             if (opened == 0) { Program.Status("error", "Npcap cannot open any network adapters."); return 4; }
-            Program.Status("listening", $"Npcap listening on {opened} adapter(s), server port(s): {string.Join(", ", _ports)}. Log into a character to read ticket snapshots.");
+            Program.Status("listening", $"Npcap active on {opened} network adapter(s). Automatic AION2.exe connection tracking enabled; teleport across zones if your character is already logged in.");
+            long nextHealth = Environment.TickCount64;
             while (!cancellation.IsCancellationRequested)
             {
+                if (Environment.TickCount64 >= _nextConnectionCheck)
+                    RefreshGameConnections();
                 if (_queue.TryTake(out TcpSegment? segment, 500))
                 {
                     try {
@@ -100,8 +112,23 @@ internal sealed class ReadOnlyCapture : IDisposable
                     }
                     catch { /* never preserve raw frames or abort capture on a malformed message */ }
                 }
-                if (_frames == 0 && _segments > 5000 && _segments % 5000 == 0)
-                    Program.Status("listening", "Game traffic detected; no supported frames decoded yet. Try logging out and back in, or verify the server port.");
+                if (Environment.TickCount64 >= nextHealth)
+                {
+                    nextHealth = Environment.TickCount64 + 2000;
+                    // Aggregate diagnostics only: no network addresses, packet bytes,
+                    // raw frames, or account identifiers are emitted or persisted.
+                    Program.Emit(new {
+                        kind = "health", packets = Interlocked.Read(ref _segments),
+                        frames = _frames, identities = _protocol.CharacterRecords,
+                        rosters = _protocol.RosterRecords,
+                        dropped = Interlocked.Read(ref _dropped),
+                        gaps = _reassembler.Gaps, desyncs = _reassembler.Desyncs,
+                        port = string.Join(",", _ports.OrderBy(x=>x)),
+                        gameRunning = _gameRunning, connections = _gameConnections,
+                        loopback = _gameViaLoopback, adapters = opened,
+                        osLookupError = _osLookupError
+                    });
+                }
             }
             return 0;
         }
@@ -109,6 +136,39 @@ internal sealed class ReadOnlyCapture : IDisposable
         {
             Program.Status("error", "Npcap could not initialize: " + ex.GetBaseException().Message);
             return 5;
+        }
+    }
+
+    private string CaptureFilter()
+    {
+        var expressions=new List<string>();
+        expressions.AddRange(_ports.OrderBy(x=>x).Select(p=>$"src port {p}"));
+        // Only Windows-owned AION2.exe connection destinations, no broad 443 capture.
+        foreach(var endpoint in _lastDiscovered.Values.OrderBy(x=>x.Key,StringComparer.Ordinal))
+            expressions.Add(endpoint.Filter);
+        return "tcp and ("+string.Join(" or ",expressions)+")";
+    }
+
+    private Dictionary<string,GameConnections.Endpoint> _lastDiscovered=new(StringComparer.Ordinal);
+
+    private void RefreshGameConnections()
+    {
+        _nextConnectionCheck=Environment.TickCount64+4000;
+        var observed=GameConnections.Observe();
+        _gameRunning=observed.Running;
+        _gameConnections=observed.Endpoints.Count;
+        _gameViaLoopback=observed.Endpoints.Any(e=>e.Loopback);
+        _osLookupError=observed.Error;
+        var fresh=observed.Endpoints.ToDictionary(x=>x.Key,StringComparer.Ordinal);
+        _lastDiscovered=fresh;
+        Volatile.Write(ref _autoEndpoints,fresh.Keys.ToHashSet(StringComparer.Ordinal));
+        string filter=CaptureFilter();
+        if(filter==_appliedFilter) return;
+        _appliedFilter=filter;
+        foreach(var device in _devices)
+        {
+            try { device.Filter=filter; }
+            catch(PcapException) { /* Retain existing filter, visible counters still update. */ }
         }
     }
 
@@ -120,7 +180,9 @@ internal sealed class ReadOnlyCapture : IDisposable
             Packet packet = Packet.ParsePacket(raw.LinkLayerType, raw.Data);
             TcpPacket? tcp = packet.Extract<TcpPacket>();
             IPPacket? ip = packet.Extract<IPPacket>();
-            if (tcp is null || ip is null || !_ports.Contains(tcp.SourcePort)) return;
+            if (tcp is null || ip is null) return;
+            string endpoint=ip.SourceAddress+":"+tcp.SourcePort;
+            if (!_ports.Contains(tcp.SourcePort) && !Volatile.Read(ref _autoEndpoints).Contains(endpoint)) return;
             byte[] payload = tcp.PayloadData ?? Array.Empty<byte>();
             if (payload.Length == 0) return;
             Interlocked.Increment(ref _segments);
@@ -181,6 +243,42 @@ public static class SelfTest
             List<AccountRoster.Character> account=AccountRoster.Parse(roster);
             if(account.Count!=1||account[0].Name!="Ceti"||account[0].ServerId!=1204)
                 throw new Exception("Account roster decode failed.");
+            // Regression: the own-character frame may be 40 kB long on a teleport
+            // to a new zone. It must survive many TCP fragments beyond the old
+            // unsynced 8 KB ring-buffer cutoff.
+            byte[] identityBody = new byte[40000];
+            identityBody[0]=0x33;
+            identityBody[1]=0x36;
+            long declared=identityBody.Length + 4; // varint body length includes bias +4
+            var prefix=new List<byte>();
+            do {
+                byte next=(byte)(declared & 0x7f);
+                declared >>= 7;
+                if(declared>0)next|=0x80;
+                prefix.Add(next);
+            } while(declared>0);
+            byte[] wire=prefix.Concat(identityBody).ToArray();
+            var assembler=new TcpReassembler();
+            var frameLayout=new FrameLayout();
+            var known=new HashSet<int>{0x3336};
+            int emitted=0;
+            // A partial next frame immediately following identity is a realistic
+            // network situation and must not block accepting the complete identity.
+            byte[] joined=wire.Concat(new byte[]{0x10,0x33}).ToArray();
+            for(int offset=0;offset<joined.Length;offset+=1200)
+            {
+                int size=Math.Min(1200,joined.Length-offset);
+                var seg=new TcpSegment(DateTime.UtcNow,"server:13328","local:52344",
+                    (uint)(1000+offset),joined.AsMemory(offset,size),true);
+                var output=assembler.Push(seg,frameLayout,known);
+                emitted+=output.Count;
+                if(output.Any(f=>f.Length!=identityBody.Length))
+                    throw new Exception("Partial character frame emitted as complete.");
+            }
+            if(emitted!=1)
+                throw new Exception($"Large teleport identity frame lost (received {emitted}).");
+            if (GameConnections.RemotePort(0x00001034u)!=13328)
+                throw new Exception("TCP owner table remote-port endianness failed.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }
