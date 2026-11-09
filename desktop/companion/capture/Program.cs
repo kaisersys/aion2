@@ -586,8 +586,8 @@ public static class SelfTest
             if(items.Update(ItemUpdate(11,531060004,15)) is not InventoryItems.Delta decrease ||
                decrease.Quantity!=-30)
                 throw new Exception("Scroll consumption/transfer decrease was not observed.");
-            if(items.Update(ItemUpdate(11,531060004,0,2)) is not InventoryItems.Delta removed ||
-               removed.Quantity!=-15)
+            if(items.Update(ItemUpdate(11,531060004,0,2)) is not InventoryItems.Delta removedStack ||
+               removedStack.Quantity!=-15)
                 throw new Exception("Remaining stack removal failed.");
             if(items.Update(ItemUpdate(33,531060004,100,1)) is not null)
                 throw new Exception("Unknown stack change must establish baseline only.");

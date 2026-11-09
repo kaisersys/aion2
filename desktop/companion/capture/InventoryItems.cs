@@ -39,10 +39,11 @@ public sealed class InventoryItems
             frame[0]!=0x11 || frame[1]!=0x56) return false;
 
         var snapshot=new Dictionary<uint,(uint ItemId,long Count)>();
+        ReadOnlySpan<byte> reservedZero=stackalloc byte[4];
         for(int i=10;i+12<=frame.Length;i++)
         {
             uint item=BinaryPrimitives.ReadUInt32LittleEndian(frame[i..]);
-            if(!RealItem(item) || !frame.Slice(i-4,4).SequenceEqual(stackalloc byte[4]))
+            if(!RealItem(item) || !frame.Slice(i-4,4).SequenceEqual(reservedZero))
                 continue;
             uint handle=BinaryPrimitives.ReadUInt32LittleEndian(frame[(i-8)..]);
             ulong count=BinaryPrimitives.ReadUInt64LittleEndian(frame[(i+4)..]);
