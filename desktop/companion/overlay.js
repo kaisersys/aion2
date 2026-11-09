@@ -23,6 +23,8 @@ function render(s){
    :health?.packets===0?'No packets · open full diagnostics'
    :health?.frames===0?'Packets only · decoder needs attention'
    :health?.characterPackets>0 && health?.identities===0?'Character packet parse mismatch'
+   :health?.bundles>0 && health?.bundlesDecoded===0?'Compressed data needs updating'
+   :health?.identities===0 && health?.bundlesDecoded>0?'Compressed frames · identity pending'
    :health?.identities===0?'Frames decoded · identity not seen'
    :'Checking character identity'
   :capture==='error'?'Capture error · open full companion'

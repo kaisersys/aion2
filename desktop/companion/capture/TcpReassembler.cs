@@ -170,8 +170,8 @@ public sealed class TcpReassembler
                     // A capture that starts at one of these records will not have a COMPLETE
                     // frame until much more than SyncGiveUpBytes has arrived. Preserve a
                     // plausible, explicitly known identity-frame header rather than discarding
-                    // the character name before a zone change has finished loading.
-                    int partialAt = FindPartialIdentityFrame(stream.Buffer, layout);
+                    // a large login or zone-change message before it has finished loading.
+                    int partialAt = FindPartialIdentityOrBundleFrame(stream.Buffer, layout);
                     if (partialAt >= 0)
                     {
                         if (partialAt > 0)
@@ -320,12 +320,12 @@ public sealed class TcpReassembler
     private const int SyncGiveUpBytes = 8192;
 
     /// <summary>
-    /// A partial own-character or account-roster frame can exceed the usual 8 KB
+    /// A partial own-character, account-roster or compressed-bundle frame can exceed 8 KB
     /// sync search buffer. Hold such an incomplete record only when its length prefix
     /// and known identity opcode both match; never retain arbitrary unknown traffic.
     /// Once the declared frame arrives, normal ChainFits validation takes over.
     /// </summary>
-    private static int FindPartialIdentityFrame(List<byte> b, FrameLayout layout)
+    private static int FindPartialIdentityOrBundleFrame(List<byte> b, FrameLayout layout)
     {
         if (!layout.IsVarint || !layout.OpcodeBigEndian) return -1;
         int last = Math.Min(SyncSearchWindow, b.Count - 4);
@@ -348,7 +348,7 @@ public sealed class TcpReassembler
                 start + total <= b.Count) continue;
             int opcodeAt = start + prefix;
             int opcode = b[opcodeAt] << 8 | b[opcodeAt + 1];
-            if (opcode is 0x3336 or 0x2636 or 0x1536) return start;
+            if (opcode is 0x3336 or 0x2636 or 0x1536 or 0xffff) return start;
         }
         return -1;
     }
@@ -419,7 +419,7 @@ public sealed class TcpReassembler
             // One complete large identity/roster frame is sufficient to establish sync
             // even when the server has already appended a PARTIAL next frame.
             // Otherwise the old 3-frame heuristic throws away an entire teleport record.
-            if (n == 0 && total >= 512 && opcode is 0x3336 or 0x2636 or 0x1536)
+            if (n == 0 && total >= 512 && opcode is 0x3336 or 0x2636 or 0x1536 or 0xffff)
             {
                 return true;
             }

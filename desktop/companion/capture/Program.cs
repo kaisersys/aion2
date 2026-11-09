@@ -48,6 +48,11 @@ internal sealed class ReadOnlyCapture : IDisposable
     private readonly HashSet<int> _knownOpcodes = new();
     private long _segments;
     private long _frames;
+    private long _outerFrames;
+    private long _bundlesSeen;
+    private long _bundlesDecoded;
+    private long _bundleFailures;
+    private long _innerFrames;
     private long _dropped;
     private readonly Dictionary<int, long> _observedOpcodes = new();
     private HashSet<string> _autoEndpoints = new(StringComparer.Ordinal);
@@ -107,16 +112,8 @@ internal sealed class ReadOnlyCapture : IDisposable
                     try {
                         foreach (ReadOnlyMemory<byte> frame in _reassembler.Push(segment, _layout, _knownOpcodes))
                         {
-                            _frames++;
-                            if (frame.Length >= 2) {
-                                int opcode = frame.Span[0] << 8 | frame.Span[1];
-                                // Aggregate opcode counts only. Never export payloads or names.
-                                if (_observedOpcodes.TryGetValue(opcode, out long previous))
-                                    _observedOpcodes[opcode] = previous + 1;
-                                else if (_observedOpcodes.Count < 512)
-                                    _observedOpcodes[opcode] = 1;
-                            }
-                            _protocol.OnFrame(frame, segment.Timestamp.ToUniversalTime());
+                            _outerFrames++;
+                            ProcessFrame(frame, segment.Timestamp.ToUniversalTime(), nested:false);
                         }
                     }
                     catch { /* never preserve raw frames or abort capture on a malformed message */ }
@@ -128,7 +125,10 @@ internal sealed class ReadOnlyCapture : IDisposable
                     // raw frames, or account identifiers are emitted or persisted.
                     Program.Emit(new {
                         kind = "health", packets = Interlocked.Read(ref _segments),
-                        frames = _frames, identities = _protocol.CharacterRecords,
+                        frames = _frames, outerFrames = _outerFrames,
+                        bundles = _bundlesSeen, bundlesDecoded = _bundlesDecoded,
+                        bundleFailures = _bundleFailures, innerFrames = _innerFrames,
+                        identities = _protocol.CharacterRecords,
                         rosters = _protocol.RosterRecords,
                         characterPackets = _protocol.CharacterOpcodesSeen,
                         rosterPackets = _protocol.RosterOpcodesSeen,
@@ -151,6 +151,41 @@ internal sealed class ReadOnlyCapture : IDisposable
             Program.Status("error", "Npcap could not initialize: " + ex.GetBaseException().Message);
             return 5;
         }
+    }
+
+    /// <summary>
+    /// Local-only packet processing. Aion 2 sometimes sends the character identity, roster
+    /// and ticket counters inside a 0xFFFF compressed bundle rather than as a top-level
+    /// packet. Expand it once, count only aggregate message types, and never log bytes.
+    /// </summary>
+    private void ProcessFrame(ReadOnlyMemory<byte> frame,DateTime at,bool nested)
+    {
+        _frames++;
+        if (frame.Length < 2) return;
+        int opcode = frame.Span[0] << 8 | frame.Span[1];
+        if (_observedOpcodes.TryGetValue(opcode,out long previous))
+            _observedOpcodes[opcode]=previous+1;
+        else if (_observedOpcodes.Count<512)
+            _observedOpcodes[opcode]=1;
+
+        if (opcode == Aion2Bundles.BundleOpcode)
+        {
+            _bundlesSeen++;
+            if (nested || !Aion2Bundles.TryExpand(frame,out List<ReadOnlyMemory<byte>> inner))
+            {
+                _bundleFailures++;
+                return;
+            }
+            _bundlesDecoded++;
+            foreach (ReadOnlyMemory<byte> message in inner)
+            {
+                _innerFrames++;
+                ProcessFrame(message,at,nested:true);
+            }
+            return;
+        }
+
+        _protocol.OnFrame(frame, at);
     }
 
     private string CaptureFilter()
@@ -305,6 +340,53 @@ public static class SelfTest
             if (!TicketProtocol.TryReadCharacter(ownCharacter,out string ownName,out int ownServer) ||
                 ownName!="Ceti" || ownServer!=1204)
                 throw new Exception("Own-character identification parser self-test failed.");
+
+            // MIT-licensed SkeeveTV fixture from a real Aion 2 server packet:
+            // 0xFFFF bundle containing 20 separately framed game messages.
+            const string realBundleHex = "ffff08020000ff13200438b81c0400ec1b5e7d14011a02c3f8006c01000000c24e87080100200438f81b1d000150c40701001e1d0015003a0015c43a000c1b002700c51b004f200438ea53000212cd53001fea530007071b000c53001fe153000212b353001fe1530007071b00095300f100332a38f81b011335ade5cc0ae02e0001006065a020f4a0019e00f0090c5e7d1401004f576fc60aa7724600c021440d0e92f81b012e0090160538f81b09ec1b354a0120c00b2a0080332a38ea1b0113391f000f4d001415ea4d0010ea4d0010394d00118d77004f332a38e19a001c15e14d0010e14d00019a0011854d00b00e0036857120f4a0010000";
+            if (!Aion2Bundles.TryExpand(Convert.FromHexString(realBundleHex),
+                    out List<ReadOnlyMemory<byte>> realInner) || realInner.Count != 20)
+                throw new Exception("Real Aion 2 LZ4 bundle fixture failed to expand to 20 frames.");
+            if (!realInner.Any(f => f.Length > 2 && f.Span[0]==0x04 && f.Span[1]==0x38))
+                throw new Exception("Real bundle missing the expected inner game opcodes.");
+
+            // Synthetic bundle with a real-shaped ticket snapshot and a validated own-character
+            // frame, proving the two decoder stages can share a compressed container.
+            var innerWire = new List<byte>();
+            foreach (byte[] message in new[] { list, ownCharacter })
+            {
+                long declaredSize = message.Length + 4;
+                do
+                {
+                    byte part = (byte)(declaredSize & 0x7f);
+                    declaredSize >>= 7;
+                    if (declaredSize > 0) part |= 0x80;
+                    innerWire.Add(part);
+                } while (declaredSize > 0);
+                innerWire.AddRange(message);
+            }
+            var lz4Literal = new List<byte> { 0xf0 };
+            int extension = innerWire.Count - 15;
+            while (extension >= 255) { lz4Literal.Add(255); extension -= 255; }
+            lz4Literal.Add((byte)extension);
+            lz4Literal.AddRange(innerWire);
+            var wrapped = new List<byte>{0xff,0xff};
+            wrapped.AddRange(BitConverter.GetBytes((uint)innerWire.Count));
+            wrapped.AddRange(lz4Literal);
+            if (!Aion2Bundles.TryExpand(wrapped.ToArray(),out List<ReadOnlyMemory<byte>> inner)
+                || inner.Count != 2)
+                throw new Exception("Synthetic ticket/identity LZ4 bundle failed.");
+            var observed = new List<object>();
+            var protocol = new TicketProtocol(ev => observed.Add(ev));
+            foreach(var message in inner) protocol.OnFrame(message,DateTime.UtcNow);
+            if (protocol.CharacterRecords != 1 || protocol.TicketOpcodesSeen != 1 ||
+                !observed.Any(ev => ev.ToString()!.Contains("kind = character")) ||
+                !observed.Any(ev => ev.ToString()!.Contains("kind = event")))
+                throw new Exception("Decoded bundle did not deliver character and ticket events.");
+            byte[] truncatedBundle=wrapped.ToArray();
+            truncatedBundle[^1]=255;
+            if (Aion2Bundles.TryExpand(truncatedBundle.AsMemory(0,truncatedBundle.Length-1),out _))
+                throw new Exception("Truncated LZ4 block incorrectly accepted.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }

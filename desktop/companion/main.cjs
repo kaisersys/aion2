@@ -226,6 +226,9 @@ function processCaptureMessage(message) {
     const value = n => Number.isSafeInteger(n) && n>=0 ? n : 0;
     const h = {
       packets:value(message.packets),frames:value(message.frames),
+      outerFrames:value(message.outerFrames), bundles:value(message.bundles),
+      bundlesDecoded:value(message.bundlesDecoded),
+      bundleFailures:value(message.bundleFailures), innerFrames:value(message.innerFrames),
       identities:value(message.identities),rosters:value(message.rosters),
       characterPackets:value(message.characterPackets),rosterPackets:value(message.rosterPackets),
       ticketPackets:value(message.ticketPackets),
@@ -249,15 +252,21 @@ function processCaptureMessage(message) {
         captureStatus.message='AION2.exe detected with '+h.connections+' TCP connection(s), but Npcap has captured ZERO game packets. Check driver access and VPN/loopback adapters; teleporting will not fix this.';
       else if(h.frames===0)
         captureStatus.message='Received '+h.packets+' TCP packets but decoded ZERO Aion 2 frames. The protocol decoder or traffic path needs fixing, not another teleport.';
+      else if(h.bundles>0 && h.bundlesDecoded===0)
+        captureStatus.message='Observed '+h.bundles+
+          ' compressed game bundles, but none could be unpacked. The bundle format needs investigation.';
       else if(h.identities===0 && h.rosters===0 && h.characterPackets>0)
         captureStatus.message='Game data is arriving, including '+h.characterPackets+
           ' character packet(s), but the identity parser rejected them. This indicates a decoder-version mismatch.';
       else if(h.identities===0 && h.rosters===0 && h.rosterPackets>0)
         captureStatus.message='Received '+h.rosterPackets+
           ' account-roster packet(s), but could not parse the character list. The roster decoder needs updating.';
+      else if(h.identities===0 && h.rosters===0 && h.bundlesDecoded>0)
+        captureStatus.message='Expanded '+h.bundlesDecoded+' compressed bundle(s) and decoded '+
+          h.innerFrames+' inner frames, but no identity record yet. The decoder is receiving more of the game protocol.';
       else if(h.identities===0 && h.rosters===0)
         captureStatus.message='Decoded '+h.frames+
-          ' frames, but no character/roster opcodes were present. Check the opcode summary below; further teleporting is unlikely to help.';
+          ' regular frames; no character, roster, or compressed identity messages yet. The opcode summary below can help investigate.';
       else
         captureStatus.message='Game traffic and identity records detected. Verifying the active character.';
     }

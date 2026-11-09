@@ -84,3 +84,22 @@ A synthetic test verifies reassembly of a fragmented 40 KB identity frame and Wi
 ## Opcode-only diagnostics
 
 This preview distinguishes **character-related opcode received** from **successfully parsed character identity**. The diagnostic panel displays counters for character and roster frames, parsed identities, ticket frames, and a top-8 opcode histogram. Only opcode values and occurrence counts are shown; no game message bytes, player names, IP addresses, credentials, or other packet content are logged. If a 0x3336 frame is received but parsing fails, the current parser likely needs updating for this game release. If no character-related opcodes are received despite many other frames, the capture/framing path or protocol version needs investigation. Do not keep teleporting when the panel explicitly identifies a decoder mismatch.
+
+## LZ4-compressed Aion 2 message bundles
+
+Aion 2 Global inbound 0xFFFF envelopes contain a little-endian uncompressed
+size followed by an LZ4 block of varint-framed inner messages. Login, zone,
+roster and ticket records can be nested in those bundles. The companion now
+decompresses the envelope locally and validates every inner frame boundary
+before forwarding messages to the strict character and counter decoder.
+No raw traffic or compressed payloads are stored or uploaded. The LZ4 block
+decompressor is adapted from the MIT-licensed SkeeveTV/Aion-DPS-Meter project
+(see capture/THIRD-PARTY-NOTICES.md). Maximum output is limited to 1 MB and
+no nested compression is followed.
+
+Diagnostics now separately count bundles seen, bundles unpacked, failures,
+and inner frames. Automated tests use a real 20-message LZ4 bundle fixture
+and a synthetic bundle containing a ticket and own-character record.
+
+Live Aion 2 Global compatibility is not yet proven; this remains an
+unofficial packet-capture beta with potential NCSOFT policy risk.

@@ -65,6 +65,9 @@ function render(){
  $('diagnostic-adapters').textContent=h?String(h.adapters):'—';
  $('diagnostic-packets').textContent=h?String(h.packets):'—';
  $('diagnostic-frames').textContent=h?String(h.frames):'—';
+ $('diagnostic-bundles').textContent=h?String(h.bundlesDecoded)+' / '+String(h.bundles):'—';
+ $('diagnostic-bundle-errors').textContent=h?String(h.bundleFailures):'—';
+ $('diagnostic-inner').textContent=h?String(h.innerFrames):'—';
  $('diagnostic-identity').textContent=h?String(h.identities+h.rosters):'—';
  $('diagnostic-identity-packets').textContent=h?String(h.characterPackets+h.rosterPackets):'—';
  $('diagnostic-ticket-packets').textContent=h?String(h.ticketPackets):'—';
@@ -81,6 +84,10 @@ function render(){
    ?'The companion sees no game packets. Check Npcap, administrator-only capture settings, and VPN/loopback routing; teleporting repeatedly will not help.'
    :h && h.frames===0
    ?'Packets are arriving, but the decoder has not produced game frames. This indicates a capture/protocol mismatch that requires investigation.'
+   :h && h.bundles>0 && h.bundlesDecoded===0
+   ?'Compressed bundles were detected but failed to decompress; the decoder needs a format update.'
+   :h && h.bundlesDecoded>0 && h.characterPackets===0 && h.rosterPackets===0
+   ?'Compressed game data was unpacked successfully; character identification is still pending.'
    :h && h.characterPackets>0 && h.identities===0
    ?'Character packets are reaching us but the parser is rejecting them. No additional teleport is necessary; the decoder must be updated.'
    :h && h.rosterPackets>0 && h.rosters===0
