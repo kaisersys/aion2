@@ -276,6 +276,38 @@ function render(){
   note.textContent='Ground pickup · not Market earnings';
   row.append(info,qty,note);groundGroups.append(row);
  }
+ const marketStatus=$('market-ocr-status');
+ marketStatus.textContent=state.marketOcr?.message||'Market OCR waiting for sign-in.';
+ const marketHolder=$('market-observations');
+ marketHolder.replaceChildren();
+ const marketRows=(state.marketObservations||[]).filter(e=>match(e,profile));
+ if(!marketRows.length){
+  const empty=document.createElement('div');empty.className='empty';
+  empty.textContent='No Market observations for this character yet.';
+  marketHolder.append(empty);
+ }
+ for(const entry of marketRows.slice(0,20)){
+  const row=document.createElement('div');row.className='item-group-row';
+  const info=document.createElement('div');
+  const name=document.createElement('strong');
+  name.textContent=entry.item_name||(
+   entry.kind==='listing_observation'?'Market listing':'Market settlement');
+  const desc=document.createElement('span');desc.className='movement-source';
+  desc.textContent=(entry.kind==='listing_observation'?'Listing observed':'Settlement observed')+
+   ' · '+new Date(entry.occurred_at).toLocaleString()+
+   ' · OCR unverified'+(entry.synced?' · account synced':' · pending sync');
+  info.append(name,desc);
+  const qty=document.createElement('span');qty.className='item-group-qty';
+  qty.textContent=entry.quantity?'×'+num(entry.quantity):'—';
+  const details=document.createElement('div');
+  const total=document.createElement('strong');total.textContent=num(entry.amount)+' Kina';
+  details.append(total);
+  if(entry.fee!==null&&entry.fee!==undefined){
+   const fee=document.createElement('small');fee.className='item-group-caption';
+   fee.textContent='Listing fee '+num(entry.fee)+' Kina';details.append(fee);
+  }
+  row.append(info,qty,details);marketHolder.append(row);
+ }
  for(const period of ['daily','weekly']){
   const holder=$(period+'-counters');holder.replaceChildren();
   const matching=[...counters.values()].filter(e=>e.frequency===period);
