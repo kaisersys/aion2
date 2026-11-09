@@ -487,7 +487,11 @@ function stopCapture() {
 }
 
 function secureWindowContents(target) {
-  target.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  target.webContents.setWindowOpenHandler(({url})=>{
+    if(url==='https://atreiastreet.com/terms.html')
+      void shell.openExternal(url);
+    return {action:'deny'};
+  });
   target.webContents.on('will-navigate',e=>e.preventDefault());
 }
 function createOverlay() {
