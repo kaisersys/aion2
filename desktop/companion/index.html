@@ -63,6 +63,9 @@
         <span>Identity parsed <strong id="diagnostic-identity">—</strong></span>
         <span>Ticket packets <strong id="diagnostic-ticket-packets">—</strong></span>
         <span>Inventory packets <strong id="diagnostic-inventory">—</strong></span>
+        <span>Item stack updates <strong id="diagnostic-item-updates">—</strong></span>
+        <span>Item quantity changes <strong id="diagnostic-item-deltas">—</strong></span>
+        <span>Tracked inventory stacks <strong id="diagnostic-item-stacks">—</strong></span>
         <span>Regular Kina readings <strong id="diagnostic-wallet-regular">—</strong></span>
         <span>Bound Kina readings <strong id="diagnostic-wallet-bound">—</strong></span>
       </div>
@@ -105,6 +108,9 @@
      </div>
      <div class="movement-list-title"><span>RECENT BALANCE CHANGES</span><small>Local-only observations · source unknown</small></div>
      <div id="movement-rows" class="movement-rows" aria-live="polite"><div class="empty">No observed wallet movement yet.</div></div>
+     <div class="movement-list-title item-groups-title"><span>ITEM-LEVEL SPENDING / RECEIPTS</span><small>Possible association · not a verified Market receipt</small></div>
+     <p class="movement-help">When one identifiable item changes near a Kina transfer, the companion can associate them. It will not guess a purchase when several items change together, and it cannot yet distinguish NPC shops from player Market transactions.</p>
+     <div id="item-groups" class="item-groups"><div class="empty">No item-level associations yet.</div></div>
    </section>
    <div class="main-grid">
     <section class="panel">
@@ -136,6 +142,8 @@
    </form>
  </div>
  <script src="./wallets.js" defer></script>
+ <script src="./item-catalog.js" defer></script>
+ <script src="./item-economy.js" defer></script>
  <script src="./ui.js" defer></script>
 </body>
 </html>

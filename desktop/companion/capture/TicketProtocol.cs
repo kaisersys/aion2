@@ -17,6 +17,7 @@ public sealed class TicketProtocol
 {
     private readonly Action<object> _emit;
     private string _observationSession = Guid.NewGuid().ToString("N");
+    private readonly InventoryItems _items = new();
     private readonly Dictionary<uint, TicketReading> _pendingTickets = new();
     private readonly Dictionary<uint, TicketReading> _latestTickets = new();
     private bool _awaitingCharacter;
@@ -35,6 +36,9 @@ public sealed class TicketProtocol
     public int InventoryFramesSeen { get; private set; }
     public int UnboundWalletReadings { get; private set; }
     public int BoundWalletReadings { get; private set; }
+    public int InventoryItemUpdates => _items.ItemUpdates;
+    public int InventoryItemDeltas => _items.EmittedDeltas;
+    public int TrackedItemStacks => _items.TrackedStacks;
 
     public TicketProtocol(Action<object> emit) => _emit = emit;
 
@@ -124,6 +128,9 @@ public sealed class TicketProtocol
                         // A new character is a new wallet-observation session.
                         // Never infer financial movement across logins.
                         _observationSession=Guid.NewGuid().ToString("N");
+                        // Preserve the first login's inventory baseline if it preceded
+                        // the first identity; clear on confirmed character switches.
+                        if (_currentName is not null) _items.Reset();
                     }
                     _currentName = name;
                     _currentServerId = serverId;
@@ -143,6 +150,14 @@ public sealed class TicketProtocol
             case 0x1156: // login inventory snapshot
             case 0x1b56: // inventory slot changes; not inherently a transaction
                 InventoryFramesSeen++;
+                if(opcode==0x1156) _items.Baseline(frame);
+                else
+                {
+                    var change=_items.Update(frame);
+                    if(change is InventoryItems.Delta item &&
+                       _currentName is not null && !_awaitingCharacter)
+                        PublishItem(item,observedAt);
+                }
                 if (opcode != 0x1156 || frame.Length > 5000)
                 {
                     if (TryReadKinahWallets(frame, out List<WalletReading> readings))
@@ -159,6 +174,23 @@ public sealed class TicketProtocol
                 }
                 break;
         }
+    }
+
+    private void PublishItem(InventoryItems.Delta item,DateTime at)
+    {
+        if(_currentName is null)return;
+        // The item movement's origin is NOT known: loot, quest rewards,
+        // crafting, consumption, sale and purchases can look identical.
+        _emit(new {
+            kind="event", @event=new {
+                id=Guid.NewGuid().ToString("N"), type="item_change",
+                character=_currentName, serverId=_currentServerId,
+                item_id=(long)item.ItemId, delta=item.Quantity,
+                observation_session=_observationSession,
+                occurred_at=at.ToUniversalTime().ToString("O"),
+                source="decoded"
+            }
+        });
     }
 
     private void PublishWallet(string currencyKind, long amount, DateTime at)

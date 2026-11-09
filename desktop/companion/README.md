@@ -171,3 +171,24 @@ The mini desktop panel also shows compact daily observed In and Out metrics. It 
 4. If either action changes the in-game wallet but creates no movement, check the **Diagnostics** tab for inventory packets and wallet-reading counts and report those values. Do not share raw PCAPs or any credentials.
 
 Third-party packet capture remains an unofficial beta; consider NCSOFT's terms and any account risks.
+
+## Item-level economy associations (local preview)
+
+**Overview → Wallet Activity → Item-level spending / receipts** groups possible purchases and receipts by item. The decoder reads 0x1156 inventory snapshots as the baseline and 0x1B56 slot updates to observe stack quantity changes. The baseline never counts as earnings. A newly seen stack counts as an inventory addition only after a complete baseline has been recorded. Unknown stack updates do not manufacture prior item gains.
+
+A wallet outflow and an increase in **exactly one item type** within 4.5 seconds and in the same capture session can be displayed as a **possible purchase**. A wallet inflow close to an item removal can be marked a **possible sale**. The UI groups multiple possible Courage Scroll (Bound) purchases by item ID, showing quantities, observed total Kina spent, and per-unit averages. Different items bought together remain unassigned to avoid arbitrary cost allocation. Individual item changes cannot be matched to more than one wallet movement.
+
+**Limitations:** The game does not prove market/NPC transaction origin in these inventory or wallet messages. A coincidental loot or crafting event might occur next to a purchase. Storage transfers, crafting and consumption look like other item changes. A Market settlement can occur long after the sale listing, so the app does **not** attribute delayed settlement proceeds to a specific sold item. The amounts are observed currency changes, not verified market purchase receipts or market profits.
+
+The offline item-name lookup covers 9,450 English client-derived names; unknown IDs appear numerically. Source: https://github.com/l33tm3/FullAIon2Companion. Only item ID and English name metadata is bundled; no third-party artwork, proprietary assets or recipes. Game data ownership remains with NCSOFT.
+
+**Privacy:** New item-change events are local-only and excluded from website synchronization. No game packet bytes, IP addresses, in-game account or market identifiers, process memory or inventory handles are exported or uploaded.
+
+### Live check
+
+1. Launch the companion before Aion 2, then enter the character. Under Diagnostics, Tracked inventory stacks should be greater than zero.
+2. When you make an item purchase you already planned, note the item count and regular/bound Kina difference.
+3. Check Overview → Observed Out and the new per-item grouping. If no item association appears, check Diagnostics → Item quantity changes.
+4. Report the item ID (or name), currency differences, and counters if the grouping is inaccurate—no raw PCAP files are needed.
+
+This is unofficial passive packet capture and may pose an account-policy risk under NCSOFT terms.

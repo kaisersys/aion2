@@ -137,6 +137,9 @@ internal sealed class ReadOnlyCapture : IDisposable
                         rosterPackets = _protocol.RosterOpcodesSeen,
                         ticketPackets = _protocol.TicketOpcodesSeen,
                         inventoryFrames = _protocol.InventoryFramesSeen,
+                        itemUpdates = _protocol.InventoryItemUpdates,
+                        itemDeltas = _protocol.InventoryItemDeltas,
+                        itemStacks = _protocol.TrackedItemStacks,
                         unboundWalletReadings = _protocol.UnboundWalletReadings,
                         boundWalletReadings = _protocol.BoundWalletReadings,
                         lobbyRosterPackets = _protocol.LobbyRosterPackets,
@@ -553,6 +556,58 @@ public static class SelfTest
                 boundOnlyReadings.Single(x=>x.CurrencyKind=="bound").Balance!=900000 ||
                 boundOnlyReadings.Single(x=>x.CurrencyKind=="unbound").Balance!=0)
                 throw new Exception("Snapshot with only bound Kina failed to infer zero regular Kina.");
+            // Passive item-level parser: a full inventory MUST establish a baseline
+            // before any apparent stack changes can be treated as item movement.
+            byte[] itemsSnapshot=new byte[6000];
+            itemsSnapshot[0]=0x11;itemsSnapshot[1]=0x56;
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(itemsSnapshot.AsSpan(42),11);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(itemsSnapshot.AsSpan(50),531060004);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(itemsSnapshot.AsSpan(54),10);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(itemsSnapshot.AsSpan(82),22);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(itemsSnapshot.AsSpan(90),511060016);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(itemsSnapshot.AsSpan(94),12);
+            var items=new InventoryItems();
+            if(!items.Baseline(itemsSnapshot) || items.TrackedStacks!=2)
+                throw new Exception("Initial inventory item handles were not recorded.");
+            static byte[] ItemUpdate(uint handle,uint id,ulong qty,byte kind=1)
+            {
+                byte[] f=new byte[27];
+                f[0]=0x1b;f[1]=0x56;f[2]=1;f[3]=kind;
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(5),handle);
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(f.AsSpan(13),id);
+                System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(f.AsSpan(17),qty);
+                return f;
+            }
+            if(items.Update(ItemUpdate(11,531060004,45)) is not InventoryItems.Delta increase ||
+               increase.Quantity!=35 || increase.ItemId!=531060004)
+                throw new Exception("Scroll acquisition delta was not tracked.");
+            if(items.Update(ItemUpdate(11,531060004,45)) is not null)
+                throw new Exception("Duplicate inventory packet counted as a purchase.");
+            if(items.Update(ItemUpdate(11,531060004,15)) is not InventoryItems.Delta decrease ||
+               decrease.Quantity!=-30)
+                throw new Exception("Scroll consumption/transfer decrease was not observed.");
+            if(items.Update(ItemUpdate(11,531060004,0,2)) is not InventoryItems.Delta removedStack ||
+               removedStack.Quantity!=-15)
+                throw new Exception("Remaining stack removal failed.");
+            if(items.Update(ItemUpdate(33,531060004,100,1)) is not null)
+                throw new Exception("Unknown stack change must establish baseline only.");
+            if(items.Update(ItemUpdate(44,531060004,20,0)) is not InventoryItems.Delta gained ||
+               gained.Quantity!=20)
+                throw new Exception("New scroll stack did not report a gain.");
+            var noBaseline=new InventoryItems();
+            if(noBaseline.Update(ItemUpdate(100,531060004,100,0)) is not null)
+                throw new Exception("An uninitialized inventory fabricated item earnings.");
+            byte[] malformed=ItemUpdate(44,531060004,99);
+            malformed[9]=9;
+            if(items.Update(malformed) is not null)
+                throw new Exception("Invalid inventory padding was accepted.");
+            var captured=new List<object>();
+            var withIdentity=new TicketProtocol(e=>captured.Add(e));
+            withIdentity.OnFrame(itemsSnapshot,DateTime.UtcNow);
+            withIdentity.OnFrame(ownCharacter,DateTime.UtcNow);
+            withIdentity.OnFrame(ItemUpdate(11,531060004,15),DateTime.UtcNow);
+            if(captured.Count(x=>x.ToString()!.Contains("type = item_change"))!=1)
+                throw new Exception("Item-level changes did not reach character telemetry.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }
