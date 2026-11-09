@@ -136,6 +136,9 @@ internal sealed class ReadOnlyCapture : IDisposable
                         characterPackets = _protocol.CharacterOpcodesSeen,
                         rosterPackets = _protocol.RosterOpcodesSeen,
                         ticketPackets = _protocol.TicketOpcodesSeen,
+                        inventoryFrames = _protocol.InventoryFramesSeen,
+                        unboundWalletReadings = _protocol.UnboundWalletReadings,
+                        boundWalletReadings = _protocol.BoundWalletReadings,
                         lobbyRosterPackets = _protocol.LobbyRosterPackets,
                         lobbyRosterCharacters = _protocol.LobbyRosterCharacters,
                         popularOpcodes = _observedOpcodes.OrderByDescending(x=>x.Value)
@@ -475,6 +478,52 @@ public static class SelfTest
             }
             if(lobbyFrames!=1)
                 throw new Exception("Lobby character list lost during TCP framing.");
+            // Both Kina wallets are independent items in the game. Ordinary
+            // (tradeable) Kina is 930100031; previously we only read 930100001.
+            static byte[] MakeWalletFrame(params (uint Item,long Balance,byte Kind)[] currency)
+            {
+                var result=new byte[2+currency.Length*34+12];
+                result[0]=0x1b;result[1]=0x56;
+                for(int j=0;j<currency.Length;j++)
+                {
+                    int i=12+j*34;
+                    result[i-10]=currency[j].Kind;
+                    BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(i),currency[j].Item);
+                    BinaryPrimitives.WriteUInt64LittleEndian(result.AsSpan(i+4),(ulong)currency[j].Balance);
+                    result[i+12]=1; // inventory (not account storage)
+                    result[i+13]=(byte)j;
+                }
+                return result;
+            }
+            byte[] twoWallets=MakeWalletFrame(
+                (930100001u, 10000, (byte)1),
+                (930100031u, 4200, (byte)1));
+            if(!TicketProtocol.TryReadKinahWallets(twoWallets,out List<WalletReading> both) ||
+               both.Count!=2 || both.SingleOrDefault(x=>x.CurrencyKind=="bound").Balance!=10000 ||
+               both.SingleOrDefault(x=>x.CurrencyKind=="unbound").Balance!=4200)
+                throw new Exception("Both Kinah wallets were not decoded separately.");
+            byte[] removed=MakeWalletFrame((930100031u,4200,(byte)2));
+            if(!TicketProtocol.TryReadKinahWallets(removed,out List<WalletReading> emptied) ||
+               emptied.Count!=1 || emptied[0].Balance!=0)
+                throw new Exception("Removed regular-Kinah slot was not set to zero.");
+            if(TicketProtocol.TryReadKinahWallets(MakeWalletFrame(
+                 (930100030u,999999,(byte)1)),out _))
+                throw new Exception("Combined Kina cost token was interpreted as a wallet.");
+            var incomeEvents=new List<object>();
+            var walletDecoder=new TicketProtocol(x=>incomeEvents.Add(x));
+            walletDecoder.OnFrame(twoWallets,DateTime.UtcNow);
+            if(walletDecoder.UnboundWalletReadings!=1 || incomeEvents.Count!=0)
+                throw new Exception("Currency packets were wrongly attributed before login.");
+            walletDecoder.OnFrame(ownCharacter,DateTime.UtcNow);
+            if(incomeEvents.Count(x=>x.ToString()!.Contains("wallet_snapshot"))!=2 ||
+               !incomeEvents.Any(x=>x.ToString()!.Contains("currency_kind = unbound")))
+                throw new Exception("Both wallet snapshots did not publish after character identity.");
+            walletDecoder.OnFrame(twoWallets,DateTime.UtcNow);
+            if(incomeEvents.Count(x=>x.ToString()!.Contains("wallet_snapshot"))!=2)
+                throw new Exception("Identical wallet packet created duplicate events.");
+            walletDecoder.OnFrame(MakeWalletFrame((930100031u,4600,(byte)1)),DateTime.UtcNow);
+            if(incomeEvents.Count(x=>x.ToString()!.Contains("wallet_snapshot"))!=3)
+                throw new Exception("Regular Kina increase did not publish an updated balance.");
             Console.WriteLine("Packet parsing self-test passed.");
             return 0;
         }

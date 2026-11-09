@@ -234,6 +234,9 @@ function processCaptureMessage(message) {
       lobbyRosterCharacters:value(message.lobbyRosterCharacters),
       characterPackets:value(message.characterPackets),rosterPackets:value(message.rosterPackets),
       ticketPackets:value(message.ticketPackets),
+      inventoryFrames:value(message.inventoryFrames),
+      unboundWalletReadings:value(message.unboundWalletReadings),
+      boundWalletReadings:value(message.boundWalletReadings),
       popularOpcodes:Array.isArray(message.popularOpcodes)
         ? message.popularOpcodes.slice(0,8).filter(x=>/^[0-9a-f]{4}$/.test(x?.opcode) &&
             Number.isSafeInteger(x?.count) && x.count>=0)

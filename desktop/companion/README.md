@@ -6,7 +6,7 @@ A lightweight, **local-first character economy and daily/weekly summary** for th
 
 This version integrates a **read-only Npcap capture helper** with TCP stream reconstruction and a decoder for Aion 2 character identity and game-reported daily/weekly ticket snapshots. **Capture automatically starts when the companion opens** (unless the user previously paused it). The Windows driver still needs to be installed separately. The implementation is newly written and **has not been proven against a live Aion 2 Global session**; it has a small protocol parser self-test based on synthetic fixtures. Real game traffic is necessary to validate port differences, decoder coverage, character matching, and reset behavior before public release.
 
-**Kinah: only the known bound-Kinah item (ID 930100001) is decoded into a labeled balance snapshot**. Total Kinah, gross Kinah earned and gross Kinah spent are NOT automatically decoded yet. Manual economic entries remain available for testing and corrections. Do not treat bound-Kinah snapshots as full wallet totals or infer earnings/spending from changes in net wallet balance.
+**Kinah: ordinary/tradable Kina (Global item ID 930100031) and bound Kina (observed inventory item ID 930100001) are now decoded into separate labeled balance snapshots.** When both are observed, a combined balance is calculated locally. The "Regular net today" field is the change from the first observed unbound balance after the 07:00 UTC reset; it is NOT gross income from kills. Gross Kinah earned/spent are only available when explicit transaction events are supplied (e.g. manual entry); **do not treat inventory deltas as gross earnings or expenditures**. Live verification of ID 930100031 in Global inventory packets is required.
 
 The verified ticket-message research in MIT-licensed community projects is promising; the actual capture adapter must associate a login's ticket snapshots with the correct character and verify opcode coverage for Global. The Kinah earned/spent ledger must be based on independently observed transactions or explicitly marked estimates, never inferred from net wallet changes.
 
@@ -131,3 +131,15 @@ tickets and wallets are only attributed from confirmed world records.
 The main app now displays lobby list packet and character counts separately
 from successfully parsed active-world identities. This remains unofficial
 passive packet analysis and may have NCSOFT account-policy implications.
+
+## Regular Kinah balance detection and validation
+
+- The companion now scans verified inventory slot records for **930100031**, the Global client item ID for **regular (tradable) Kina**. It keeps **930100001**, the bound Kina item observed in community capture data, as a separate wallet. The virtual combined-price item **930100030** is not treated as a third wallet.
+- Incoming full inventory snapshots (0x1156) and slot changes (0x1b56) are parsed for both currencies. A removal record (kind 2) resets the affected wallet to zero. Repeated unchanged readings are deduplicated.
+- The desktop dashboard and mini overlay separately show regular and bound Kina. A combined value is only shown after BOTH are observed. "Regular net today" is a net *balance* difference against the first observation since daily reset; it may include payments, market actions, storage movements, and other changes. **It is not gross earnings or mob-only income.**
+- Diagnostics expose inventory-frame count, regular-wallet readings, and bound-wallet readings. A player can record the before/after regular Kina balance while killing one mob to check whether the game sends an observable inventory update.
+- As with all passive packet analysis, this beta is unofficial and has not been verified against every Global server update. The protocol decoder never inspects game memory or sends packets.
+
+## Website syncing
+
+The new migration `supabase/migrations/20261109_companion_currency_kinds.sql` expands the allowed values of the `currency_kind` column to `bound` and `unbound`; it must be applied before optional Supabase sync of regular Kina snapshots. The base 20261108 telemetry migration should already be installed. Local capture and dashboards work without website configuration.

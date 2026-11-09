@@ -52,3 +52,32 @@ test('separates characters on same server',()=>{
  const s=summarize([a],'Other','NA West',Date.parse('2026-11-08T12:10:00Z'));
  assert.equal(s.dayEarned,0);
 });
+
+test('unbound and bound wallet snapshots stay separate and never manufacture income',()=>{
+ const a=event('wallet-1','wallet_snapshot',{balance:1_200_000,currency_kind:'unbound'},'2026-11-08T08:00:00Z');
+ const b=event('wallet-2','wallet_snapshot',{balance:780_000,currency_kind:'bound'},'2026-11-08T08:01:00Z');
+ const c=event('wallet-3','wallet_snapshot',{balance:1_202_500,currency_kind:'unbound'},'2026-11-08T08:02:00Z');
+ const summary=summarize([a,b,c],'Ceti','NA West',Date.parse('2026-11-08T08:03:00Z'));
+ assert.equal(summary.wallets.unbound.balance,1_202_500);
+ assert.equal(summary.wallets.bound.balance,780_000);
+ assert.equal(summary.unboundNetToday,2500);
+ assert.equal(summary.dayEarned,0);
+ assert.equal(summary.daySpent,0);
+ assert.equal(summary.wallet,null);
+});
+test('unbound net change is NOT gross earned or spent, and resets daily',()=>{
+ const a=event('old','wallet_snapshot',{balance:300,currency_kind:'unbound'},'2026-11-08T06:59:00Z');
+ const b=event('b','wallet_snapshot',{balance:400,currency_kind:'unbound'},'2026-11-08T07:01:00Z');
+ const c=event('c','wallet_snapshot',{balance:300,currency_kind:'unbound'},'2026-11-08T08:00:00Z');
+ const s=summarize([a,b,c],'Ceti','NA West',Date.parse('2026-11-08T08:05:00Z'));
+ assert.equal(s.unboundNetToday,-100);
+ assert.equal(s.dayEarned,0);
+ assert.equal(s.daySpent,0);
+});
+test('one unbound reading is a baseline, not an invented gain',()=>{
+ const s=summarize([
+  event('b','wallet_snapshot',{balance:1000,currency_kind:'unbound'})
+ ],'Ceti','NA West',Date.parse('2026-11-08T12:05:00Z'));
+ assert.equal(s.unboundNetToday,null);
+ assert.equal(s.wallets.unbound.balance,1000);
+});

@@ -24,6 +24,7 @@ function entryKind(){
  const counter=$('entry-type').value==='counter';
  $('key-field').hidden=!counter;$('frequency-field').hidden=!counter;
  $('scope-field').hidden=!counter;$('max-field').hidden=!counter;
+ $('currency-kind-field').hidden=$('entry-type').value!=='wallet_snapshot';
  $('amount-field').firstChild.textContent=$('entry-type').value==='wallet_snapshot'?'Balance':counter?'Current value':'Amount';
  $('entry-amount').min=counter?'0':'0';
 }
@@ -72,6 +73,9 @@ function render(){
  $('diagnostic-lobby').textContent=h?String(h.lobbyRosterCharacters)+' from '+String(h.lobbyRosterPackets)+' packet(s)':'—';
  $('diagnostic-identity-packets').textContent=h?String(h.characterPackets+h.rosterPackets):'—';
  $('diagnostic-ticket-packets').textContent=h?String(h.ticketPackets):'—';
+ $('diagnostic-inventory').textContent=h?String(h.inventoryFrames):'—';
+ $('diagnostic-wallet-regular').textContent=h?String(h.unboundWalletReadings):'—';
+ $('diagnostic-wallet-bound').textContent=h?String(h.boundWalletReadings):'—';
  $('diagnostic-opcodes').textContent=h?.popularOpcodes?.length
    ? h.popularOpcodes.map(x=>x.opcode+' ('+x.count+')').join(' · ') : 'Awaiting frames';
  $('detection-instructions').hidden=hasIdentity;
@@ -111,32 +115,50 @@ function render(){
  $('weekly-reset').textContent='Next '+new Date(p.nextWeekly).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
  const events=(state.events||[]).filter(e=>match(e,profile) && Date.parse(e.occurred_at)<=Date.now())
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
- const t={dayEarned:0,daySpent:0,weekEarned:0,weekSpent:0};
- let wallet=null, boundWallet=null;
+ const t={dayEarned:0,daySpent:0};
+ let regularWallet=null, boundWallet=null;
+ let regularDayBaseline=null, regularDayLast=null, regularDayReadings=0;
+ let hasEarned=false,hasSpent=false;
  const counters=new Map();
  for(const e of events){
    const at=Date.parse(e.occurred_at);
    if(e.type==='wallet_snapshot'){
      if(e.currency_kind==='bound')boundWallet=e;
-     else wallet=e;
+     if(e.currency_kind==='unbound'){
+       regularWallet=e;
+       if(at>=p.daily){
+         if(regularDayBaseline===null) regularDayBaseline=e.balance;
+         regularDayLast=e.balance; regularDayReadings++;
+       }
+     }
    }
    if(e.type==='kinah_earned'||e.type==='kinah_spent'){
      const field=e.type==='kinah_earned'?'Earned':'Spent';
-     if(at>=p.daily)t['day'+field]+=e.amount;
-     if(at>=p.weekly)t['week'+field]+=e.amount;
+     if(at>=p.daily){
+       t['day'+field]+=e.amount;
+       if(field==='Earned')hasEarned=true;
+       else hasSpent=true;
+     }
    }
    if(e.type==='counter'&&at>=(e.frequency==='daily'?p.daily:p.weekly))counters.set(e.frequency+':'+e.key,e);
  }
- const shownWallet=boundWallet||wallet;
- $('wallet-title').textContent=boundWallet?'BOUND KINAH (OBSERVED)':'OBSERVED KINAH';
- $('wallet').textContent=shownWallet?num(shownWallet.balance):'—';
- $('wallet-note').textContent=shownWallet?(boundWallet?'Bound Kinah only · ':'')+'Last seen '+new Date(shownWallet.occurred_at).toLocaleString():'Awaiting wallet snapshot';
- $('today-earned').textContent=num(t.dayEarned);
- $('today-spent').textContent=num(t.daySpent);
- const net=t.weekEarned-t.weekSpent;
- $('week-net').textContent=(net>0?'+':'')+num(net);
- $('week-net').className=net<0?'down':net>0?'up':'';
- $('week-note').textContent=num(t.weekEarned)+' earned · '+num(t.weekSpent)+' spent';
+ $('wallet').textContent=regularWallet?num(regularWallet.balance):'—';
+ $('wallet-note').textContent=regularWallet
+   ?'Tradeable Kina · last observed '+new Date(regularWallet.occurred_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})
+   :'Waiting for regular Kina inventory packets';
+ $('bound-wallet').textContent=boundWallet?num(boundWallet.balance):'—';
+ $('bound-wallet-note').textContent=boundWallet
+   ?'Last observed '+new Date(boundWallet.occurred_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})
+   :'Waiting for bound Kina inventory packets';
+ const both=Boolean(regularWallet && boundWallet);
+ $('total-wallet').textContent=both?num(regularWallet.balance+boundWallet.balance):'—';
+ $('total-wallet-note').textContent=both?'Sum of latest observed balances':'Needs both wallet readings';
+ const net=regularDayReadings>=2?regularDayLast-regularDayBaseline:null;
+ $('regular-day-net').textContent=net===null?'—':(net>0?'+':'')+num(net);
+ $('regular-day-net').className=net===null?'':net<0?'down':net>0?'up':'';
+ $('regular-day-note').textContent=net===null?'Awaiting a second reading today':'Net vs first reading today · not gross earnings';
+ $('today-earned').textContent=hasEarned?num(t.dayEarned):'—';
+ $('today-spent').textContent=hasSpent?num(t.daySpent):'—';
  for(const period of ['daily','weekly']){
   const holder=$(period+'-counters');holder.replaceChildren();
   const matching=[...counters.values()].filter(e=>e.frequency===period);
@@ -156,7 +178,7 @@ function render(){
  for(const e of events.slice(-6).reverse()){
   const row=document.createElement('div');row.className='activity-row';
   const name=e.type==='kinah_earned'?'Kinah earned':e.type==='kinah_spent'?'Kinah spent':
-      e.type==='wallet_snapshot'?'Wallet observed':labels[e.key]||e.key;
+      e.type==='wallet_snapshot'?(e.currency_kind==='unbound'?'Regular Kina observed':e.currency_kind==='bound'?'Bound Kina observed':'Wallet observed'):labels[e.key]||e.key;
   const amount=e.type==='kinah_earned'?'+'+num(e.amount):e.type==='kinah_spent'?'−'+num(e.amount):
      e.type==='wallet_snapshot'?num(e.balance):num(e.current)+' / '+num(e.maximum);
   const cls=e.type==='kinah_earned'?'up':e.type==='kinah_spent'?'down':'';
@@ -184,7 +206,10 @@ $('event-form').addEventListener('submit',async e=>{
  const type=$('entry-type').value,amount=Number($('entry-amount').value);
  const record={character:p.character,server:p.server,type,occurred_at:new Date().toISOString()};
  if(type==='kinah_earned'||type==='kinah_spent')record.amount=amount;
- if(type==='wallet_snapshot')record.balance=amount;
+ if(type==='wallet_snapshot'){
+   record.balance=amount;
+   record.currency_kind=$('entry-currency-kind').value;
+ }
  if(type==='counter')Object.assign(record,{key:$('entry-key').value.trim(),current:amount,maximum:Number($('entry-max').value),
     frequency:$('entry-frequency').value,scope:$('entry-scope').value});
  try{await api.addEvent(record);$('event-form').reset();entryKind();show('Entry saved locally.');await refresh();}

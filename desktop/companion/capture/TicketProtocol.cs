@@ -5,6 +5,7 @@ using System.Text.Unicode;
 namespace AtreiaCapture;
 
 public readonly record struct TicketReading(uint Id, long Count, long Bonus, long TimeMs);
+public readonly record struct WalletReading(string CurrencyKind, long Balance);
 public sealed record CounterDef(string Key, string Frequency, string Scope, int Max);
 
 /// <summary>
@@ -18,7 +19,8 @@ public sealed class TicketProtocol
     private readonly Dictionary<uint, TicketReading> _pendingTickets = new();
     private readonly Dictionary<uint, TicketReading> _latestTickets = new();
     private bool _awaitingCharacter;
-    private long? _pendingBoundKinah;
+    private readonly Dictionary<string,long> _pendingWallets = new(StringComparer.Ordinal);
+    private readonly Dictionary<string,long> _latestWallets = new(StringComparer.Ordinal);
     private string? _currentName;
     private int _currentServerId;
 
@@ -29,6 +31,9 @@ public sealed class TicketProtocol
     public int LobbyRosterPackets { get; private set; }
     public int LobbyRosterCharacters { get; private set; }
     public int TicketOpcodesSeen { get; private set; }
+    public int InventoryFramesSeen { get; private set; }
+    public int UnboundWalletReadings { get; private set; }
+    public int BoundWalletReadings { get; private set; }
 
     public TicketProtocol(Action<object> emit) => _emit = emit;
 
@@ -112,6 +117,7 @@ public sealed class TicketProtocol
                 {
                     CharacterRecords++;
                     bool changed = _currentName != name || _currentServerId != serverId;
+                    if (changed) _latestWallets.Clear();
                     _currentName = name;
                     _currentServerId = serverId;
                     _emit(new { kind = "character", name, serverId });
@@ -122,39 +128,46 @@ public sealed class TicketProtocol
                         _pendingTickets.Clear();
                         _awaitingCharacter = false;
                     }
-                    if (_pendingBoundKinah is long amount)
-                    {
-                        PublishWallet(amount, observedAt);
-                        _pendingBoundKinah = null;
-                    }
+                    foreach (var pending in _pendingWallets.ToArray())
+                        PublishWallet(pending.Key,pending.Value,observedAt);
+                    _pendingWallets.Clear();
                 }
                 break;
             case 0x1156: // login inventory snapshot
             case 0x1b56: // inventory slot changes; not inherently a transaction
+                InventoryFramesSeen++;
                 if (opcode != 0x1156 || frame.Length > 5000)
                 {
-                    if (TryReadBoundKinah(frame, out long balance))
+                    if (TryReadKinahWallets(frame, out List<WalletReading> readings))
                     {
-                        if (_awaitingCharacter || _currentName is null) _pendingBoundKinah = balance;
-                        else PublishWallet(balance, observedAt);
+                        foreach (WalletReading reading in readings)
+                        {
+                            if (reading.CurrencyKind == "unbound") UnboundWalletReadings++;
+                            else BoundWalletReadings++;
+                            if (_awaitingCharacter || _currentName is null)
+                                _pendingWallets[reading.CurrencyKind]=reading.Balance;
+                            else PublishWallet(reading.CurrencyKind,reading.Balance,observedAt);
+                        }
                     }
                 }
                 break;
         }
     }
 
-    private void PublishWallet(long amount, DateTime at)
+    private void PublishWallet(string currencyKind, long amount, DateTime at)
     {
         if (_currentName is null) return;
-        // 930100001 is identified as BOUND Kinah. Do not present this as total
-        // Kinah or use it to derive gross earnings and expenses.
+        if (_latestWallets.TryGetValue(currencyKind,out long previous) && previous==amount) return;
+        _latestWallets[currencyKind]=amount;
+        // These are observed wallet balances, NOT transactions. Do not infer
+        // gross income/spending or mob-kill rewards from changes in the balance.
         _emit(new
         {
             kind = "event", @event = new
             {
                 id = Guid.NewGuid().ToString("N"), type = "wallet_snapshot",
                 character = _currentName, serverId = _currentServerId,
-                balance = amount, currency_kind = "bound",
+                balance = amount, currency_kind = currencyKind,
                 occurred_at = at.ToUniversalTime().ToString("O"), source = "decoded"
             }
         });
@@ -280,24 +293,55 @@ public sealed class TicketProtocol
     }
 
     /// <summary>
-    /// The game represents *bound* Kinah as item 930100001 in the inventory and sends new quantities
-    /// in inventory snapshots/changes. Only the observed bound-Kinah component is reported here.
+    /// Aion 2 represents bound Kina as 930100001 in observed inventory packets
+    /// and ordinary/tradable Kina as 930100031 in the Global client item database.
+    /// 930100030 is the virtual "Kina (All)" cost type; never treat it as a
+    /// separately spendable third wallet. A matching change packet contains a new
+    /// slot quantity, not an "earned" or "spent" transaction.
+    ///
+    /// Validated against structural anchors used for inventory slot records:
+    /// kind (0..2) ten bytes earlier, reserved bytes, inventory container=1.
+    /// Kind=2 means the slot was REMOVED and its new balance is zero.
     /// </summary>
-    public static bool TryReadBoundKinah(ReadOnlySpan<byte> frame, out long amount)
+    public static bool TryReadKinahWallets(ReadOnlySpan<byte> frame,out List<WalletReading> readings)
     {
-        amount = 0;
-        if (frame.Length < 18) return false;
+        readings=new();
+        if (frame.Length < 18 || !(
+            frame[0]==0x11 && frame[1]==0x56 ||
+            frame[0]==0x1b && frame[1]==0x56)) return false;
         ReadOnlySpan<byte> body = frame[2..];
-        for (int i = 10; i + 14 <= body.Length; i++)
+        var latest = new Dictionary<string,long>(StringComparer.Ordinal);
+        for (int i=10;i+14<=body.Length;i++)
         {
-            if (BinaryPrimitives.ReadUInt32LittleEndian(body[i..]) != 930100001u) continue;
-            if (body[i - 10] > 2 || body[i + 9] != 0 || body[i + 10] != 0 || body[i + 11] != 0 ||
-                body[i + 12] != 1) continue;
-            ulong qty = BinaryPrimitives.ReadUInt64LittleEndian(body[(i + 4)..]);
-            if (qty > 100000000000000UL) continue;
-            amount = (long)qty;
-            return true;
+            uint itemId=BinaryPrimitives.ReadUInt32LittleEndian(body[i..]);
+            string currencyKind=itemId switch {
+                930100001u=>"bound",
+                930100031u=>"unbound",
+                _=>""
+            };
+            if(currencyKind.Length==0)continue;
+            byte kind=body[i-10];
+            if(kind>2||body[i+9]!=0||body[i+10]!=0||body[i+11]!=0||
+               body[i+12]!=1)continue;
+            ulong value=BinaryPrimitives.ReadUInt64LittleEndian(body[(i+4)..]);
+            if(value>100_000_000_000_000UL)continue;
+            latest[currencyKind]=kind==2 ? 0 : (long)value;
+            i+=13; // skip this validated record so random internal bytes do not masquerade as another
+        }
+        foreach(var kv in latest)readings.Add(new WalletReading(kv.Key,kv.Value));
+        return readings.Count>0;
+    }
+
+    // Keep the original public helper for older test fixtures and tooling.
+    public static bool TryReadBoundKinah(ReadOnlySpan<byte> frame,out long amount)
+    {
+        amount=0;
+        if(!TryReadKinahWallets(frame,out List<WalletReading> readings))return false;
+        foreach(var r in readings)
+        {
+            if(r.CurrencyKind=="bound"){amount=r.Balance;return true;}
         }
         return false;
     }
+
 }
