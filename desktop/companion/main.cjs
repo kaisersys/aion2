@@ -201,7 +201,7 @@ async function marketOcrTick() {
    types:['window'],thumbnailSize:{width:1920,height:1080},
    fetchWindowIcons:false
   });
-  const games=sources.filter(x=>/^AION2(?:\\s|$|[.:-])/i.test(x.name) &&
+  const games=sources.filter(x=>/^AION2(?:\s|$|[.:-])/i.test(x.name) &&
    !x.thumbnail.isEmpty() && x.thumbnail.getSize().width>=640);
   if(games.length!==1) {
    marketOcrMessage('waiting','Waiting for one visible AION2 game window.');
