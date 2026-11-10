@@ -260,3 +260,12 @@ After observing the confirmation prompt, the fee matcher looks for an **exact, u
 Other Kinah purchases and expenses still show **source not yet identified** unless another trusted item/packet association exists. A packet balance delta alone has no market/NPC/shop reason code; attributing all unidentified spending would fabricate information. The next protocol research step is to decode game operation-specific transaction confirmations (vendor buys, Market purchases, settlement claims) or to correlate their distinctive on-screen dialogs with wallet changes, while retaining the same evidence labels.
 
 The SQL migration `supabase/migrations/20261109_market_confirmation_phase.sql` adds the private `screen_phase` field. Screenshots and full OCR output remain in RAM only; they are not uploaded or written to disk. Market observations remain private to their signed-in account through existing row-level security. This release is a **Windows preview** until tested with a live Aion 2 Global transaction and decoder wallet events.
+
+
+## OCR startup crash hotfix (v0.1.4)
+
+The v0.1.3 Windows preview could crash with `SyntaxError: Unexpected identifier 'source'` from the `wasm-feature-detect/dist/cjs/index.cjs` dependency inside `app.asar` as the OCR worker loaded. The newer `wasm-feature-detect@1.9.0` contains experimental `import.source()` syntax unsupported by the Electron runtime bundled with the companion, despite Node 22 unit checks passing.
+
+The v0.1.4 preview forces `wasm-feature-detect@1.8.0` using an npm override and pins `tesseract.js@6.0.1`. `npm run verify:ocr-dependencies` rejects an accidental incompatible detector upgrade. The Windows CI also boots the **packaged Electron .exe** with `--atreia-startup-smoke`, initializes an English OCR worker, terminates it, and fails the release if the runtime throws or the worker cannot start. This runs before installer artifact upload, unlike prior builds that only checked JavaScript source files in Node.
+
+After downloading v0.1.4, install it over the previous preview and sign in if requested. Local ledger data is stored in the user-data directory, outside the installer, and should remain intact. Do not reinstall Npcap or reset the stored ledger to address this JavaScript startup failure. A future missing-language-data, GPU screenshot, or game capture issue will appear in Market Diagnostics rather than causing a startup parse failure.
