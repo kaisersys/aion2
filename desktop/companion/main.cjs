@@ -10,6 +10,7 @@ const { readMarket,stableFingerprint } = require('./market-ocr.cjs');
 const { reconcileFees } = require('./market-fees.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
+const STARTUP_SMOKE = process.argv.includes('--atreia-startup-smoke');
 const FILE_LIMIT = 8 * 1024 * 1024;
 let win;
 let overlay;
@@ -745,7 +746,35 @@ function createWindow() {
   win.loadFile(path.join(__dirname,'index.html'));
   win.once('ready-to-show',()=>win.show());
 }
+async function runStartupSmoke() {
+ let worker=null;
+ const watchdog=setTimeout(()=>{
+  console.error('OCR startup smoke timed out after 90 seconds.');
+  app.exit(1);
+ },90000);
+ try {
+  // Exercise the actual bundled OCR dependency from Electron's Node runtime.
+  // Static source checks under host Node 22 did not catch the import.source()
+  // syntax error thrown by wasm-feature-detect 1.9.0 in packaged Electron.
+  const {createWorker}=require('tesseract.js');
+  if(typeof createWorker!=='function')throw new Error('OCR worker API unavailable.');
+  worker=await createWorker('eng');
+  if(!worker||typeof worker.recognize!=='function')
+   throw new Error('Tesseract OCR worker failed to initialize.');
+  console.log('ATREIA_OCR_SMOKE_OK');
+  await worker.terminate();
+  worker=null;
+  clearTimeout(watchdog);
+  app.exit(0);
+ } catch(err){
+  console.error('ATREIA_OCR_SMOKE_FAILED',err);
+  if(worker)try{await worker.terminate();}catch{}
+  clearTimeout(watchdog);
+  app.exit(1);
+ }
+}
 app.whenReady().then(()=>{
+  if(STARTUP_SMOKE){void runStartupSmoke();return;}
   loadState();
   ipcMain.handle('state:get',()=>captureState());
   ipcMain.handle('profile:add',(_,{character,server})=>{
