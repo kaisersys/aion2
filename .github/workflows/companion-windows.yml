@@ -32,6 +32,8 @@ jobs:
           }
           exit 1
       - run: npm test
+      - name: Reject OCR dependency versions unsupported by packaged Electron
+        run: npm run verify:ocr-dependencies
       - run: node --check main.cjs
       - run: node --check ui.js
       - run: node --check overlay.js
@@ -53,6 +55,18 @@ jobs:
             Start-Sleep -Seconds (5 * $attempt)
           }
           exit 1
+      - name: Launch packaged Electron and initialize OCR worker
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'release/win-unpacked/Atreia Street Companion.exe'
+          if (-not (Test-Path $exe)) { throw "Packaged companion executable not found: $exe" }
+          $p = Start-Process -FilePath $exe -ArgumentList '--atreia-startup-smoke' -PassThru
+          if (-not $p.WaitForExit(105000)) {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            throw 'Packaged companion OCR smoke timed out'
+          }
+          $p.Refresh()
+          if ($p.ExitCode -ne 0) { throw "Packaged companion OCR smoke failed with exit code $($p.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
           name: atreiastreet-companion-windows-preview
