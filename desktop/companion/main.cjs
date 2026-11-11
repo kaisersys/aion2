@@ -268,7 +268,7 @@ async function sampleMarketFrame() {
   const sources=await desktopCapturer.getSources({
    types:['window'],thumbnailSize:{width:2560,height:1440},fetchWindowIcons:false
   });
-  const titled=sources.filter(x=>/^AION\\s*2(?:\\s|$|[.:-])/i.test(x.name));
+  const titled=sources.filter(x=>/^AION\s*2(?:\s|$|[.:-])/i.test(x.name));
   marketOcrStatus.windowCandidates=titled.length;
   const games=titled.filter(x=>!x.thumbnail.isEmpty()&&x.thumbnail.getSize().width>=640);
   if(games.length!==1) {
