@@ -29,6 +29,7 @@ let marketSyncBusy=false;
 let lastMarketSyncAttemptAt=0;
 let lastMarketFrame=null;
 let lastMarketSeenAt=0;
+let lastMarketSaveAt=0;
 let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0,scans:0,framesBuffered:0,framesCaptured:0,lastCapturedAt:null,lastScanAt:null,windowCandidates:0,capturePixels:null,recognizedChars:0,feeLabelSeen:false,feeEvidence:[],spatialFee:null};
 let marketObservations=[];
 let recentMarket=new Map();
@@ -401,10 +402,9 @@ async function marketOcrTick() {
    return;
   }
   const match=matchWebsiteCharacter(current.character,current.server);
-  if(!match) {
-   marketOcrMessage('unmapped','Market fee visible, but no matching character and server exist in the signed-in website account.');
-   return;
-  }
+  // Save private local evidence even if this in-world character isn't yet linked
+  // to the website. Never upload it without an exact account-character match.
+  const localOnly=!match;
   const evidence={...parsed.evidence,screen_phase:parsed.screen_phase};
   const key=stableFingerprint(current.character,current.server,evidence);
   const now=screenCapturedAt;
@@ -417,6 +417,16 @@ async function marketOcrTick() {
    const last=marketObservations.findLast(x=>x.user_id===remote.user_id &&
     x.character===current.character && x.server===current.server &&
     stableFingerprint(x.character,x.server,x)===key);
+   if(last && last.status==='unverified' &&
+      parsed.screen_phase==='confirmation' && now>=Date.parse(last.occurred_at)) {
+    const previous=Date.parse(last.last_seen_at||last.occurred_at);
+    if(now>previous)last.last_seen_at=new Date(now).toISOString();
+    const matchedNow=reconcileFees(marketObservations,state.events);
+    if(matchedNow || now-lastMarketSaveAt>5000) {
+     saveMarket();lastMarketSaveAt=now;
+     if(matchedNow && remote)void syncMarket().catch(()=>{});
+    }
+   }
    const matched=last?.status==='corroborated';
    marketOcrMessage(matched?'corroborated':'listening',evidence.fee!==null
     ?('Registration fee: '+evidence.fee+' Kina. '+
@@ -451,20 +461,22 @@ async function marketOcrTick() {
   if(existing) {
    existing.screen_phase='confirmation';
    existing.occurred_at=new Date(now).toISOString();
+   existing.last_seen_at=new Date(now).toISOString();
+   if(!existing.character_id && match)existing.character_id=match.id;
    existing.item_name=evidence.item_name||existing.item_name;
    existing.quantity=evidence.quantity||existing.quantity;
    existing.synced=false;
   } else marketObservations.push({
    id:crypto.randomUUID(),user_id:remote.user_id,
    character:current.character,server:current.server,
-   character_id:match.id,occurred_at:new Date(now).toISOString(),
+   character_id:match?.id||null,occurred_at:new Date(now).toISOString(),
    kind:evidence.kind,amount:evidence.amount,fee:evidence.fee,
    quantity:evidence.quantity,item_name:evidence.item_name,
-   screen_phase:parsed.screen_phase,
+   screen_phase:parsed.screen_phase,last_seen_at:new Date(now).toISOString(),
    evidence:'screen_ocr',status:'unverified',synced:false
   });
   marketObservations=marketObservations.slice(-2000);
-  saveMarket();
+  saveMarket();lastMarketSaveAt=now;
   const n=reconcileFees(marketObservations,state.events);
   if(n)saveMarket();
   marketOcrMessage(n?'corroborated':'observed',
@@ -474,6 +486,8 @@ async function marketOcrTick() {
         ?'Listing Confirm/Cancel prompt found. Fee '+evidence.fee+' Kina is pending until a matching Kina debit follows.'
         :'Listing form shows '+evidence.fee+' Kina fee; no Confirm/Cancel prompt yet.')
     :'Settlement amount observed; collection is not yet verified.');
+  if(localOnly)marketOcrMessage('local-only',
+   'Fee evidence saved locally, but this game character has no matching website profile. Link the character to sync.');
   // Failures remain queued; no raw OCR text or screenshot is sent.
   try {await syncMarket();}
   catch(err){marketOcrMessage('sync-error',
@@ -490,7 +504,13 @@ async function syncMarket() {
  if(!remote || marketSyncBusy)return 0;
  marketSyncBusy=true;
  try {
-  const unsynced=marketObservations.filter(x=>!x.synced && x.user_id===remote.user_id).slice(0,100);
+  for(const x of marketObservations) {
+   if(x.user_id!==remote.user_id||x.character_id)continue;
+   const linked=matchWebsiteCharacter(x.character,x.server);
+   if(linked)x.character_id=linked.id;
+  }
+  const unsynced=marketObservations.filter(x=>
+   !x.synced && x.character_id && x.user_id===remote.user_id).slice(0,100);
   if(!unsynced.length)return 0;
   lastMarketSyncAttemptAt=Date.now();
   await refreshed();
