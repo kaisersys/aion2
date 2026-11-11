@@ -24,7 +24,9 @@ function reconcileFees(observations,events,now=Date.now()) {
  let matched=0;
  for(const row of pending) {
   const candidateTime=Date.parse(row.occurred_at);
-  if(candidateTime>now+60000 || candidateTime<now-3600000)continue;
+  const lastSeen=Number.isFinite(Date.parse(row.last_seen_at))?
+   Math.max(candidateTime,Date.parse(row.last_seen_at)):candidateTime;
+  if(candidateTime>now+60000 || lastSeen<now-3600000)continue;
   const key=charKey(row.character,row.server);
   if(!byCharacter.has(key)) {
    const characterEvents=(Array.isArray(events)?events:[]).filter(e=>
@@ -36,7 +38,7 @@ function reconcileFees(observations,events,now=Date.now()) {
   }
   const possible=byCharacter.get(key).filter(w=>
    !consumed.has(w.id) && Date.parse(w.occurred_at)>=candidateTime-WINDOW_BEFORE_MS &&
-   Date.parse(w.occurred_at)<=candidateTime+WINDOW_AFTER_MS);
+   Date.parse(w.occurred_at)<=lastSeen+WINDOW_AFTER_MS);
   const exact=possible.filter(w=>w.amount===row.fee);
   let used=[],currency=null;
   // Multiple equal debits cannot uniquely identify which one is the fee.

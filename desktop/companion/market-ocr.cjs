@@ -16,7 +16,7 @@ const TOTAL=/\b(?:total\s+sale\s+price|total\s+price|total\s+listing\s+price|tot
 const UNIT=/\b(?:sale\s+price\s+per\s+item|unit\s+price|price\s+per\s+item|asking\s+price)\b/i;
 const PROCEEDS=/\b(?:settlement\s+amount|settlement\s+proceeds|sale\s+proceeds|receive\s+amount|amount\s+received|claimable\s+amount)\b/i;
 const QUANTITY=/\b(?:sale\s+quantity|quantity|qty|count)\b/i;
-const ITEM=/\b(?:item\s+name|item)\b\s*[:：]\s*(.{2,80})$/i;
+const ITEM=/^(?:item\s+name|item)\s*[:：]\s*(.{2,80})$/i;
 function parseValue(raw) {
  if(typeof raw!=='string')return null;
  const remainder=raw.replace(/^[\s:：=]+/,'')
@@ -66,8 +66,10 @@ function readMarket(text) {
  const names=lines.map(s=>s.match(ITEM)).filter(Boolean);
  let item=names.length===1?names[0][1].trim():null;
  if(!item && confirmation) {
-  const beforeTotal=lines.findIndex(x=>TOTAL.test(x));
-  const pool=lines.slice(Math.max(0,beforeTotal-5),Math.max(0,beforeTotal));
+  // OCR reading order can place the item after the fee labels when the
+  // confirmation dialog is laid out in columns. Search all plain item-like
+  // lines; multiple candidates remain unassigned rather than guessed.
+  const pool=lines;
   const candidate=pool.filter(line=>
    /^[\p{L}][\p{L}\p{M}\p{N}' -]{2,60}$/u.test(line) &&
    !/\b(?:confirm|cancel|market|funds|price|sale|fee|registration|total|quantity|are you|wish to|list for)\b/i.test(line));
