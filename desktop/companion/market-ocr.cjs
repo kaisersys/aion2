@@ -16,7 +16,7 @@ const TOTAL=/\b(?:total\s+sale\s+price|total\s+price|total\s+listing\s+price|tot
 const UNIT=/\b(?:sale\s+price\s+per\s+item|unit\s+price|price\s+per\s+item|asking\s+price)\b/i;
 const PROCEEDS=/\b(?:settlement\s+amount|settlement\s+proceeds|sale\s+proceeds|receive\s+amount|amount\s+received|claimable\s+amount)\b/i;
 const QUANTITY=/\b(?:sale\s+quantity|quantity|qty|count)\b/i;
-const ITEM=/\b(?:item\s+name|item)\b\s*[:：]\s*(.{2,80})$/i;
+const ITEM=/^(?:item\s+name|item)\s*[:：]\s*(.{2,80})$/i;
 function parseValue(raw) {
  if(typeof raw!=='string')return null;
  const remainder=raw.replace(/^[\s:：=]+/,'')
