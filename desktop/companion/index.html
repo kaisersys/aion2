@@ -34,7 +34,7 @@
    </div>
   </aside>
   <main class="main">
-   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1.4 · OCR STARTUP FIX</span></div>
+   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1.5 · MARKET FEE TRACKING</span></div>
    <div class="header">
     <div><div class="eyebrow">YOUR PROGRESS, AT A GLANCE</div>
      <h1><span id="page-title-prefix">Character </span><em id="page-title-topic">overview.</em></h1>
@@ -84,13 +84,17 @@
        <span>Game windows matched <strong id="diagnostic-market-windows">—</strong></span>
        <span>Captured image <strong id="diagnostic-market-pixels">—</strong></span>
        <span>OCR scans <strong id="diagnostic-market-scans">0</strong></span>
+       <span>Screen frames buffered <strong id="diagnostic-market-buffered">0</strong></span>
+       <span>Screen frames captured <strong id="diagnostic-market-captured">0</strong></span>
+       <span>Last frame captured <strong id="diagnostic-market-captured-at">—</strong></span>
+       <span>Spatial fee read <strong id="diagnostic-market-spatial-fee">—</strong></span>
        <span>OCR characters <strong id="diagnostic-market-chars">—</strong></span>
        <span>Fee label recognized <strong id="diagnostic-market-fee">—</strong></span>
        <span>Detected screen <strong id="diagnostic-market-phase">—</strong></span>
        <span>OCR region <strong id="diagnostic-market-ocr-mode">—</strong></span>
        <span>Last attempt <strong id="diagnostic-market-time">—</strong></span>
      </div>
-     <p class="movement-help">Only the named AION2 window is scanned. Screenshots and raw recognized text are not uploaded or saved. A fee quote is not counted as spent until a Kina decrease corroborates it.</p>
+     <p class="movement-help">The visible AION2 window is sampled roughly every 850 ms; a short rolling buffer stays in memory while on-device OCR runs. Fee amounts are matched to their on-screen labels by position, not by text reading order. Images and raw recognized text are not uploaded or stored. A fee is not counted as spent until a matching wallet decrease corroborates it.</p>
      <p id="diagnostic-market-evidence" class="movement-help">No fee label recognized yet.</p>
      <button class="outlined" id="market-scan-diagnostics" type="button">Scan visible Market now</button>
    </section>
