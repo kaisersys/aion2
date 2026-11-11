@@ -34,3 +34,22 @@ test('Market OCR is gated on signed-in account and never stores raw screen conte
  assert.ok(main.includes("clearSecureSession();void stopMarketOcr()"));
  assert.ok(!main.includes("writeFileSync('screenshot'"));
 });
+
+
+test('Market scanning begins automatically on sign-in and session restoration',()=>{
+ assert.ok(main.includes('marketSampleTimer=setInterval(()=>{void sampleMarketFrame();},850)'),
+  'background market sampler must be scheduled');
+ assert.ok((main.match(/startMarketOcr\(\);/g)||[]).length>=2,
+  'restored sessions and new login should start automatic monitoring');
+ assert.ok(main.includes('autoRunning:Boolean(remote && marketSampleTimer && marketOcrTimer)'),
+  'UI must receive actual timer status rather than assume monitoring is active');
+});
+test('Overview never implies Market fee tracking needs a manual scan',()=>{
+ assert.ok(!html.includes('id="market-scan"'),
+  'manual scan action should not appear in Market overview');
+ assert.ok(!ui.includes("$('market-scan').addEventListener"));
+ assert.ok(html.includes('Market listings are detected automatically'));
+ assert.ok(html.includes('Optional troubleshooting only'));
+ assert.ok(html.includes('id="market-scan-diagnostics"'),
+  'manual capture may still be requested for diagnostics');
+});
