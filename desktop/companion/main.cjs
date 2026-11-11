@@ -127,7 +127,9 @@ function captureState() {
   return { ...state, feedPath:feed ? path.basename(feed.path) : null,
     remote:remote ? {email:remote.email,characters:remote.characters} : null,
     configured:Boolean(readConfig()), capture:captureStatus,
-    marketOcr:marketOcrStatus,
+    marketOcr:{...marketOcrStatus,
+      autoRunning:Boolean(remote && marketSampleTimer && marketOcrTimer),
+      monitorMode:'automatic',sampleIntervalMs:850},
     marketObservations:remote?marketObservations.filter(x=>x.user_id===remote.user_id).slice(-200).reverse():[] };
 }
 function insert(raw, fallbackId) {
