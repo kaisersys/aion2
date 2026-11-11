@@ -53,3 +53,18 @@ test('Overview never implies Market fee tracking needs a manual scan',()=>{
  assert.ok(html.includes('id="market-scan-diagnostics"'),
   'manual capture may still be requested for diagnostics');
 });
+
+test('automatic Market sampler starts before potentially failing character lookup',()=>{
+ const login=main.slice(main.indexOf("ipcMain.handle('remote:login'"),
+  main.indexOf("ipcMain.handle('remote:logout'"));
+ const restore=main.slice(main.indexOf("async function restoreSecureSession()"),
+  main.indexOf("function saveMarket()"));
+ for(const source of [login,restore]){
+  assert.ok(source.indexOf('startMarketOcr();')>=0,
+   'Market monitor starts after successful authentication');
+  assert.ok(source.indexOf('startMarketOcr();')<source.indexOf('await characters();'),
+   'character list fetch must not block automatic Market capture');
+  assert.ok(source.includes("marketOcrMessage('mapping-error'"),
+   'temporary mapping failure must be visible but nonfatal');
+ }
+});
