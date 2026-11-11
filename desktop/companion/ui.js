@@ -84,6 +84,12 @@ function render(){
  $('diagnostic-market-windows').textContent=market.windowCandidates===undefined?'—':String(market.windowCandidates);
  $('diagnostic-market-pixels').textContent=market.capturePixels||'—';
  $('diagnostic-market-scans').textContent=String(market.scans||0);
+ $('diagnostic-market-buffered').textContent=String(market.framesBuffered||0);
+ $('diagnostic-market-captured').textContent=String(market.framesCaptured||0);
+ $('diagnostic-market-captured-at').textContent=market.lastCapturedAt?
+  new Date(market.lastCapturedAt).toLocaleTimeString():'Never';
+ $('diagnostic-market-spatial-fee').textContent=Number.isSafeInteger(market.spatialFee)?
+  num(market.spatialFee)+' Kina':'—';
  $('diagnostic-market-chars').textContent=String(market.recognizedChars||0);
  $('diagnostic-market-fee').textContent=market.feeLabelSeen?'Yes':'No';
  $('diagnostic-market-phase').textContent=market.screenPhase||'—';
