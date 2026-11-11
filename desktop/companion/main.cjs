@@ -83,8 +83,12 @@ async function restoreSecureSession() {
   remote={email:saved.email,user_id:data.user.id,access_token:data.access_token,
    refresh_token:data.refresh_token,expires_at:Date.now()+data.expires_in*1000,characters:[]};
   saveSecureSession();
-  await characters();
-  startMarketOcr();notify();
+  startMarketOcr();
+  try {await characters();}
+  catch(err){marketOcrMessage('mapping-error',
+    'Automatic Market capture is running, but website character mapping failed: '+
+    String(err.message).slice(0,90));}
+  notify();
  } catch(err) {
   marketOcrMessage('sign-in','Unable to restore secure account session: '+String(err.message).slice(0,100));
  }
@@ -923,9 +927,13 @@ app.whenReady().then(()=>{
     const data=await res.json();
     remote={email,user_id:data.user.id,access_token:data.access_token,
       refresh_token:data.refresh_token,expires_at:Date.now()+data.expires_in*1000,characters:[]};
-    await characters();
     saveSecureSession();
-    startMarketOcr();notify();
+    startMarketOcr();
+    try {await characters();}
+    catch(err){marketOcrMessage('mapping-error',
+      'Automatic Market capture is running, but website character mapping failed: '+
+      String(err.message).slice(0,90));}
+    notify();
     return {email,characters:remote.characters};
   });
   ipcMain.handle('remote:logout',()=>{remote=null;clearSecureSession();void stopMarketOcr();notify();return true;});
