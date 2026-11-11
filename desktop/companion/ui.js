@@ -75,9 +75,17 @@ function render(){
  $('connection-status').textContent=state.remote?'Connected · '+state.remote.email:
   state.configured?'Account not connected':'Account configuration missing';
  const market=state.marketOcr||{};
- $('market-header-status').textContent='MARKET READER · '+
+ const monitorOn=market.autoRunning===true;
+ const recentlyCaptured=market.lastCapturedAt &&
+  Date.now()-Date.parse(market.lastCapturedAt)<15000;
+ const monitorLabel=monitorOn?(recentlyCaptured?
+   'AUTO MONITOR ON · game screen being captured':
+   'AUTO MONITOR ON · waiting for a readable AION2 window'):
+   state.remote?'AUTO MONITOR NOT RUNNING':'AUTO MONITOR OFF · connect account';
+ $('market-header-status').textContent=monitorLabel+' · '+
   (market.message||'Sign in to enable Market reading.');
- $('market-header-status').style.borderColor=market.state==='error'||market.state==='config-missing'?
+ $('market-header-status').style.borderColor=!monitorOn||
+  market.state==='error'||market.state==='config-missing'?
    '#be7578':market.state==='corroborated'?'#60987e':'#6180a5';
  $('diagnostic-market-state').textContent=market.state||'idle';
  $('diagnostic-market-message').textContent=market.message||'No Market scan started.';
@@ -99,7 +107,6 @@ function render(){
  $('diagnostic-market-evidence').textContent=Array.isArray(market.feeEvidence)&&market.feeEvidence.length?
   'OCR fee-label line (not uploaded): '+market.feeEvidence.join(' / '):
   'No recognized fee-label line available. If the game window is captured, the on-screen fee may be too small or obscured for OCR.';
- $('market-scan').disabled=!state.remote;
  $('market-scan-diagnostics').disabled=!state.remote;
  $('show-login').textContent=state.remote?'Disconnect account':'Connect account';
  $('sync-now').disabled=!state.remote;
@@ -315,7 +322,9 @@ function render(){
   row.append(info,qty,note);groundGroups.append(row);
  }
  const marketStatus=$('market-ocr-status');
- marketStatus.textContent=state.marketOcr?.message||'Market OCR waiting for sign-in.';
+ marketStatus.textContent=(market.autoRunning?
+  'Automatically monitoring Market screens · ':'Automatic Market tracking is not running · ')+
+  (market.message||'Connect the website account inside the companion.');
  const marketHolder=$('market-observations');
  marketHolder.replaceChildren();
  const marketRows=(state.marketObservations||[]).filter(e=>match(e,profile));
@@ -459,7 +468,6 @@ async function scanMarketNow(){
  try {const result=await api.scanMarket();show(result.message||'Market scan completed.');await refresh();}
  catch(err){show(err.message,true);}
 }
-$('market-scan').addEventListener('click',scanMarketNow);
 $('market-scan-diagnostics').addEventListener('click',scanMarketNow);
 $('sync-now').addEventListener('click',async()=>{
  try{const r=await api.sync();show('Synced '+r.uploaded+' local records and '+r.ticketBalances+

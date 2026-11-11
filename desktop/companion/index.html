@@ -34,7 +34,7 @@
    </div>
   </aside>
   <main class="main">
-   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1.5 · MARKET FEE TRACKING</span></div>
+   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1.6 · AUTO MARKET TRACKING</span></div>
    <div class="header">
     <div><div class="eyebrow">YOUR PROGRESS, AT A GLANCE</div>
      <h1><span id="page-title-prefix">Character </span><em id="page-title-topic">overview.</em></h1>
@@ -42,7 +42,7 @@
     </div>
     <div class="sync-indicator"><span class="light"></span><span id="activity-status">Local history active</span></div>
    </div>
-   <div id="market-header-status" class="alert" role="status" aria-live="polite">Market OCR: checking account and game window…</div>
+   <div id="market-header-status" class="alert" role="status" aria-live="polite">Automatic Market monitoring: checking account and game window…</div>
    <div id="alert" class="alert" role="status" hidden></div>
    <section id="view-diagnostics" class="tab-view" hidden>
    <section class="panel source-panel">
@@ -78,7 +78,7 @@
     <div class="source-actions"><label class="capture-port">FALLBACK PORT <input id="game-port" aria-label="Aion 2 game server port" type="number" min="1" max="65535" value="13328" /></label><button id="capture-toggle" class="filled">Pause automatic tracking</button><button id="choose-feed" class="outlined">JSONL test feed</button></div>
    </section>
    <section class="panel">
-     <div class="section-top"><div><span class="section-label">MARKET OCR DIAGNOSTICS</span><h2>Game-window reading</h2></div><span class="tag" id="diagnostic-market-state">Not started</span></div>
+     <div class="section-top"><div><span class="section-label">AUTOMATIC MARKET MONITOR</span><h2>Game-window reading</h2></div><span class="tag" id="diagnostic-market-state">Not started</span></div>
      <p class="capture-detail" id="diagnostic-market-message">Sign in to the companion to start Market scanning.</p>
      <div class="detection-metrics">
        <span>Game windows matched <strong id="diagnostic-market-windows">—</strong></span>
@@ -94,9 +94,9 @@
        <span>OCR region <strong id="diagnostic-market-ocr-mode">—</strong></span>
        <span>Last attempt <strong id="diagnostic-market-time">—</strong></span>
      </div>
-     <p class="movement-help">The visible AION2 window is sampled roughly every 850 ms; a short rolling buffer stays in memory while on-device OCR runs. Fee amounts are matched to their on-screen labels by position, not by text reading order. Images and raw recognized text are not uploaded or stored. A fee is not counted as spent until a matching wallet decrease corroborates it.</p>
+     <p class="movement-help">Market screen capture starts automatically when your account is connected. No manual scan is needed when you open a listing, Confirm/Cancel prompt, or settlement. The AION2 window is sampled roughly every 850 ms while OCR processes buffered screenshots. The game still requires you to press Confirm or Cancel yourself. Images and raw recognized text are not uploaded or stored; expenses are only attributed to Market fees when a matching Kina decrease is observed.</p>
      <p id="diagnostic-market-evidence" class="movement-help">No fee label recognized yet.</p>
-     <button class="outlined" id="market-scan-diagnostics" type="button">Scan visible Market now</button>
+     <button class="outlined" id="market-scan-diagnostics" type="button">Run extra diagnostic capture</button><p class="movement-help">Optional troubleshooting only. This does not enable Market tracking; the automatic monitor already runs when connected.</p>
    </section>
    </section>
    <section id="view-overview" class="tab-view">
@@ -139,8 +139,8 @@
      <div class="movement-list-title item-groups-title"><span>CORROBORATED GROUND PICKUPS</span><small>Ground spawn + own pickup + inventory update</small></div>
      <div id="ground-groups" class="item-groups"><div class="empty">No ground pickups corroborated yet.</div></div>
      <div class="movement-list-title item-groups-title"><span>MARKET FEES &amp; SETTLEMENTS</span><small>Observed quotations vs wallet-matched spending</small></div>
-     <p class="movement-help" id="market-ocr-status">Sign in to begin reading the Aion 2 Market window.</p>
-     <button id="market-scan" class="outlined" type="button">Scan visible Market now</button>
+     <p class="movement-help" id="market-ocr-status">Market listings are detected automatically after companion sign-in.</p>
+     <p class="movement-help">No scan button or manual entry is needed to track a Market registration fee. Open the in-game Market and confirm your listing normally.</p>
      <div class="movement-metrics">
        <div class="movement-metric"><small>LATEST REGISTRATION FEE SHOWN</small><strong id="market-fees-quoted">—</strong><p>On-screen quote, not necessarily paid</p></div>
        <div class="movement-metric"><small>FEES MATCHED TO KINA OUT · TODAY</small><strong class="down" id="market-fees-matched">—</strong><p>Confirm prompt followed by matching Kina debit; likely registered, not a server receipt</p></div>
