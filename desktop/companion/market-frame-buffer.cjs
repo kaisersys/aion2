@@ -9,6 +9,7 @@ class MarketFrameBuffer {
   this.maxAgeMs=maxAgeMs;
   this.frames=[];
   this.lastDigest=null;
+  this.lastStoredAt=0;
   this.dropped=0;
  }
  push(frame) {
@@ -17,8 +18,9 @@ class MarketFrameBuffer {
      !Number.isFinite(frame.capturedAt) || frame.focusPng.length>5000000 ||
      frame.fullPng.length>15000000)return false;
   const digest=crypto.createHash('sha1').update(frame.focusPng).digest('hex');
-  if(digest===this.lastDigest)return false;
+  if(digest===this.lastDigest && frame.capturedAt-this.lastStoredAt<5000)return false;
   this.lastDigest=digest;
+  this.lastStoredAt=frame.capturedAt;
   this.frames.push(frame);
   while(this.frames.length>this.maxFrames) {
    this.frames.shift();this.dropped++;
@@ -35,7 +37,7 @@ class MarketFrameBuffer {
   this.purge(now);
   return this.frames.shift()||null;
  }
- clear(){this.frames.length=0;this.lastDigest=null;}
+ clear(){this.frames.length=0;this.lastDigest=null;this.lastStoredAt=0;}
  get length(){return this.frames.length;}
 }
 module.exports={MarketFrameBuffer};
