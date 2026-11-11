@@ -66,8 +66,10 @@ function readMarket(text) {
  const names=lines.map(s=>s.match(ITEM)).filter(Boolean);
  let item=names.length===1?names[0][1].trim():null;
  if(!item && confirmation) {
-  const beforeTotal=lines.findIndex(x=>TOTAL.test(x));
-  const pool=lines.slice(Math.max(0,beforeTotal-5),Math.max(0,beforeTotal));
+  // OCR reading order can place the item after the fee labels when the
+  // confirmation dialog is laid out in columns. Search all plain item-like
+  // lines; multiple candidates remain unassigned rather than guessed.
+  const pool=lines;
   const candidate=pool.filter(line=>
    /^[\p{L}][\p{L}\p{M}\p{N}' -]{2,60}$/u.test(line) &&
    !/\b(?:confirm|cancel|market|funds|price|sale|fee|registration|total|quantity|are you|wish to|list for)\b/i.test(line));
