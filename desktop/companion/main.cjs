@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, dialog, shell, screen, desktopCapturer, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen, desktopCapturer, nativeImage, safeStorage } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -7,6 +7,8 @@ const { spawn } = require('node:child_process');
 const readline = require('node:readline');
 const { normalizeEvent, addEvents, charKey, periods } = require('./ledger.cjs');
 const { readMarket,stableFingerprint } = require('./market-ocr.cjs');
+const { addSpatialRows } = require('./market-spatial.cjs');
+const { MarketFrameBuffer } = require('./market-frame-buffer.cjs');
 const { reconcileFees } = require('./market-fees.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
@@ -20,11 +22,14 @@ let feed = null;
 let remote = null;
 let capture = null;
 let marketOcrTimer=null, marketOcrBusy=false, marketOcrWorker=null;
+let marketSampleTimer=null, marketSampleBusy=false;
+const marketFrameBuffer=new MarketFrameBuffer(36,45000);
+let lastFullMarketFallbackAt=0;
 let marketSyncBusy=false;
 let lastMarketSyncAttemptAt=0;
 let lastMarketFrame=null;
 let lastMarketSeenAt=0;
-let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0,scans:0,lastScanAt:null,windowCandidates:0,capturePixels:null,recognizedChars:0,feeLabelSeen:false,feeEvidence:[]};
+let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0,scans:0,framesBuffered:0,framesCaptured:0,lastCapturedAt:null,lastScanAt:null,windowCandidates:0,capturePixels:null,recognizedChars:0,feeLabelSeen:false,feeEvidence:[],spatialFee:null};
 let marketObservations=[];
 let recentMarket=new Map();
 let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
@@ -255,8 +260,52 @@ function marketOcrMessage(stateName,message) {
  marketOcrStatus={...marketOcrStatus,state:stateName,message,observations:marketObservations.length};
  notify();
 }
+
+async function sampleMarketFrame() {
+ if(marketSampleBusy||!remote||!readConfig())return false;
+ marketSampleBusy=true;
+ try {
+  const sources=await desktopCapturer.getSources({
+   types:['window'],thumbnailSize:{width:2560,height:1440},fetchWindowIcons:false
+  });
+  const titled=sources.filter(x=>/^AION\\s*2(?:\\s|$|[.:-])/i.test(x.name));
+  marketOcrStatus.windowCandidates=titled.length;
+  const games=titled.filter(x=>!x.thumbnail.isEmpty()&&x.thumbnail.getSize().width>=640);
+  if(games.length!==1) {
+   if(!marketFrameBuffer.length)
+    marketOcrMessage('waiting',titled.length===0?'No AION2 window detected.':
+     titled.length>1?'Multiple AION2 windows: cannot select a capture source.':
+     'AION2 window thumbnail blank. Try borderless/windowed mode.');
+   return false;
+  }
+  const full=games[0].thumbnail;
+  const sz=full.getSize();
+  const box={x:Math.floor(sz.width*.25),y:Math.floor(sz.height*.025),
+    width:Math.floor(sz.width*.53),height:Math.floor(sz.height*.82)};
+  let focused=full.crop(box);
+  if(focused.getSize().width<1600)
+   focused=focused.resize({width:Math.min(1600,focused.getSize().width*2),quality:'best'});
+  const capturedAt=Date.now();
+  const wasBuffered=marketFrameBuffer.push({
+   focusPng:focused.toPNG(),fullPng:full.toPNG(),capturedAt
+  });
+  marketOcrStatus.framesBuffered=marketFrameBuffer.length;
+  marketOcrStatus.lastCapturedAt=new Date(capturedAt).toISOString();
+  if(wasBuffered) {
+   marketOcrStatus.framesCaptured++;
+   // Processing is asynchronous; a user can press Confirm while the exact
+   // screen image is already buffered. No screenshots leave RAM.
+   void marketOcrTick();
+  }
+  return wasBuffered;
+ } catch(err) {
+  marketOcrMessage('capture-error','Game window capture failed: '+String(err.message).slice(0,120));
+  return false;
+ } finally {marketSampleBusy=false;}
+}
+
 async function marketOcrTick() {
- if(marketOcrBusy){marketOcrMessage('busy','OCR is already reading the game window; check the last scan time below.');return;}
+ if(marketOcrBusy)return;
  if(!readConfig()){marketOcrMessage('config-missing','Supabase configuration missing from this installer. Account login and Market reading are unavailable.');return;}
  if(!remote){marketOcrMessage('sign-in','Sign in to Atreia Street in the companion to start Market screen reading.');return;}
  marketOcrBusy=true;
@@ -266,15 +315,19 @@ async function marketOcrTick() {
  marketOcrStatus.feeEvidence=[];
  marketOcrStatus.recognizedChars=0;
  try {
+  const buffered=marketFrameBuffer.shift();
+  marketOcrStatus.framesBuffered=marketFrameBuffer.length;
   // Only capture the explicitly named game WINDOW. Never capture a display,
   // desktop, companion window, browser, or a user-selected arbitrary source.
-  const sources=await desktopCapturer.getSources({
+  const sources=buffered?[]:await desktopCapturer.getSources({
    types:['window'],thumbnailSize:{width:2560,height:1440},
    fetchWindowIcons:false
   });
-  const titled=sources.filter(x=>/^AION\s*2(?:\s|$|[.:-])/i.test(x.name));
-  marketOcrStatus.windowCandidates=titled.length;
-  const games=titled.filter(x=>!x.thumbnail.isEmpty() && x.thumbnail.getSize().width>=640);
+  const titled=buffered?[]:sources.filter(x=>/^AION\s*2(?:\s|$|[.:-])/i.test(x.name));
+  if(!buffered)marketOcrStatus.windowCandidates=titled.length;
+  const games=buffered?
+   [{thumbnail:nativeImage.createFromBuffer(buffered.fullPng)}]:
+   titled.filter(x=>!x.thumbnail.isEmpty() && x.thumbnail.getSize().width>=640);
   if(games.length!==1) {
    marketOcrStatus.capturePixels=null;
    marketOcrMessage('waiting',titled.length===0
@@ -299,23 +352,33 @@ async function marketOcrTick() {
   const full=games[0].thumbnail;
   const box={x:Math.floor(dimensions.width*.25),y:Math.floor(dimensions.height*.025),
     width:Math.floor(dimensions.width*.53),height:Math.floor(dimensions.height*.82)};
-  let focus=full.crop(box);
-  if(focus.getSize().width<1600)
+  let focus=buffered?nativeImage.createFromBuffer(buffered.focusPng):full.crop(box);
+  if(!buffered && focus.getSize().width<1600)
    focus=focus.resize({width:Math.min(1600,focus.getSize().width*2),quality:'best'});
-  const focused=await marketOcrWorker.recognize(focus.toPNG());
-  let recognized=focused.data?.text||'';
+  const screenCapturedAt=buffered?.capturedAt??Date.now();
+  const focused=await marketOcrWorker.recognize(focus.toPNG(),{}, {tsv:true});
+  const focusedSpatial=addSpatialRows(focused.data?.text||'',focused.data?.tsv);
+  let recognized=focusedSpatial.text;
+  let spatialFee=focusedSpatial.fields['Registration Fee']??null;
   let parsed=readMarket(recognized);
   marketOcrStatus.recognitionMode='centered-dialog';
-  if(parsed.status!=='observed') {
-   const fallback=await marketOcrWorker.recognize(full.toPNG());
-   const fullText=fallback.data?.text||'';
+  // Full-window OCR is costly; only use it periodically when centered OCR
+  // lacks a valid transaction. The frame itself is still timestamped.
+  if(parsed.status!=='observed' &&
+     (!buffered||Date.now()-lastFullMarketFallbackAt>=5000)) {
+   lastFullMarketFallbackAt=Date.now();
+   const fallback=await marketOcrWorker.recognize(full.toPNG(),{}, {tsv:true});
+   const fullSpatial=addSpatialRows(fallback.data?.text||'',fallback.data?.tsv);
+   const fullText=fullSpatial.text;
    const fullParsed=readMarket(fullText);
    if(fullParsed.status==='observed' || fullText.length>recognized.length) {
     recognized=fullText;
     parsed=fullParsed;
+    spatialFee=fullSpatial.fields['Registration Fee']??null;
     marketOcrStatus.recognitionMode='full-window';
    }
   }
+  marketOcrStatus.spatialFee=spatialFee;
   marketOcrStatus.recognizedChars=recognized.length;
   marketOcrStatus.feeLabelSeen=/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(recognized);
   marketOcrStatus.feeEvidence=recognized.split(/\r?\n/)
@@ -344,7 +407,7 @@ async function marketOcrTick() {
   }
   const evidence={...parsed.evidence,screen_phase:parsed.screen_phase};
   const key=stableFingerprint(current.character,current.server,evidence);
-  const now=Date.now();
+  const now=screenCapturedAt;
   lastMarketSeenAt=now;
   for(const [k,v] of recentMarket)if(now-v>120000)recentMarket.delete(k);
   // Re-reading the same open dialog is not another transaction.
@@ -417,7 +480,11 @@ async function marketOcrTick() {
    'Fee stored locally, but account sync failed: '+String(err.message).slice(0,100));}
  } catch(err) {
   marketOcrMessage('error','Market reading unavailable: '+String(err.message).slice(0,120));
- } finally {marketOcrBusy=false;}
+ } finally {
+  marketOcrBusy=false;
+  if(marketFrameBuffer.length && remote)
+   setImmediate(()=>{void marketOcrTick();});
+ }
 }
 async function syncMarket() {
  if(!remote || marketSyncBusy)return 0;
@@ -447,19 +514,23 @@ async function syncMarket() {
 }
 function startMarketOcr() {
  if(marketOcrTimer)return;
+ marketSampleTimer=setInterval(()=>{void sampleMarketFrame();},850);
  marketOcrTimer=setInterval(()=>{
-  void marketOcrTick();
+  if(!marketFrameBuffer.length)void marketOcrTick();
   if(remote && Date.now()-lastMarketSyncAttemptAt>30000 &&
      marketObservations.some(x=>!x.synced&&x.user_id===remote.user_id)) {
    void syncMarket().catch(err=>marketOcrMessage('sync-error',
     'Fee saved locally; retrying account sync: '+String(err.message).slice(0,100)));
   }
  },3000);
- void marketOcrTick();
+ void sampleMarketFrame();
  void syncMarket().catch(err=>marketOcrMessage('sync-error',
   'Pending fee upload failed: '+String(err.message).slice(0,100)));
 }
 async function stopMarketOcr() {
+ if(marketSampleTimer){clearInterval(marketSampleTimer);marketSampleTimer=null;}
+ marketFrameBuffer.clear();
+ marketOcrStatus.framesBuffered=0;
  if(marketOcrTimer){clearInterval(marketOcrTimer);marketOcrTimer=null;}
  if(marketOcrWorker){const worker=marketOcrWorker;marketOcrWorker=null;await worker.terminate();}
  recentMarket.clear();lastMarketFrame=null;lastMarketSeenAt=0;
@@ -837,10 +908,10 @@ app.whenReady().then(()=>{
   });
   ipcMain.handle('remote:logout',()=>{remote=null;clearSecureSession();void stopMarketOcr();notify();return true;});
   ipcMain.handle('remote:sync',sync);
-  ipcMain.handle('market:scan',async()=>{await marketOcrTick();return marketOcrStatus;});
+  ipcMain.handle('market:scan',async()=>{await sampleMarketFrame();return marketOcrStatus;});
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
   app.on('activate',()=>showMain());
-  app.on('before-quit',()=>{if(marketOcrTimer)clearInterval(marketOcrTimer);});
+  app.on('before-quit',()=>{if(marketOcrTimer)clearInterval(marketOcrTimer);if(marketSampleTimer)clearInterval(marketSampleTimer);marketFrameBuffer.clear();});
   createWindow();
   void restoreSecureSession();
   if (state.settings.overlayEnabled)createOverlay();
