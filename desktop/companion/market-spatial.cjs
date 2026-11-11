@@ -64,9 +64,9 @@ function rowValue(words,parts) {
    .map(w=>({value:numberToken(w.text),dy:Math.abs(w.cy-box.cy)}))
    .filter(x=>x.value!==null).sort((a,b)=>a.dy-b.dy);
   // Read the closest horizontally aligned number, not a random other row.
-  if(possible.length&&
-     (possible.length===1||possible[1].dy>possible[0].dy+Math.max(12,box.height*.35)))
-   values.push(possible[0].value);
+  if(possible.length>1 && possible.some(x=>x.value!==possible[0].value))
+   return null; // Two different numbers on one row: never pick a fee by guess.
+  if(possible.length)values.push(possible[0].value);
  }
  if(!values.length||values.some(x=>x!==values[0]))return null;
  return values[0];
