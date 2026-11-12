@@ -889,6 +889,10 @@ async function runStartupSmoke() {
   worker=await createWorker('eng');
   if(!worker||typeof worker.recognize!=='function')
    throw new Error('Tesseract OCR worker failed to initialize.');
+  const fixture=require('./ocr-smoke-fixture.cjs');
+  const output=await worker.recognize(fixture,{}, {tsv:true});
+  if(!/REGISTRATION\s+FEE/i.test(output.data?.text||''))
+   throw new Error('Packaged Tesseract returned no readable registration fee text from the known PNG fixture.');
   console.log('ATREIA_OCR_SMOKE_OK');
   await worker.terminate();
   worker=null;
