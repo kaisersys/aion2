@@ -78,19 +78,30 @@ function render(){
  const monitorOn=market.autoRunning===true;
  const recentlyCaptured=market.lastCapturedAt &&
   Date.now()-Date.parse(market.lastCapturedAt)<15000;
- const monitorLabel=monitorOn?(recentlyCaptured?
+ const captureFrozen=market.staleVideo===true||market.streamState==='stale';
+ const monitorLabel=captureFrozen?'AUTO MONITOR BLOCKED · game video frozen':
+  monitorOn?(recentlyCaptured?
    'AUTO MONITOR ON · game screen being captured':
    'AUTO MONITOR ON · waiting for a readable AION2 window'):
    state.remote?'AUTO MONITOR NOT RUNNING':'AUTO MONITOR OFF · connect account';
  $('market-header-status').textContent=monitorLabel+' · '+
   (market.message||'Sign in to enable Market reading.');
- $('market-header-status').style.borderColor=!monitorOn||
+ $('market-header-status').style.borderColor=captureFrozen||!monitorOn||
   market.state==='error'||market.state==='config-missing'?
    '#be7578':market.state==='corroborated'?'#60987e':'#6180a5';
  $('diagnostic-market-state').textContent=market.state||'idle';
  $('diagnostic-market-message').textContent=market.message||'No Market scan started.';
  $('diagnostic-market-windows').textContent=market.windowCandidates===undefined?'—':String(market.windowCandidates);
  $('diagnostic-market-pixels').textContent=market.capturePixels||'—';
+ $('diagnostic-market-source').textContent=market.captureMethod==='window-video-stream'?
+  'AION2 video stream':'Unknown';
+ $('diagnostic-market-stream').textContent=market.streamState||'not running';
+ $('diagnostic-market-received').textContent=String(market.framesReceived||0);
+ $('diagnostic-market-last-change').textContent=market.lastVisualChangeAt?
+  new Date(market.lastVisualChangeAt).toLocaleTimeString():'Waiting for first changed frame';
+ $('diagnostic-market-freshness').textContent=captureFrozen?
+  'FROZEN · NOT RECORDING':!market.framesCaptured?
+  'Waiting for live video':'Fresh changing images';
  $('diagnostic-market-scans').textContent=String(market.scans||0);
  $('diagnostic-market-completed').textContent=String(market.completedScans||0);
  $('diagnostic-market-working').textContent=market.ocrInProgress?'Yes':'No';
@@ -119,7 +130,9 @@ function render(){
   'Last completed OCR fee-label line (not uploaded): '+market.feeEvidence.join(' / '):
   !market.completedScans?'No completed OCR result yet; wait for the first scan to finish.':
   health?.blankLike?'Captured game window looks nearly blank or black. Inspect the captured image.':
-  'Last completed OCR did not recognize the fee label. Inspect the captured image to check what OCR actually saw.';
+  captureFrozen?
+   'The window video stream has stopped changing. No new Market observations are being recorded from frozen frames. Try borderless/windowed AION2 mode.':
+   'Last completed OCR did not recognize the fee label. Inspect the captured image to check what OCR actually saw.';
  $('market-scan-diagnostics').disabled=!state.remote;
  $('market-preview-diagnostics').disabled=!state.remote;
  if(!state.remote){
