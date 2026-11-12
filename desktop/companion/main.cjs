@@ -9,6 +9,7 @@ const { normalizeEvent, addEvents, charKey, periods } = require('./ledger.cjs');
 const { readMarket,stableFingerprint } = require('./market-ocr.cjs');
 const { addSpatialRows } = require('./market-spatial.cjs');
 const { MarketFrameBuffer } = require('./market-frame-buffer.cjs');
+const { inspectBgra } = require('./market-capture-health.cjs');
 const { reconcileFees } = require('./market-fees.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
@@ -30,7 +31,11 @@ let lastMarketSyncAttemptAt=0;
 let lastMarketFrame=null;
 let lastMarketSeenAt=0;
 let lastMarketSaveAt=0;
-let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0,scans:0,framesBuffered:0,framesCaptured:0,lastCapturedAt:null,lastScanAt:null,windowCandidates:0,capturePixels:null,recognizedChars:0,feeLabelSeen:false,feeEvidence:[],spatialFee:null};
+let lastMarketPreviewPng=null;
+let lastMarketPreviewAt=null;
+let lastMarketHealthAt=0;
+let lastMarketHealthNoticeAt=0;
+let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0,scans:0,completedScans:0,ocrInProgress:false,lastCompletedAt:null,lastRecognitionMs:null,lastResult:null,framesBuffered:0,framesCaptured:0,lastCapturedAt:null,lastScanAt:null,windowCandidates:0,capturePixels:null,captureHealth:null,recognizedChars:0,feeLabelSeen:false,feeEvidence:[],spatialFee:null};
 let marketObservations=[];
 let recentMarket=new Map();
 let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
@@ -293,9 +298,20 @@ async function sampleMarketFrame() {
   if(focused.getSize().width<1600)
    focused=focused.resize({width:Math.min(1600,focused.getSize().width*2),quality:'best'});
   const capturedAt=Date.now();
+  const fullPng=full.toPNG();
   const wasBuffered=marketFrameBuffer.push({
-   focusPng:focused.toPNG(),fullPng:full.toPNG(),capturedAt
+   focusPng:focused.toPNG(),fullPng,capturedAt
   });
+  // This image remains in RAM and is displayed ONLY if the user explicitly
+  // requests a preview in the local Diagnostics tab.
+  if(wasBuffered && fullPng.length<=15000000) {
+   lastMarketPreviewPng=fullPng;
+   lastMarketPreviewAt=capturedAt;
+  }
+  if(capturedAt-lastMarketHealthAt>5000) {
+   lastMarketHealthAt=capturedAt;
+   marketOcrStatus.captureHealth=inspectBgra(full.toBitmap(),sz.width,sz.height);
+  }
   marketOcrStatus.framesBuffered=marketFrameBuffer.length;
   marketOcrStatus.lastCapturedAt=new Date(capturedAt).toISOString();
   if(wasBuffered) {
@@ -303,6 +319,11 @@ async function sampleMarketFrame() {
    // Processing is asynchronous; a user can press Confirm while the exact
    // screen image is already buffered. No screenshots leave RAM.
    void marketOcrTick();
+  }
+  // Refresh capture diagnostics even if OCR is processing an earlier frame.
+  if(capturedAt-lastMarketHealthNoticeAt>3000) {
+   lastMarketHealthNoticeAt=capturedAt;
+   notify();
   }
   return wasBuffered;
  } catch(err) {
@@ -316,11 +337,13 @@ async function marketOcrTick() {
  if(!readConfig()){marketOcrMessage('config-missing','Supabase configuration missing from this installer. Account login and Market reading are unavailable.');return;}
  if(!remote){marketOcrMessage('sign-in','Sign in to Atreia Street in the companion to start Market screen reading.');return;}
  marketOcrBusy=true;
+ const scanStartedAt=Date.now();
  marketOcrStatus.scans++;
- marketOcrStatus.lastScanAt=new Date().toISOString();
- marketOcrStatus.feeLabelSeen=false;
- marketOcrStatus.feeEvidence=[];
- marketOcrStatus.recognizedChars=0;
+ marketOcrStatus.ocrInProgress=true;
+ marketOcrStatus.lastScanAt=new Date(scanStartedAt).toISOString();
+ // IMPORTANT: preserve the LAST COMPLETED OCR result during this scan.
+ // Resetting recognizedChars/feeLabelSeen here made the interface display
+ // "0 characters" throughout every long-running recognition pass.
  try {
   const buffered=marketFrameBuffer.shift();
   marketOcrStatus.framesBuffered=marketFrameBuffer.length;
@@ -392,6 +415,7 @@ async function marketOcrTick() {
    .filter(x=>/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(x))
    .slice(0,3).map(x=>x.replace(/[^\x20-\x7e]/g,' ').trim().slice(0,100));
   marketOcrStatus.screenPhase=parsed.screen_phase||null;
+  marketOcrStatus.lastResult=parsed.status;
   if(parsed.status!=='observed') {
    if(Date.now()-lastMarketSeenAt>10000)lastMarketFrame=null;
    marketOcrMessage('listening',
@@ -499,9 +523,15 @@ async function marketOcrTick() {
   catch(err){marketOcrMessage('sync-error',
    'Fee stored locally, but account sync failed: '+String(err.message).slice(0,100));}
  } catch(err) {
+  marketOcrStatus.lastResult='error';
   marketOcrMessage('error','Market reading unavailable: '+String(err.message).slice(0,120));
  } finally {
+  marketOcrStatus.completedScans++;
+  marketOcrStatus.lastCompletedAt=new Date().toISOString();
+  marketOcrStatus.lastRecognitionMs=Date.now()-scanStartedAt;
+  marketOcrStatus.ocrInProgress=false;
   marketOcrBusy=false;
+  notify();
   if(marketFrameBuffer.length && remote)
    setImmediate(()=>{void marketOcrTick();});
  }
@@ -556,6 +586,7 @@ function startMarketOcr() {
 async function stopMarketOcr() {
  if(marketSampleTimer){clearInterval(marketSampleTimer);marketSampleTimer=null;}
  marketFrameBuffer.clear();
+ lastMarketPreviewPng=null;lastMarketPreviewAt=null;
  marketOcrStatus.framesBuffered=0;
  if(marketOcrTimer){clearInterval(marketOcrTimer);marketOcrTimer=null;}
  if(marketOcrWorker){const worker=marketOcrWorker;marketOcrWorker=null;await worker.terminate();}
@@ -858,6 +889,10 @@ async function runStartupSmoke() {
   worker=await createWorker('eng');
   if(!worker||typeof worker.recognize!=='function')
    throw new Error('Tesseract OCR worker failed to initialize.');
+  const fixture=require('./ocr-smoke-fixture.cjs');
+  const output=await worker.recognize(fixture,{}, {tsv:true});
+  if(!/REGISTRATION\s+FEE/i.test(output.data?.text||''))
+   throw new Error('Packaged Tesseract returned no readable registration fee text from the known PNG fixture.');
   console.log('ATREIA_OCR_SMOKE_OK');
   await worker.terminate();
   worker=null;
@@ -939,6 +974,13 @@ app.whenReady().then(()=>{
   ipcMain.handle('remote:logout',()=>{remote=null;clearSecureSession();void stopMarketOcr();notify();return true;});
   ipcMain.handle('remote:sync',sync);
   ipcMain.handle('market:scan',async()=>{await sampleMarketFrame();return marketOcrStatus;});
+  ipcMain.handle('market:preview',()=>{
+   if(!remote)return {error:'Sign in to inspect the local game-window capture.'};
+   if(!lastMarketPreviewPng||!lastMarketPreviewAt)
+    return {error:'No AION2 window captured yet.'};
+   return {dataUrl:'data:image/png;base64,'+lastMarketPreviewPng.toString('base64'),
+    capturedAt:new Date(lastMarketPreviewAt).toISOString()};
+  });
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
   app.on('activate',()=>showMain());
   app.on('before-quit',()=>{if(marketOcrTimer)clearInterval(marketOcrTimer);if(marketSampleTimer)clearInterval(marketSampleTimer);marketFrameBuffer.clear();});
