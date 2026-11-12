@@ -917,7 +917,7 @@ async function runStartupSmoke() {
 async function runStreamSmoke() {
  // Regression test of ACTUAL continuously changing pixels from an Electron
  // test window. A successful OCR worker startup alone cannot test game capture.
- let finished=false,winTest=null,reader=null,accepted=0;
+ let finished=false,winTest=null,reader=null,accepted=0,poll=null;
  const log=(message)=>{
   const line=new Date().toISOString()+' '+String(message).slice(0,300);
   console.log('ATREIA_STREAM_TEST',line);
@@ -928,7 +928,7 @@ async function runStreamSmoke() {
  const complete=(code,reason)=>{
   if(finished)return;
   log('COMPLETE '+code+' '+reason);
-  finished=true;clearTimeout(watchdog);
+  finished=true;clearTimeout(watchdog);if(poll)clearInterval(poll);
   if(reader)reader.stop();
   if(winTest&&!winTest.isDestroyed())winTest.close();
   console.log(code===0?'ATREIA_VIDEO_SMOKE_OK':'ATREIA_VIDEO_SMOKE_FAILED',reason);
@@ -946,6 +946,10 @@ async function runStreamSmoke() {
   await winTest.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(page));
   winTest.setTitle('AION2 Stream Test');
   log('Animated test window created with title: '+winTest.getTitle());
+  const windows=await desktopCapturer.getSources({
+   types:['window'],thumbnailSize:{width:0,height:0}
+  });
+  log('Windows enumerated: '+windows.slice(0,12).map(w=>w.name+' ['+w.id+']').join(' | '));
   reader=new MarketLiveCapture({
    onFrame:()=>{
     accepted++;
@@ -959,6 +963,9 @@ async function runStreamSmoke() {
   });
   await reader.start();
   log('Capture controller start completed');
+  // Window registration is asynchronous on some Windows hosts. The real
+  // companion rechecks automatically; the synthetic test must do so too.
+  poll=setInterval(()=>{if(reader&&!finished)void reader.ensure();},1300);
  }catch(err){complete(1,String(err.stack||err).slice(0,350));}
 }
 app.whenReady().then(()=>{
