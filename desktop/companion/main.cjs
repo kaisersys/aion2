@@ -15,6 +15,7 @@ const { reconcileFees } = require('./market-fees.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const STARTUP_SMOKE = process.argv.includes('--atreia-startup-smoke');
+const STREAM_SMOKE = process.argv.includes('--atreia-stream-smoke');
 const FILE_LIMIT = 8 * 1024 * 1024;
 let win;
 let overlay;
@@ -913,8 +914,44 @@ async function runStartupSmoke() {
   app.exit(1);
  }
 }
+async function runStreamSmoke() {
+ // Regression test of ACTUAL continuously changing pixels from an Electron
+ // test window. A successful OCR worker startup alone cannot test game capture.
+ let finished=false,winTest=null,reader=null,accepted=0;
+ const complete=(code,reason)=>{
+  if(finished)return;
+  finished=true;clearTimeout(watchdog);
+  if(reader)reader.stop();
+  if(winTest&&!winTest.isDestroyed())winTest.close();
+  console.log(code===0?'ATREIA_VIDEO_SMOKE_OK':'ATREIA_VIDEO_SMOKE_FAILED',reason);
+  app.exit(code);
+ };
+ const watchdog=setTimeout(()=>complete(1,'Timed out waiting for fresh window video.'),45000);
+ try{
+  winTest=new BrowserWindow({width:960,height:650,show:true,
+   backgroundThrottling:false,webPreferences:{nodeIntegration:false}});
+  const page='<html><head><title>AION2 Stream Test</title></head>'+
+   '<body style="background:#181c29;color:white;font-size:60px">'+
+   '<h1>REGISTRATION FEE</h1><div id="count">0</div>'+
+   '<script>let n=0;setInterval(()=>{document.getElementById("count").textContent=String(++n)},270)</script>'+
+   '</body></html>';
+  await winTest.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(page));
+  winTest.setTitle('AION2 Stream Test');
+  reader=new MarketLiveCapture({
+   onFrame:()=>{
+    accepted++;
+    if(accepted>=2)complete(0,'Observed two genuinely changed AION2 test-window video frames.');
+   },
+   onStatus:(status,message)=>{
+    if(status==='error')complete(1,message);
+   }
+  });
+  await reader.start();
+ }catch(err){complete(1,String(err.stack||err).slice(0,350));}
+}
 app.whenReady().then(()=>{
   if(STARTUP_SMOKE){void runStartupSmoke();return;}
+  if(STREAM_SMOKE){void runStreamSmoke();return;}
   loadState();
   ipcMain.handle('state:get',()=>captureState());
   ipcMain.handle('profile:add',(_,{character,server})=>{
