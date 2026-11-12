@@ -296,3 +296,16 @@ If **OCR scans finished = 0**, the OCR engine may still be initializing or proce
 This is an instrumentation fix, **not** proof that the user's live fee is now tracked. The packaged OCR startup smoke and parser unit tests alone do not verify in-game capture fidelity.
 
 The Windows packaged-app smoke test now performs **actual text recognition** against a tiny built-in PNG reading `REGISTRATION FEE 30` and fails if Tesseract returns empty or incorrect text. Earlier smoke checks only initialized the worker, which was insufficient to establish whether it could recognize text. The fixture was checked independently against the Tesseract CLI and contains no user data.
+
+
+## Frozen game capture repair (v0.1.8 preview)
+
+**Cause:** Electron's repeated `desktopCapturer.getSources({types:['window'],thumbnailSize:{width:2560,height:1440}})` calls can return the *same cached Windows game-window thumbnail* indefinitely. The earlier sampler assigned `Date.now()` to each returned thumbnail and the bounded buffer even re-added identical thumbnails after five seconds. This made an hour-old picture appear freshly captured, allowing mistaken Market evidence timestamps.
+
+**Change:** The companion now discovers the named AION2 window by `desktopCapturer.getSources` with `thumbnailSize: {width:0,height:0}`, then starts a private, video-only `getUserMedia` stream for **that exact window source id** in a hidden, isolated Electron renderer. It does not capture whole screens, microphones, application windows or audio. Each actual video frame is passed from the renderer to the main process in memory at approximately 850 ms intervals. A first frame is *not* assumed to be live; a visible pixel change must be seen before OCR may record transaction evidence.
+
+If video frames stop changing for 15 seconds, Diagnostics explicitly reports **FROZEN · NOT RECORDING**, clears buffered images, and blocks fee attribution from stale screenshots. A bounded, automatic stream restart is attempted if Windows freezes a stream. If the game scene changes again, OCR resumes automatically and observations use capture-time timestamps. There is no silent fallback to cached thumbnails. The installed screenshot preview is only kept in RAM while frames remain valid, and is discarded on a frozen stream.
+
+In Diagnostics, **Source = AION2 video stream** indicates the streaming path, **Video frames received** counts source frames (including duplicates), **Last visual change** shows the most recent actually different image, and **Image freshness** displays `FROZEN · NOT RECORDING` when the stream is stuck. A game showing an entirely static screen can also temporarily trigger this warning: moving or opening a menu should produce a frame transition and resume. Try **borderless/windowed mode** if exclusive fullscreen or game graphics/anti-cheat prevents Windows from providing fresh video content.
+
+This is a correctness and capture-source change, not an assertion that the Aion 2 game's rendering can be video-captured on every Windows system. The Windows build validates syntax and the packaged OCR worker; *actual live game video capture still requires a user's in-game test*. No server-side records are backfilled from frozen screenshots and no screenshots are uploaded.
