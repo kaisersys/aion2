@@ -69,7 +69,9 @@ class MarketLiveCapture {
    const stalled=this.sourceId===games[0].id&&this.selectedAt>0&&
     now-this.selectedAt>18000&&
     now-this.lastFrameAt>18000&&now-this.lastRestartAt>18000;
-   if(this.sourceId===games[0].id&&!stalled)return;
+   const frozen=this.sourceId===games[0].id&&this.stale&&
+    now-this.lastRestartAt>30000;
+   if(this.sourceId===games[0].id&&!stalled&&!frozen)return;
    this.sourceId=games[0].id;
    this.selectedAt=now;this.lastFrameAt=0;this.lastRestartAt=now;
    this.gate.reset();this.stale=false;this.lastChangeAt=null;
