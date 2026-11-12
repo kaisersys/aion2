@@ -408,6 +408,11 @@ async function marketOcrTick() {
     marketOcrStatus.recognitionMode='full-window';
    }
   }
+  // Never attribute an older image if capture froze during OCR.
+  if(marketLiveCapture.stale){
+   marketOcrStatus.lastResult='discarded-stale';
+   return;
+  }
   marketOcrStatus.spatialFee=spatialFee;
   marketOcrStatus.recognizedChars=recognized.length;
   marketOcrStatus.feeLabelSeen=/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(recognized);
