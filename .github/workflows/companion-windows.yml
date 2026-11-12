@@ -79,11 +79,12 @@ jobs:
         run: |
           $exe = Join-Path $PWD 'release/win-unpacked/Atreia Street Companion.exe'
           if (-not (Test-Path $exe)) { throw "Packaged companion executable not found: $exe" }
+          $env:ATREIA_SMOKE_LOG = Join-Path $env:RUNNER_TEMP 'atreia-video-smoke.txt'
           $p = Start-Process -FilePath $exe -ArgumentList '--atreia-stream-smoke' -PassThru
-          if (-not $p.WaitForExit(55000)) {
-            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-            throw 'Packaged video-stream smoke timed out'
-          }
+          $exited = $p.WaitForExit(55000)
+          if (-not $exited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+          if (Test-Path $env:ATREIA_SMOKE_LOG) { Get-Content $env:ATREIA_SMOKE_LOG }
+          if (-not $exited) { throw 'Packaged video-stream smoke timed out' }
           $p.Refresh()
           if ($p.ExitCode -ne 0) { throw "Packaged video-stream smoke failed with exit code $($p.ExitCode)" }
       - uses: actions/upload-artifact@v4
