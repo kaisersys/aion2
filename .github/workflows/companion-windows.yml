@@ -74,6 +74,18 @@ jobs:
           }
           $p.Refresh()
           if ($p.ExitCode -ne 0) { throw "Packaged companion OCR smoke failed with exit code $($p.ExitCode)" }
+      - name: Verify packaged game-window video capture receives changed frames
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'release/win-unpacked/Atreia Street Companion.exe'
+          if (-not (Test-Path $exe)) { throw "Packaged companion executable not found: $exe" }
+          $p = Start-Process -FilePath $exe -ArgumentList '--atreia-stream-smoke' -PassThru
+          if (-not $p.WaitForExit(55000)) {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            throw 'Packaged video-stream smoke timed out'
+          }
+          $p.Refresh()
+          if ($p.ExitCode -ne 0) { throw "Packaged video-stream smoke failed with exit code $($p.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
           name: atreiastreet-companion-windows-preview
