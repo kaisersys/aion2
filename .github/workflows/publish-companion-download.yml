@@ -1,4 +1,4 @@
-name: Publish Companion v0.1.7 preview download
+name: Publish Companion v0.1.8 preview download
 on:
   push:
     branches:
@@ -13,21 +13,26 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch validated v0.1.7 installer from Windows CI
+      - name: Fetch validated v0.1.8 installer from Windows CI
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p dist
-          gh run download 43170889008 --repo "$GITHUB_REPOSITORY" --name atreiastreet-companion-windows-preview --dir dist
-          test -f "dist/Atreia Street Companion Setup 0.1.7.exe"
-          echo "9e1f1bbe989f253bc649a3678025e19aabe908d6e66d13f41fd6e3d2aa1fe08a  dist/Atreia Street Companion Setup 0.1.7.exe" | sha256sum --check
-          mv "dist/Atreia Street Companion Setup 0.1.7.exe" "dist/Atreia-Street-Companion-Setup-v0.1.7.exe"
-      - name: Create public preview release
+          gh run download 43178025943 --repo "$GITHUB_REPOSITORY" --name atreiastreet-companion-windows-preview --dir dist
+          test -f "dist/Atreia Street Companion Setup 0.1.8.exe"
+          echo "ba70cfa56dbb47cd396e7933c6021db13769008d2f794fc7844eedabe6cb97cf  dist/Atreia Street Companion Setup 0.1.8.exe" | sha256sum --check
+          mv "dist/Atreia Street Companion Setup 0.1.8.exe" "dist/Atreia-Street-Companion-Setup-v0.1.8.exe"
+      - name: Create public experimental preview release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create companion-v0.1.7-preview             "dist/Atreia-Street-Companion-Setup-v0.1.7.exe"             --repo "$GITHUB_REPOSITORY"             --target "$GITHUB_SHA"             --title "Atreia Street Companion v0.1.7 (Windows Preview)"             --notes "Free Windows preview. This is an unverified Aion 2 companion prototype with private account-linked Market observations. v0.1.7 improves diagnostics, distinguishing finished OCR scans and previewing the locally captured game window. Full live-game fee tracking is not yet verified. This installer is unsigned. No other third-party software required beyond the documented Npcap runtime."             --prerelease             --latest=false
+          gh release create companion-v0.1.8-preview "dist/Atreia-Street-Companion-Setup-v0.1.8.exe" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Atreia Street Companion v0.1.8 (Experimental Windows Preview)" \
+            --notes "Experimental Windows preview. v0.1.8 fixes the one-time screenshot preview, switches to an AION2-only video stream, and rejects cached or frozen game frames before Market attribution. The hosted Windows CI runner could not enumerate its own test game window, so game-window video capture remains UNVERIFIED on a normal Windows desktop; automatic Market fees are NOT confirmed fixed. You may test it in AION2 borderless/windowed mode. The installer is unsigned. No screenshots or raw OCR text are uploaded." \
+            --prerelease --latest=false
