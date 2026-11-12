@@ -136,6 +136,8 @@ function render(){
  $('market-scan-diagnostics').disabled=!state.remote;
  $('market-preview-diagnostics').disabled=!state.remote;
  if(!state.remote){
+  marketPreviewEnabled=false;marketPreviewLastAt=null;
+  $('market-preview-diagnostics').textContent='Start refreshing local game preview';
   const img=$('market-preview-image');
   img.removeAttribute('src');img.hidden=true;
  }
@@ -500,18 +502,42 @@ async function scanMarketNow(){
  catch(err){show(err.message,true);}
 }
 $('market-scan-diagnostics').addEventListener('click',scanMarketNow);
-$('market-preview-diagnostics').addEventListener('click',async()=>{
+let marketPreviewEnabled=false,marketPreviewBusy=false,marketPreviewLastAt=null;
+async function updateMarketPreview(){
+ if(!marketPreviewEnabled||marketPreviewBusy||activeView!=='diagnostics'||!state?.remote)return;
+ marketPreviewBusy=true;
  try {
   const result=await api.previewMarketCapture();
-  if(result.error) {show(result.error,true);return;}
-  const image=$('market-preview-image');
-  image.src=result.dataUrl;
-  image.hidden=false;
+  if(result.error){
+   $('market-preview-note').textContent=result.error+
+    ' No screenshot is uploaded or saved.';
+   return;
+  }
+  const capturedAt=Date.parse(result.capturedAt);
+  const age=Math.max(0,Math.round((Date.now()-capturedAt)/1000));
+  if(marketPreviewLastAt!==result.capturedAt){
+   const image=$('market-preview-image');
+   image.src=result.dataUrl;
+   image.hidden=false;
+   marketPreviewLastAt=result.capturedAt;
+  }
   $('market-preview-note').textContent=
-   'Local capture from '+new Date(result.capturedAt).toLocaleTimeString()+
-   '. If this is black, missing Market labels, or obscured by another app, OCR cannot read the fee. The preview is not stored or uploaded.';
- } catch(err){show(err.message,true);}
+   (age>15?'WARNING: No new accepted game frame for '+age+' seconds. Capture may be frozen.':
+    'Live preview · last changed game frame '+age+' seconds ago.')+
+   ' Snapshot time: '+new Date(result.capturedAt).toLocaleTimeString()+
+   '. The image is local to this PC and never uploaded or stored.';
+ }catch(err){
+  $('market-preview-note').textContent='Live preview error: '+String(err.message).slice(0,120);
+ }finally{marketPreviewBusy=false;}
+}
+$('market-preview-diagnostics').addEventListener('click',()=>{
+ marketPreviewEnabled=!marketPreviewEnabled;
+ $('market-preview-diagnostics').textContent=marketPreviewEnabled?
+  'Stop refreshing local game preview':'Start refreshing local game preview';
+ if(marketPreviewEnabled)void updateMarketPreview();
+ else $('market-preview-note').textContent='Local preview paused. The image is a snapshot and will not update until resumed.';
 });
+setInterval(()=>{void updateMarketPreview();},2000);
 $('sync-now').addEventListener('click',async()=>{
  try{const r=await api.sync();show('Synced '+r.uploaded+' local records and '+r.ticketBalances+
  ' decoded ticket snapshots. '+r.unmatched+' records had no matching website character.');}
