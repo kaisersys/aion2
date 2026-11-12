@@ -34,7 +34,7 @@
    </div>
   </aside>
   <main class="main">
-   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1.7 · OCR DIAGNOSTICS</span></div>
+   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1.8 · LIVE VIDEO CAPTURE</span></div>
    <div class="header">
     <div><div class="eyebrow">YOUR PROGRESS, AT A GLANCE</div>
      <h1><span id="page-title-prefix">Character </span><em id="page-title-topic">overview.</em></h1>
@@ -83,6 +83,11 @@
      <div class="detection-metrics">
        <span>Game windows matched <strong id="diagnostic-market-windows">—</strong></span>
        <span>Captured image <strong id="diagnostic-market-pixels">—</strong></span>
+       <span>Source <strong id="diagnostic-market-source">—</strong></span>
+       <span>Window video <strong id="diagnostic-market-stream">—</strong></span>
+       <span>Video frames received <strong id="diagnostic-market-received">0</strong></span>
+       <span>Last visual change <strong id="diagnostic-market-last-change">—</strong></span>
+       <span>Image freshness <strong id="diagnostic-market-freshness">—</strong></span>
        <span>OCR scans started <strong id="diagnostic-market-scans">0</strong></span>
        <span>OCR scans finished <strong id="diagnostic-market-completed">0</strong></span>
        <span>OCR working <strong id="diagnostic-market-working">—</strong></span>
@@ -100,11 +105,11 @@
        <span>OCR region <strong id="diagnostic-market-ocr-mode">—</strong></span>
        <span>Last attempt <strong id="diagnostic-market-time">—</strong></span>
      </div>
-     <p class="movement-help">Market screen capture starts automatically when your account is connected. No manual scan is needed when you open a listing, Confirm/Cancel prompt, or settlement. The AION2 window is sampled roughly every 850 ms while OCR processes buffered screenshots. The game still requires you to press Confirm or Cancel yourself. Images and raw recognized text are not uploaded or stored; expenses are only attributed to Market fees when a matching Kina decrease is observed.</p>
+     <p class="movement-help">The companion automatically captures a live video stream of the AION2 game window, not cached Windows thumbnails. It samples the named game window approximately every 850 ms without capturing the whole desktop or audio. Identical frames do not count as new evidence; if video freezes, the app pauses Market attribution and attempts a safe stream restart. Your Confirm/Cancel actions happen inside AION2. Raw screenshots and OCR text are never uploaded or written to disk.</p>
      <p id="diagnostic-market-evidence" class="movement-help">No fee label recognized yet.</p>
      <button class="outlined" id="market-scan-diagnostics" type="button">Run extra diagnostic capture</button>
-     <button class="outlined" id="market-preview-diagnostics" type="button">Inspect captured AION2 window</button>
-     <p id="market-preview-note" class="movement-help">Preview is on this computer only. No screenshot is uploaded or saved. This is the exact game-window image the companion sees.</p>
+     <button class="outlined" id="market-preview-diagnostics" type="button">Start refreshing local game preview</button>
+     <p id="market-preview-note" class="movement-help">This preview is paused until you start it. Once enabled, it refreshes every two seconds while Diagnostics is open and shows the last valid frame's age. No screenshot is uploaded or saved.</p>
      <img id="market-preview-image" hidden alt="Last in-memory capture of the AION2 window, shown locally for troubleshooting" style="display:block;max-width:100%;height:auto;border:1px solid #334156;border-radius:8px;margin-top:10px" />
      <p class="movement-help">Optional troubleshooting only. Buttons here are not required for automatic tracking.</p>
    </section>

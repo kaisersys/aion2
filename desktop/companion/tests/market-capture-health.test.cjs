@@ -49,7 +49,7 @@ test('OCR UI retains last COMPLETED results rather than resetting them at start 
  assert.ok(pkg.build.files.includes('ocr-smoke-fixture.cjs'));
  const sample=require('../ocr-smoke-fixture.cjs');
  assert.ok(sample.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')));
- assert.equal(pkg.version,'0.1.7');
+ assert.equal(pkg.version,'0.1.8');
  for(const id of ['diagnostic-market-completed','diagnostic-market-working',
   'diagnostic-market-finished-at','diagnostic-market-last-result',
   'diagnostic-market-image-health','market-preview-diagnostics','market-preview-image']){

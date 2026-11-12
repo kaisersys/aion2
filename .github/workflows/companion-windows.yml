@@ -47,6 +47,10 @@ jobs:
       - run: node --check market-spatial.cjs
       - run: node --check market-frame-buffer.cjs
       - run: node --check market-capture-health.cjs
+      - run: node --check market-live-frame.cjs
+      - run: node --check market-live-capture.cjs
+      - run: node --check market-stream-preload.cjs
+      - run: node --check market-stream-renderer.js
       - run: npm run capture:build
       - name: Package Windows preview (retry transient CDN errors)
         shell: pwsh
@@ -70,6 +74,24 @@ jobs:
           }
           $p.Refresh()
           if ($p.ExitCode -ne 0) { throw "Packaged companion OCR smoke failed with exit code $($p.ExitCode)" }
+      - name: Verify packaged game-window video capture receives changed frames
+        # GitHub-hosted Windows build agents run without an interactive game
+        # desktop: desktopCapturer exposes only HostedComputeAgent, not even
+        # an animated test BrowserWindow. Keep failure visible in checks but do
+        # not pretend the absence of a desktop proves video capture is broken.
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'release/win-unpacked/Atreia Street Companion.exe'
+          if (-not (Test-Path $exe)) { throw "Packaged companion executable not found: $exe" }
+          $env:ATREIA_SMOKE_LOG = Join-Path $env:RUNNER_TEMP 'atreia-video-smoke.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList '--atreia-stream-smoke' -PassThru
+          $exited = $p.WaitForExit(55000)
+          if (-not $exited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+          if (Test-Path $env:ATREIA_SMOKE_LOG) { Get-Content $env:ATREIA_SMOKE_LOG }
+          if (-not $exited) { throw 'Packaged video-stream smoke timed out' }
+          $p.Refresh()
+          if ($p.ExitCode -ne 0) { throw "Packaged video-stream smoke failed with exit code $($p.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
           name: atreiastreet-companion-windows-preview

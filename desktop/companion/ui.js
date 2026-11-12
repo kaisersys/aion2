@@ -78,19 +78,30 @@ function render(){
  const monitorOn=market.autoRunning===true;
  const recentlyCaptured=market.lastCapturedAt &&
   Date.now()-Date.parse(market.lastCapturedAt)<15000;
- const monitorLabel=monitorOn?(recentlyCaptured?
+ const captureFrozen=market.staleVideo===true||market.streamState==='stale';
+ const monitorLabel=captureFrozen?'AUTO MONITOR BLOCKED · game video frozen':
+  monitorOn?(recentlyCaptured?
    'AUTO MONITOR ON · game screen being captured':
    'AUTO MONITOR ON · waiting for a readable AION2 window'):
    state.remote?'AUTO MONITOR NOT RUNNING':'AUTO MONITOR OFF · connect account';
  $('market-header-status').textContent=monitorLabel+' · '+
   (market.message||'Sign in to enable Market reading.');
- $('market-header-status').style.borderColor=!monitorOn||
+ $('market-header-status').style.borderColor=captureFrozen||!monitorOn||
   market.state==='error'||market.state==='config-missing'?
    '#be7578':market.state==='corroborated'?'#60987e':'#6180a5';
  $('diagnostic-market-state').textContent=market.state||'idle';
  $('diagnostic-market-message').textContent=market.message||'No Market scan started.';
  $('diagnostic-market-windows').textContent=market.windowCandidates===undefined?'—':String(market.windowCandidates);
  $('diagnostic-market-pixels').textContent=market.capturePixels||'—';
+ $('diagnostic-market-source').textContent=market.captureMethod==='window-video-stream'?
+  'AION2 video stream':'Unknown';
+ $('diagnostic-market-stream').textContent=market.streamState||'not running';
+ $('diagnostic-market-received').textContent=String(market.framesReceived||0);
+ $('diagnostic-market-last-change').textContent=market.lastVisualChangeAt?
+  new Date(market.lastVisualChangeAt).toLocaleTimeString():'Waiting for first changed frame';
+ $('diagnostic-market-freshness').textContent=captureFrozen?
+  'FROZEN · NOT RECORDING':!market.framesCaptured?
+  'Waiting for live video':'Fresh changing images';
  $('diagnostic-market-scans').textContent=String(market.scans||0);
  $('diagnostic-market-completed').textContent=String(market.completedScans||0);
  $('diagnostic-market-working').textContent=market.ocrInProgress?'Yes':'No';
@@ -119,10 +130,14 @@ function render(){
   'Last completed OCR fee-label line (not uploaded): '+market.feeEvidence.join(' / '):
   !market.completedScans?'No completed OCR result yet; wait for the first scan to finish.':
   health?.blankLike?'Captured game window looks nearly blank or black. Inspect the captured image.':
-  'Last completed OCR did not recognize the fee label. Inspect the captured image to check what OCR actually saw.';
+  captureFrozen?
+   'The window video stream has stopped changing. No new Market observations are being recorded from frozen frames. Try borderless/windowed AION2 mode.':
+   'Last completed OCR did not recognize the fee label. Inspect the captured image to check what OCR actually saw.';
  $('market-scan-diagnostics').disabled=!state.remote;
  $('market-preview-diagnostics').disabled=!state.remote;
  if(!state.remote){
+  marketPreviewEnabled=false;marketPreviewLastAt=null;
+  $('market-preview-diagnostics').textContent='Start refreshing local game preview';
   const img=$('market-preview-image');
   img.removeAttribute('src');img.hidden=true;
  }
@@ -487,18 +502,42 @@ async function scanMarketNow(){
  catch(err){show(err.message,true);}
 }
 $('market-scan-diagnostics').addEventListener('click',scanMarketNow);
-$('market-preview-diagnostics').addEventListener('click',async()=>{
+let marketPreviewEnabled=false,marketPreviewBusy=false,marketPreviewLastAt=null;
+async function updateMarketPreview(){
+ if(!marketPreviewEnabled||marketPreviewBusy||activeView!=='diagnostics'||!state?.remote)return;
+ marketPreviewBusy=true;
  try {
   const result=await api.previewMarketCapture();
-  if(result.error) {show(result.error,true);return;}
-  const image=$('market-preview-image');
-  image.src=result.dataUrl;
-  image.hidden=false;
+  if(result.error){
+   $('market-preview-note').textContent=result.error+
+    ' No screenshot is uploaded or saved.';
+   return;
+  }
+  const capturedAt=Date.parse(result.capturedAt);
+  const age=Math.max(0,Math.round((Date.now()-capturedAt)/1000));
+  if(marketPreviewLastAt!==result.capturedAt){
+   const image=$('market-preview-image');
+   image.src=result.dataUrl;
+   image.hidden=false;
+   marketPreviewLastAt=result.capturedAt;
+  }
   $('market-preview-note').textContent=
-   'Local capture from '+new Date(result.capturedAt).toLocaleTimeString()+
-   '. If this is black, missing Market labels, or obscured by another app, OCR cannot read the fee. The preview is not stored or uploaded.';
- } catch(err){show(err.message,true);}
+   (age>15?'WARNING: No new accepted game frame for '+age+' seconds. Capture may be frozen.':
+    'Live preview · last changed game frame '+age+' seconds ago.')+
+   ' Snapshot time: '+new Date(result.capturedAt).toLocaleTimeString()+
+   '. The image is local to this PC and never uploaded or stored.';
+ }catch(err){
+  $('market-preview-note').textContent='Live preview error: '+String(err.message).slice(0,120);
+ }finally{marketPreviewBusy=false;}
+}
+$('market-preview-diagnostics').addEventListener('click',()=>{
+ marketPreviewEnabled=!marketPreviewEnabled;
+ $('market-preview-diagnostics').textContent=marketPreviewEnabled?
+  'Stop refreshing local game preview':'Start refreshing local game preview';
+ if(marketPreviewEnabled)void updateMarketPreview();
+ else $('market-preview-note').textContent='Local preview paused. The image is a snapshot and will not update until resumed.';
 });
+setInterval(()=>{void updateMarketPreview();},2000);
 $('sync-now').addEventListener('click',async()=>{
  try{const r=await api.sync();show('Synced '+r.uploaded+' local records and '+r.ticketBalances+
  ' decoded ticket snapshots. '+r.unmatched+' records had no matching website character.');}
