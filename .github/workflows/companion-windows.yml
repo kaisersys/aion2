@@ -47,6 +47,10 @@ jobs:
       - run: node --check market-spatial.cjs
       - run: node --check market-frame-buffer.cjs
       - run: node --check market-capture-health.cjs
+      - run: node --check market-live-frame.cjs
+      - run: node --check market-live-capture.cjs
+      - run: node --check market-stream-preload.cjs
+      - run: node --check market-stream-renderer.js
       - run: npm run capture:build
       - name: Package Windows preview (retry transient CDN errors)
         shell: pwsh
