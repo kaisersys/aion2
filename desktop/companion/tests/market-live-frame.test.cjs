@@ -61,3 +61,14 @@ test('Windows code streams a named AION2 window instead of repeating thumbnails'
   assert.ok(pkg.build.files.includes(file),'Missing bundled file: '+file);
  assert.equal(pkg.version,'0.1.8');
 });
+
+test('live preview refreshes while Diagnostics is visible and reports stale snapshot age',()=>{
+ const root=path.resolve(__dirname,'..');
+ const ui=fs.readFileSync(path.join(root,'ui.js'),'utf8');
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ assert.ok(ui.includes('async function updateMarketPreview()'));
+ assert.ok(ui.includes('activeView!==\'diagnostics\''));
+ assert.ok(ui.includes('setInterval(()=>{void updateMarketPreview();},2000)'));
+ assert.ok(ui.includes('Capture may be frozen.'));
+ assert.ok(html.includes('Start refreshing local game preview'));
+});
