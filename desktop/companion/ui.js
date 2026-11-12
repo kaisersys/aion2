@@ -92,6 +92,17 @@ function render(){
  $('diagnostic-market-windows').textContent=market.windowCandidates===undefined?'—':String(market.windowCandidates);
  $('diagnostic-market-pixels').textContent=market.capturePixels||'—';
  $('diagnostic-market-scans').textContent=String(market.scans||0);
+ $('diagnostic-market-completed').textContent=String(market.completedScans||0);
+ $('diagnostic-market-working').textContent=market.ocrInProgress?'Yes':'No';
+ $('diagnostic-market-finished-at').textContent=market.lastCompletedAt?
+  new Date(market.lastCompletedAt).toLocaleTimeString():'Never';
+ $('diagnostic-market-last-result').textContent=market.lastResult||'No completed result';
+ $('diagnostic-market-duration').textContent=Number.isFinite(market.lastRecognitionMs)?
+  (market.lastRecognitionMs/1000).toFixed(1)+'s':'—';
+ const health=market.captureHealth;
+ $('diagnostic-market-image-health').textContent=health?
+  (health.blankLike?'POSSIBLY BLANK · ':'Detail visible · ')+
+  'contrast '+health.contrast:'Not sampled yet';
  $('diagnostic-market-buffered').textContent=String(market.framesBuffered||0);
  $('diagnostic-market-captured').textContent=String(market.framesCaptured||0);
  $('diagnostic-market-captured-at').textContent=market.lastCapturedAt?
@@ -105,9 +116,16 @@ function render(){
  $('diagnostic-market-time').textContent=market.lastScanAt?
   new Date(market.lastScanAt).toLocaleTimeString():'Never';
  $('diagnostic-market-evidence').textContent=Array.isArray(market.feeEvidence)&&market.feeEvidence.length?
-  'OCR fee-label line (not uploaded): '+market.feeEvidence.join(' / '):
-  'No recognized fee-label line available. If the game window is captured, the on-screen fee may be too small or obscured for OCR.';
+  'Last completed OCR fee-label line (not uploaded): '+market.feeEvidence.join(' / '):
+  !market.completedScans?'No completed OCR result yet; wait for the first scan to finish.':
+  health?.blankLike?'Captured game window looks nearly blank or black. Inspect the captured image.':
+  'Last completed OCR did not recognize the fee label. Inspect the captured image to check what OCR actually saw.';
  $('market-scan-diagnostics').disabled=!state.remote;
+ $('market-preview-diagnostics').disabled=!state.remote;
+ if(!state.remote){
+  const img=$('market-preview-image');
+  img.removeAttribute('src');img.hidden=true;
+ }
  $('show-login').textContent=state.remote?'Disconnect account':'Connect account';
  $('sync-now').disabled=!state.remote;
  $('feed-label').textContent=state.feedPath?'Also watching '+state.feedPath+' for decoded JSONL events':'Read-only Npcap capture; decoded events are stored locally.';
@@ -469,6 +487,18 @@ async function scanMarketNow(){
  catch(err){show(err.message,true);}
 }
 $('market-scan-diagnostics').addEventListener('click',scanMarketNow);
+$('market-preview-diagnostics').addEventListener('click',async()=>{
+ try {
+  const result=await api.previewMarketCapture();
+  if(result.error) {show(result.error,true);return;}
+  const image=$('market-preview-image');
+  image.src=result.dataUrl;
+  image.hidden=false;
+  $('market-preview-note').textContent=
+   'Local capture from '+new Date(result.capturedAt).toLocaleTimeString()+
+   '. If this is black, missing Market labels, or obscured by another app, OCR cannot read the fee. The preview is not stored or uploaded.';
+ } catch(err){show(err.message,true);}
+});
 $('sync-now').addEventListener('click',async()=>{
  try{const r=await api.sync();show('Synced '+r.uploaded+' local records and '+r.ticketBalances+
  ' decoded ticket snapshots. '+r.unmatched+' records had no matching website character.');}
