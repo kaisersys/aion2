@@ -918,8 +918,16 @@ async function runStreamSmoke() {
  // Regression test of ACTUAL continuously changing pixels from an Electron
  // test window. A successful OCR worker startup alone cannot test game capture.
  let finished=false,winTest=null,reader=null,accepted=0;
+ const log=(message)=>{
+  const line=new Date().toISOString()+' '+String(message).slice(0,300);
+  console.log('ATREIA_STREAM_TEST',line);
+  const filename=process.env.ATREIA_SMOKE_LOG;
+  if(typeof filename==='string'&&filename.length<500)
+   try {fs.appendFileSync(filename,line+'\n');}catch{}
+ };
  const complete=(code,reason)=>{
   if(finished)return;
+  log('COMPLETE '+code+' '+reason);
   finished=true;clearTimeout(watchdog);
   if(reader)reader.stop();
   if(winTest&&!winTest.isDestroyed())winTest.close();
@@ -937,16 +945,20 @@ async function runStreamSmoke() {
    '</body></html>';
   await winTest.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(page));
   winTest.setTitle('AION2 Stream Test');
+  log('Animated test window created with title: '+winTest.getTitle());
   reader=new MarketLiveCapture({
    onFrame:()=>{
     accepted++;
+    log('Fresh video frame accepted: '+accepted);
     if(accepted>=2)complete(0,'Observed two genuinely changed AION2 test-window video frames.');
    },
    onStatus:(status,message)=>{
+    log('stream status '+status+': '+message);
     if(status==='error')complete(1,message);
    }
   });
   await reader.start();
+  log('Capture controller start completed');
  }catch(err){complete(1,String(err.stack||err).slice(0,350));}
 }
 app.whenReady().then(()=>{
