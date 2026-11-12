@@ -46,7 +46,8 @@
       "market-attribution.js",
       "market-spatial.cjs",
       "market-frame-buffer.cjs",
-      "market-capture-health.cjs"
+      "market-capture-health.cjs",
+      "ocr-smoke-fixture.cjs"
     ],
     "win": {
       "target": "nsis",
