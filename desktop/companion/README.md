@@ -282,3 +282,15 @@ A separate sampler captures **only the named AION2 game window about every 850 m
 Evidence is saved in the local character ledger even when the signed-in account has no corresponding website character; the upload remains blocked until a verified character and server mapping is available. Under Diagnostics, inspect `Screen frames captured`, `Screen frames buffered`, `Spatial fee read`, `Detected screen`, `OCR region`, and `Regular/Bound Kina readings`. A confirmed fee still requires an exact, unambiguous decoded Kina decrease, not merely an on-screen quotation. Other spending without linked evidence remains unattributed.
 
 This build is not validated on a live game session until the user observes both the 23-Kina screen-read and a matching packet-derived wallet decrease. Avoid presenting an unverified fee as actual spending or a confirmed listing.
+
+## Market OCR: last-completed results and local capture preview (v0.1.7)
+
+Previously the companion reset `OCR characters`, `fee label recognized`, and the recognized text diagnostics to zero at the start of **every** OCR operation. A screenshot captured while the status said *scanning* could therefore display `0 characters` even when previous passes recognized text. The counters were misleading and obscured whether the screen capture, OCR worker or Market parser was responsible for missing listing fees.
+
+The Diagnostics tab now reports **OCR scans started**, **OCR scans finished**, **OCR working**, **last finished OCR**, **last OCR result** and **recognition duration**. The last complete result remains visible while a new scan is running. The AION2 window is checked periodically for whether it looks blank or contains visible image contrast, using on-device pixel statistics. These image quality metrics do not capture or export other desktop windows.
+
+A new **Inspect captured AION2 window** button presents the exact latest captured game window **inside the companion on the local device**, from RAM only. It does not enable capture, export raw text, upload screenshots to Supabase, or write images to disk. It is purely a diagnostic to determine whether Electron's Windows game-window capture is black, obscured, cropped, or legible. Screenshots are cleared on account logout or application exit.
+
+If **OCR scans finished = 0**, the OCR engine may still be initializing or processing; do not interpret zero text as a completed failure. If finished scans are greater than zero and **last result=empty** with a **blank-looking capture**, the problem is in the game-window capture. If the captured window shows the fee legibly but OCR still returns empty, investigate the OCR preprocessing/recognition parameters rather than adjusting wallet transaction attribution. A source-unknown wallet debit cannot be attributed to a listing fee until its OCR evidence is recognized and matched.
+
+This is an instrumentation fix, **not** proof that the user's live fee is now tracked. The packaged OCR startup smoke and parser unit tests alone do not verify in-game capture fidelity.
