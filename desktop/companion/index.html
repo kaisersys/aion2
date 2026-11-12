@@ -34,7 +34,7 @@
    </div>
   </aside>
   <main class="main">
-   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1 · MVP</span></div>
+   <div class="topline"><span>THE CODEX / CHARACTER INTELLIGENCE</span><span class="version">VERSION 0.1.8 · LIVE VIDEO CAPTURE</span></div>
    <div class="header">
     <div><div class="eyebrow">YOUR PROGRESS, AT A GLANCE</div>
      <h1><span id="page-title-prefix">Character </span><em id="page-title-topic">overview.</em></h1>
@@ -42,6 +42,7 @@
     </div>
     <div class="sync-indicator"><span class="light"></span><span id="activity-status">Local history active</span></div>
    </div>
+   <div id="market-header-status" class="alert" role="status" aria-live="polite">Automatic Market monitoring: checking account and game window…</div>
    <div id="alert" class="alert" role="status" hidden></div>
    <section id="view-diagnostics" class="tab-view" hidden>
    <section class="panel source-panel">
@@ -66,12 +67,51 @@
         <span>Item stack updates <strong id="diagnostic-item-updates">—</strong></span>
         <span>Item quantity changes <strong id="diagnostic-item-deltas">—</strong></span>
         <span>Tracked inventory stacks <strong id="diagnostic-item-stacks">—</strong></span>
+        <span>Ground drops observed <strong id="diagnostic-ground-items">—</strong></span>
+        <span>Own ground pickups <strong id="diagnostic-ground-pickups">—</strong></span>
+        <span>Ground pickups matched to inventory <strong id="diagnostic-ground-matches">—</strong></span>
         <span>Regular Kina readings <strong id="diagnostic-wallet-regular">—</strong></span>
         <span>Bound Kina readings <strong id="diagnostic-wallet-bound">—</strong></span>
       </div>
       <p class="opcode-diagnostic">Frequent game opcodes: <span id="diagnostic-opcodes">Awaiting frames</span></p>
     </div>
     <div class="source-actions"><label class="capture-port">FALLBACK PORT <input id="game-port" aria-label="Aion 2 game server port" type="number" min="1" max="65535" value="13328" /></label><button id="capture-toggle" class="filled">Pause automatic tracking</button><button id="choose-feed" class="outlined">JSONL test feed</button></div>
+   </section>
+   <section class="panel">
+     <div class="section-top"><div><span class="section-label">AUTOMATIC MARKET MONITOR</span><h2>Game-window reading</h2></div><span class="tag" id="diagnostic-market-state">Not started</span></div>
+     <p class="capture-detail" id="diagnostic-market-message">Sign in to the companion to start Market scanning.</p>
+     <div class="detection-metrics">
+       <span>Game windows matched <strong id="diagnostic-market-windows">—</strong></span>
+       <span>Captured image <strong id="diagnostic-market-pixels">—</strong></span>
+       <span>Source <strong id="diagnostic-market-source">—</strong></span>
+       <span>Window video <strong id="diagnostic-market-stream">—</strong></span>
+       <span>Video frames received <strong id="diagnostic-market-received">0</strong></span>
+       <span>Last visual change <strong id="diagnostic-market-last-change">—</strong></span>
+       <span>Image freshness <strong id="diagnostic-market-freshness">—</strong></span>
+       <span>OCR scans started <strong id="diagnostic-market-scans">0</strong></span>
+       <span>OCR scans finished <strong id="diagnostic-market-completed">0</strong></span>
+       <span>OCR working <strong id="diagnostic-market-working">—</strong></span>
+       <span>Last finished OCR <strong id="diagnostic-market-finished-at">—</strong></span>
+       <span>Last OCR result <strong id="diagnostic-market-last-result">—</strong></span>
+       <span>Last OCR duration <strong id="diagnostic-market-duration">—</strong></span>
+       <span>Capture image signal <strong id="diagnostic-market-image-health">—</strong></span>
+       <span>Screen frames buffered <strong id="diagnostic-market-buffered">0</strong></span>
+       <span>Screen frames captured <strong id="diagnostic-market-captured">0</strong></span>
+       <span>Last frame captured <strong id="diagnostic-market-captured-at">—</strong></span>
+       <span>Spatial fee read <strong id="diagnostic-market-spatial-fee">—</strong></span>
+       <span>OCR characters <strong id="diagnostic-market-chars">—</strong></span>
+       <span>Fee label recognized <strong id="diagnostic-market-fee">—</strong></span>
+       <span>Detected screen <strong id="diagnostic-market-phase">—</strong></span>
+       <span>OCR region <strong id="diagnostic-market-ocr-mode">—</strong></span>
+       <span>Last attempt <strong id="diagnostic-market-time">—</strong></span>
+     </div>
+     <p class="movement-help">The companion automatically captures a live video stream of the AION2 game window, not cached Windows thumbnails. It samples the named game window approximately every 850 ms without capturing the whole desktop or audio. Identical frames do not count as new evidence; if video freezes, the app pauses Market attribution and attempts a safe stream restart. Your Confirm/Cancel actions happen inside AION2. Raw screenshots and OCR text are never uploaded or written to disk.</p>
+     <p id="diagnostic-market-evidence" class="movement-help">No fee label recognized yet.</p>
+     <button class="outlined" id="market-scan-diagnostics" type="button">Run extra diagnostic capture</button>
+     <button class="outlined" id="market-preview-diagnostics" type="button">Start refreshing local game preview</button>
+     <p id="market-preview-note" class="movement-help">This preview is paused until you start it. Once enabled, it refreshes every two seconds while Diagnostics is open and shows the last valid frame's age. No screenshot is uploaded or saved.</p>
+     <img id="market-preview-image" hidden alt="Last in-memory capture of the AION2 window, shown locally for troubleshooting" style="display:block;max-width:100%;height:auto;border:1px solid #334156;border-radius:8px;margin-top:10px" />
+     <p class="movement-help">Optional troubleshooting only. Buttons here are not required for automatic tracking.</p>
    </section>
    </section>
    <section id="view-overview" class="tab-view">
@@ -111,6 +151,16 @@
      <div class="movement-list-title item-groups-title"><span>ITEM-LEVEL SPENDING / RECEIPTS</span><small>Possible association · not a verified Market receipt</small></div>
      <p class="movement-help">When one identifiable item changes near a Kina transfer, the companion can associate them. It will not guess a purchase when several items change together, and it cannot yet distinguish NPC shops from player Market transactions.</p>
      <div id="item-groups" class="item-groups"><div class="empty">No item-level associations yet.</div></div>
+     <div class="movement-list-title item-groups-title"><span>CORROBORATED GROUND PICKUPS</span><small>Ground spawn + own pickup + inventory update</small></div>
+     <div id="ground-groups" class="item-groups"><div class="empty">No ground pickups corroborated yet.</div></div>
+     <div class="movement-list-title item-groups-title"><span>MARKET FEES &amp; SETTLEMENTS</span><small>Observed quotations vs wallet-matched spending</small></div>
+     <p class="movement-help" id="market-ocr-status">Market listings are detected automatically after companion sign-in.</p>
+     <p class="movement-help">No scan button or manual entry is needed to track a Market registration fee. Open the in-game Market and confirm your listing normally.</p>
+     <div class="movement-metrics">
+       <div class="movement-metric"><small>LATEST REGISTRATION FEE SHOWN</small><strong id="market-fees-quoted">—</strong><p>On-screen quote, not necessarily paid</p></div>
+       <div class="movement-metric"><small>FEES MATCHED TO KINA OUT · TODAY</small><strong class="down" id="market-fees-matched">—</strong><p>Confirm prompt followed by matching Kina debit; likely registered, not a server receipt</p></div>
+     </div>
+     <div id="market-observations" class="item-groups"><div class="empty">No Market observations yet.</div></div>
    </section>
    <div class="main-grid">
     <section class="panel">
@@ -126,7 +176,7 @@
      <div class="section-top"><div><div class="section-label">YOUR LEDGER</div><h2>Recent activity</h2></div><span id="ledger-count" class="tag">0 records</span></div>
      <div id="activity-rows"></div>
    </section>
-   <div class="footnote">Automatic capture begins when the companion opens. You may pause it at any time. Discovered characters are stored locally and shown after their first detected login. Only validated decoded events or your manual entries are recorded. Regular and bound Kina are tracked separately. Today's regular net change is not gross earnings. Wallet changes are never assumed to be earned or spent transactions. Raw packets are not stored or uploaded. This app does not automatically identify Market sales or purchases.</div>
+   <div class="footnote">Game packet capture starts with the companion; Market screen reading starts after account sign-in and stops at sign-out. OCR reads only the AION2 window. Extracted Market listing and settlement observations sync to your private account, not raw images or screen text. OCR observations are unverified until independently reconciled. Wallet changes alone are not proof of Market sales or purchases. See the account notice before connecting.</div>
    </section>
   </main>
  </div>
@@ -134,7 +184,7 @@
    <form id="auth-form" class="auth-modal">
      <button type="button" id="close-login" class="modal-close" aria-label="Close sign in">×</button>
      <div class="section-label">ATREIA STREET · ACCOUNT</div><h2>Connect your website.</h2>
-     <p>Sign in with the account you already use on atreiastreet.com. Only summarized records will be synced when you choose.</p>
+     <p>Connecting enables automatic Market screen reading while the AION2 game window is visible. The companion reads listing fees, prices and settlements using on-device OCR and automatically uploads extracted transaction fields to your private account. No screenshots or unrelated screen contents are uploaded. Closing the app or signing out stops Market reading. The companion also supports separate manual synchronization of wallet and progression events.</p>
      <label>Email<input type="email" id="auth-email" autocomplete="username" required /></label>
      <label>Password<input type="password" id="auth-password" autocomplete="current-password" required /></label>
      <button class="filled" type="submit">Connect account</button>
@@ -144,6 +194,7 @@
  <script src="./wallets.js" defer></script>
  <script src="./item-catalog.js" defer></script>
  <script src="./item-economy.js" defer></script>
+ <script src="./market-attribution.js" defer></script>
  <script src="./ui.js" defer></script>
 </body>
 </html>

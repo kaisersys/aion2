@@ -1,6 +1,6 @@
 'use strict';
 const { periods } = require('./periods.cjs');
-const TYPES = new Set(['kinah_earned', 'kinah_spent', 'wallet_snapshot', 'counter', 'item_change']);
+const TYPES = new Set(['kinah_earned', 'kinah_spent', 'wallet_snapshot', 'counter', 'item_change', 'item_origin']);
 const FREQ = new Set(['daily', 'weekly']);
 const SCOPES = new Set(['character', 'server']);
 const MAX_AMOUNT = 100000000000000;
@@ -43,6 +43,25 @@ function normalizeEvent(input, fallbackId) {
       throw new Error('Invalid decoded item change');
     ev.item_id=input.item_id;
     ev.delta=input.delta;
+    ev.observation_session=input.observation_session;
+  } else if (ev.type === 'item_origin') {
+    // Source attestations must reference a local, decoded inventory event.
+    // No raw ground handles or captured packet contents may be persisted.
+    if(ev.source!=='decoded' ||
+       typeof input.item_event_id!=='string' ||
+       !/^[0-9a-f]{32}$/.test(input.item_event_id) ||
+       !Number.isSafeInteger(input.item_id) || input.item_id<100000000 ||
+       input.item_id>=1000000000 ||
+       !Number.isSafeInteger(input.quantity) || input.quantity<=0 ||
+       input.quantity>1000000000 ||
+       input.origin!=='ground_pickup' ||
+       typeof input.observation_session!=='string' ||
+       !/^[0-9a-f]{32}$/.test(input.observation_session))
+      throw new Error('Invalid decoded item origin');
+    ev.item_event_id=input.item_event_id;
+    ev.item_id=input.item_id;
+    ev.quantity=input.quantity;
+    ev.origin='ground_pickup';
     ev.observation_session=input.observation_session;
   } else if (ev.type === 'wallet_snapshot') {
     if (!validInt(input.balance)) throw new Error('Invalid wallet balance');

@@ -18,6 +18,7 @@ public sealed class TicketProtocol
     private readonly Action<object> _emit;
     private string _observationSession = Guid.NewGuid().ToString("N");
     private readonly InventoryItems _items = new();
+    private readonly TransactionSources _sources;
     private readonly Dictionary<uint, TicketReading> _pendingTickets = new();
     private readonly Dictionary<uint, TicketReading> _latestTickets = new();
     private bool _awaitingCharacter;
@@ -39,8 +40,15 @@ public sealed class TicketProtocol
     public int InventoryItemUpdates => _items.ItemUpdates;
     public int InventoryItemDeltas => _items.EmittedDeltas;
     public int TrackedItemStacks => _items.TrackedStacks;
+    public int GroundItemsSeen => _sources.GroundItemsSeen;
+    public int OwnGroundPickups => _sources.OwnPickupsSeen;
+    public int CorroboratedGroundPickups => _sources.MatchedPickups;
 
-    public TicketProtocol(Action<object> emit) => _emit = emit;
+    public TicketProtocol(Action<object> emit)
+    {
+        _emit = emit;
+        _sources = new TransactionSources(PublishGroundOrigin);
+    }
 
     // The only emitted counters are those that can safely be mapped to the site's existing
     // task keys or to explicitly named informational resource counters.
@@ -130,7 +138,11 @@ public sealed class TicketProtocol
                         _observationSession=Guid.NewGuid().ToString("N");
                         // Preserve the first login's inventory baseline if it preceded
                         // the first identity; clear on confirmed character switches.
-                        if (_currentName is not null) _items.Reset();
+                        if (_currentName is not null)
+                        {
+                            _items.Reset();
+                            _sources.Reset();
+                        }
                     }
                     _currentName = name;
                     _currentServerId = serverId;
@@ -146,6 +158,12 @@ public sealed class TicketProtocol
                         PublishWallet(pending.Key,pending.Value,observedAt);
                     _pendingWallets.Clear();
                 }
+                break;
+            case 0x1e56: // ground drop appeared; never a purchase receipt
+                _sources.GroundAppeared(frame);
+                break;
+            case 0x1f56: // ground drop was picked up or disappeared
+                _sources.GroundDisappeared(frame, observedAt);
                 break;
             case 0x1156: // login inventory snapshot
             case 0x1b56: // inventory slot changes; not inherently a transaction
@@ -181,14 +199,34 @@ public sealed class TicketProtocol
         if(_currentName is null)return;
         // The item movement's origin is NOT known: loot, quest rewards,
         // crafting, consumption, sale and purchases can look identical.
+        string eventId = Guid.NewGuid().ToString("N");
         _emit(new {
             kind="event", @event=new {
-                id=Guid.NewGuid().ToString("N"), type="item_change",
+                id=eventId, type="item_change",
                 character=_currentName, serverId=_currentServerId,
                 item_id=(long)item.ItemId, delta=item.Quantity,
                 observation_session=_observationSession,
                 occurred_at=at.ToUniversalTime().ToString("O"),
                 source="decoded"
+            }
+        });
+        // This requires the separate ground spawn AND own-pickup packet.
+        // A plain item gain must never be labeled loot or a purchase.
+        if (item.Quantity > 0)
+            _sources.InventoryAdded(item.ItemId, item.Quantity, eventId, at);
+    }
+
+    private void PublishGroundOrigin(string itemEventId, uint itemId, long quantity, DateTime at)
+    {
+        if (_currentName is null || _awaitingCharacter) return;
+        _emit(new {
+            kind="event", @event=new {
+                id=Guid.NewGuid().ToString("N"), type="item_origin",
+                character=_currentName, serverId=_currentServerId,
+                item_event_id=itemEventId, item_id=(long)itemId,
+                quantity, origin="ground_pickup",
+                observation_session=_observationSession,
+                occurred_at=at.ToUniversalTime().ToString("O"), source="decoded"
             }
         });
     }
