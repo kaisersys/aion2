@@ -46,6 +46,9 @@ test('OCR UI retains last COMPLETED results rather than resetting them at start 
  assert.ok(main.includes("ipcMain.handle('market:preview'"));
  assert.ok(main.includes("lastMarketPreviewPng=null"));
  assert.ok(pkg.build.files.includes('market-capture-health.cjs'));
+ assert.ok(pkg.build.files.includes('ocr-smoke-fixture.cjs'));
+ const sample=require('../ocr-smoke-fixture.cjs');
+ assert.ok(sample.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')));
  assert.equal(pkg.version,'0.1.7');
  for(const id of ['diagnostic-market-completed','diagnostic-market-working',
   'diagnostic-market-finished-at','diagnostic-market-last-result',
