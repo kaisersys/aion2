@@ -58,6 +58,12 @@ const chosen=SMOKE?servers.slice(0,1):servers.slice(0,LIMIT);
 const successful=[],failed=[];
 let consecutiveFailures=0;
 for(let n=0;n<chosen.length;n++){
+  // Leave time for FTPS uploads before the 18-minute Actions job deadline.
+  if(!SMOKE && Date.now()-Date.parse(when)>=11*60*1000){
+    for(const remaining of chosen.slice(n))failed.push(remaining.id);
+    console.warn('::warning title=Market refresh time budget::Stopping fetches after 11 minutes; publishing completed server snapshots.');
+    break;
+  }
   const s=chosen[n],items=[];
   try{
     // Never write a partial board: a failed page must preserve the last published snapshot.
