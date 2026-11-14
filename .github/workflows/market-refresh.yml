@@ -36,8 +36,8 @@ jobs:
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
       - name: Validate live public JSON shape on one server (no publishing)
@@ -51,22 +51,6 @@ jobs:
       - name: Refresh approved per-server market snapshots
         if: github.event_name != 'pull_request'
         run: node scripts/sync-market.mjs
-      - name: Normalize isolated data directory
+      - name: Publish only refreshed snapshots via encrypted FTPS (never delete stale snapshots)
         if: github.event_name != 'pull_request'
-        id: destination
-        shell: bash
-        run: |
-          folder="${FTP_REMOTE_DIR%/}/market-data/"
-          echo "server_dir=$folder" >> "$GITHUB_OUTPUT"
-      - name: Publish ONLY market-data files via encrypted FTPS
-        if: github.event_name != 'pull_request'
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          local-dir: ./market-data/
-          server-dir: ${{ steps.destination.outputs.server_dir }}
-          log-level: minimal
+        run: python3 scripts/publish-market.py
