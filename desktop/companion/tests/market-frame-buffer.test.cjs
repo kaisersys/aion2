@@ -3,7 +3,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {MarketFrameBuffer}=require('../market-frame-buffer.cjs');
 function frame(id,at) {
- return {focusPng:Buffer.from('dialog-'+id),fullPng:Buffer.from('screen-'+id),capturedAt:at};
+ return {image:Buffer.from('compressed-image-'+id),capturedAt:at};
 }
 test('preserves short confirmation captured between slow OCR jobs',()=>{
  const now=Date.now();
@@ -12,9 +12,9 @@ test('preserves short confirmation captured between slow OCR jobs',()=>{
  q.push(frame('confirmation',now-900));
  q.push(frame('closed',now-200));
  assert.equal(q.length,3);
- assert.equal(q.shift().focusPng.toString(),'dialog-listing');
- assert.equal(q.shift().focusPng.toString(),'dialog-confirmation');
- assert.equal(q.shift().focusPng.toString(),'dialog-closed');
+ assert.equal(q.shift().image.toString(),'compressed-image-listing');
+ assert.equal(q.shift().image.toString(),'compressed-image-confirmation');
+ assert.equal(q.shift().image.toString(),'compressed-image-closed');
 });
 test('does not retain identical frames, stale screenshots or unlimited images',()=>{
  const t=Date.now(),q=new MarketFrameBuffer(2,45000);
@@ -23,17 +23,26 @@ test('does not retain identical frames, stale screenshots or unlimited images',(
  assert.equal(q.push(frame('b',t+200)),true);
  assert.equal(q.push(frame('c',t+300)),true);
  assert.equal(q.length,2);
- assert.equal(q.shift().focusPng.toString(),'dialog-b');
- assert.equal(q.shift().focusPng.toString(),'dialog-c');
+ assert.equal(q.shift().image.toString(),'compressed-image-b');
+ assert.equal(q.shift().image.toString(),'compressed-image-c');
  const stale=new MarketFrameBuffer();
  stale.push(frame('stale',t-50000));
  assert.equal(stale.length,0);
 });
 test('releases screen buffers on logout and rejects malformed data',()=>{
  const q=new MarketFrameBuffer();
- assert.equal(q.push({focusPng:'screen',fullPng:Buffer.alloc(1),capturedAt:Date.now()}),false);
+ assert.equal(q.push({image:'screen',capturedAt:Date.now()}),false);
  q.push(frame('open',Date.now()));
  q.clear();
  assert.equal(q.length,0);
  assert.equal(q.lastDigest,null);
+});
+
+
+test('idle sampling uses newest frame without accumulating scan backlog',()=>{
+ const now=Date.now(),q=new MarketFrameBuffer(16,20000);
+ for(let i=0;i<10;i++)q.push(frame(String(i),now+i));
+ assert.equal(q.shiftLatest(now+15).image.toString(),'compressed-image-9');
+ assert.equal(q.length,0);
+ assert.equal(q.dropped,9);
 });

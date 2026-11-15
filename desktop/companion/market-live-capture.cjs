@@ -93,8 +93,8 @@ class MarketLiveCapture {
    event.sender!==this.worker.webContents||
    !payload||payload.sourceId!==this.sourceId||
    typeof payload.dataUrl!=='string'||
-   !payload.dataUrl.startsWith('data:image/png;base64,')||
-   payload.dataUrl.length>22000000)return;
+   !payload.dataUrl.startsWith('data:image/jpeg;base64,')||
+   payload.dataUrl.length>11000000)return;
   try{
    const img=nativeImage.createFromDataURL(payload.dataUrl);
    const sz=img.getSize();
@@ -104,8 +104,9 @@ class MarketLiveCapture {
    this.lastFrameAt=now;
    this.framesReceived++;
    this.lastPixels=sz.width+' × '+sz.height;
-   const png=img.toPNG();
-   const checked=this.gate.inspect(png,now);
+   // Hash compressed bytes without a redundant per-frame PNG encode.
+   const jpeg=Buffer.from(payload.dataUrl.slice('data:image/jpeg;base64,'.length),'base64');
+   const checked=this.gate.inspect(jpeg,now);
    this.lastChangeAt=checked.lastChangedAt;
    if(checked.stale&&!this.stale){
     this.stale=true;
@@ -119,7 +120,7 @@ class MarketLiveCapture {
    }
    if(checked.reason==='initial-frame')
     this.emit('warming-up','Waiting for a changed game frame before treating capture as live.');
-   if(checked.accepted)this.onFrame?.({png,capturedAt:now,dimensions:sz,image:img});
+   if(checked.accepted)this.onFrame?.({encodedFrame:jpeg,capturedAt:now,dimensions:sz,image:img});
   }catch(err){
    this.emit('error','Invalid live AION2 capture frame: '+
     String(err.message||err).slice(0,120));

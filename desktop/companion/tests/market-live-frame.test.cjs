@@ -55,11 +55,15 @@ test('Windows code streams a named AION2 window instead of repeating thumbnails'
  assert.ok(renderer.includes('chromeMediaSourceId:id'));
  assert.ok(renderer.includes('audio:false'));
  assert.ok(main.includes('if(!marketFrameBuffer.length)return; // No cached thumbnail fallback.'));
+ assert.ok(main.includes('marketFrameBuffer.shiftLatest()'));
+ assert.ok(main.includes('marketFastModeUntil=Date.now()+20000'));
+ assert.ok(controller.includes("data:image/jpeg;base64,"));
+ assert.ok(renderer.includes("canvas.toDataURL('image/jpeg',0.86)"));
  assert.ok(main.includes('if(marketLiveCapture.stale)'));
  for(const file of ['market-live-frame.cjs','market-live-capture.cjs',
   'market-stream.html','market-stream-preload.cjs','market-stream-renderer.js'])
   assert.ok(pkg.build.files.includes(file),'Missing bundled file: '+file);
- assert.equal(pkg.version,'0.1.8');
+ assert.equal(pkg.version,'0.1.9');
 });
 
 test('live preview refreshes while Diagnostics is visible and reports stale snapshot age',()=>{

@@ -13,11 +13,9 @@ class MarketFrameBuffer {
   this.dropped=0;
  }
  push(frame) {
-  if(!frame || !Buffer.isBuffer(frame.focusPng) ||
-     !Buffer.isBuffer(frame.fullPng) ||
-     !Number.isFinite(frame.capturedAt) || frame.focusPng.length>5000000 ||
-     frame.fullPng.length>15000000)return false;
-  const digest=crypto.createHash('sha1').update(frame.focusPng).digest('hex');
+  if(!frame || !Buffer.isBuffer(frame.image) ||
+     !Number.isFinite(frame.capturedAt) || frame.image.length>8000000)return false;
+  const digest=crypto.createHash('sha1').update(frame.image).digest('hex');
   if(digest===this.lastDigest && frame.capturedAt-this.lastStoredAt<5000)return false;
   this.lastDigest=digest;
   this.lastStoredAt=frame.capturedAt;
@@ -36,6 +34,13 @@ class MarketFrameBuffer {
  shift(now=Date.now()) {
   this.purge(now);
   return this.frames.shift()||null;
+ }
+ shiftLatest(now=Date.now()) {
+  this.purge(now);
+  const latest=this.frames.pop()||null;
+  this.dropped+=this.frames.length;
+  this.frames.length=0;
+  return latest;
  }
  clear(){this.frames.length=0;this.lastDigest=null;this.lastStoredAt=0;}
  get length(){return this.frames.length;}

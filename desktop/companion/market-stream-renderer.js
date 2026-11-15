@@ -22,7 +22,7 @@
    const opened=await navigator.mediaDevices.getUserMedia({
     audio:false,video:{mandatory:{
      chromeMediaSource:'desktop',chromeMediaSourceId:id,
-     maxWidth:2560,maxHeight:1440,maxFrameRate:10
+     maxWidth:1920,maxHeight:1080,maxFrameRate:8
     }}
    });
    if(sourceId!==id){for(const track of opened.getTracks())track.stop();return;}
@@ -37,18 +37,19 @@
    timer=setInterval(()=>{
     if(!stream||sourceId!==id||video.readyState<2||!video.videoWidth)return;
     try{
-     const width=Math.min(2560,video.videoWidth);
+     const width=Math.min(1920,video.videoWidth);
      const height=Math.max(1,Math.round(video.videoHeight*width/video.videoWidth));
      if(canvas.width!==width||canvas.height!==height){
       canvas.width=width;canvas.height=height;
      }
      ctx.drawImage(video,0,0,width,height);
-     const dataUrl=canvas.toDataURL('image/png');
-     if(dataUrl.length>22000000)throw new Error('Capture frame exceeds size limit.');
+     // Compressed sampling avoids encoding full-resolution PNG every moving frame.
+     const dataUrl=canvas.toDataURL('image/jpeg',0.86);
+     if(dataUrl.length>11000000)throw new Error('Capture frame exceeds size limit.');
      lastSent=Date.now();
      ipc.frame(dataUrl,id,width,height);
     }catch(err){ipc.status('frame-error',String(err.message||err).slice(0,100),id);}
-   },850);
+   },1100);
   }catch(err){
    ipc.status('stream-error','Windows live game capture failed: '+String(err.message||err).slice(0,110),id);
    stop();
