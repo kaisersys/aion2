@@ -1,4 +1,4 @@
-name: Publish Companion v0.1.9 preview download
+name: Publish Companion v0.1.10 preview download
 on:
   push:
     branches:
@@ -13,26 +13,26 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch validated v0.1.9 installer from Windows CI
+      - name: Fetch validated v0.1.10 installer from Windows CI
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p dist
-          gh run download 43691047533 --repo "$GITHUB_REPOSITORY" --name atreiastreet-companion-windows-preview --dir dist
-          test -f "dist/Atreia Street Companion Setup 0.1.9.exe"
-          echo "55a368eede2c8491b6d75fd39fcc1229793aa6a90e971d2699f7d74ac5b3c6fb  dist/Atreia Street Companion Setup 0.1.9.exe" | sha256sum --check
-          mv "dist/Atreia Street Companion Setup 0.1.9.exe" "dist/Atreia-Street-Companion-Setup-v0.1.9.exe"
+          gh run download 43734060313 --repo "$GITHUB_REPOSITORY" --name atreiastreet-companion-windows-preview --dir dist
+          test -f "dist/Atreia Street Companion Setup 0.1.10.exe"
+          echo "993856dcd0d3c3e30287c921a6c6cfd861c5d84828312facbaf3a6ebc0d71f06  dist/Atreia Street Companion Setup 0.1.10.exe" | sha256sum --check
+          mv "dist/Atreia Street Companion Setup 0.1.10.exe" "dist/Atreia-Street-Companion-Setup-v0.1.10.exe"
       - name: Create public experimental preview release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create companion-v0.1.9-preview "dist/Atreia-Street-Companion-Setup-v0.1.9.exe" \
+          gh release create companion-v0.1.10-preview "dist/Atreia-Street-Companion-Setup-v0.1.10.exe" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "054915c9d203628fd26a1187ebf0f807b69bda8d" \
-            --title "Atreia Street Companion v0.1.9 (Experimental Windows Preview)" \
-            --notes "Experimental Windows performance preview. v0.1.9 reduces CPU and memory pressure from background AION2 video sampling and OCR, and preserves automatic Market monitoring independently of the optional Diagnostics preview. Source checks, Windows packaging and packaged OCR startup passed. The hosted Windows CI machine did not expose its own simulated game window, so live in-game capture, listing fee attribution and actual performance require Windows player verification. The installer is unsigned. Raw screen captures and OCR text are not uploaded." \
+            --target "0dac6f72d50e923216a395986c5e360542218b76" \
+            --title "Atreia Street Companion v0.1.10 (Experimental Windows Preview)" \
+            --notes "Experimental v0.1.10 companion preview. Improves automatic AION2 Market OCR by using adaptive compressed game-window sampling (idle ~1.5s, recognized Market ~0.6s), bounded recent-frame OCR queue to retain short confirmation dialogs, same-row spatial fee evidence to reject extra OCR digits, and numerical fee/quantity/total consistency checks. A manual diagnostic OCR capture remains OPTIONAL, and a quoted fee is not considered paid without an independently decoded exact wallet debit. Windows unit tests and packaged OCR startup passed. The hosted CI machine does not expose a real game window, so real-game capture, fee matching and performance still require user verification. The approximate 2% fee is not an official universal rule; suspicious fees are flagged for review, not automatically guessed. The installer is unsigned. No screenshots or raw OCR text are uploaded." \
             --prerelease --latest=false
