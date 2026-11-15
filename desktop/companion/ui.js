@@ -270,14 +270,43 @@ function render(){
   :'Awaiting a captured Kina balance';
  const movementRows=$('movement-rows');
  movementRows.replaceChildren();
- if(!money.changes.length) {
+ // Present OCR-supported fee spending beside actual wallet packet changes.
+ // When packet corroboration later appears, the screen row disappears.
+ const screenFees=(state.marketObservations||[]).filter(e=>match(e,profile)&&
+  e.screen_phase==='confirmation'&&e.status!=='corroborated'&&
+  e.funds_match?.source==='market_funds_ocr'&&
+  Date.parse(e.funds_match.occurred_at)>=p.daily);
+ const activity=[
+  ...money.changes.map(x=>({kind:'wallet',at:x.occurred_at,value:x})),
+  ...screenFees.map(x=>({kind:'screen-fee',at:x.funds_match.occurred_at,value:x}))
+ ].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)).slice(0,9);
+ if(!activity.length) {
    const empty=document.createElement('div');empty.className='empty';
    empty.textContent=money.observations===0
     ?'No capture-session wallet readings yet. Open Aion 2 to establish a baseline.'
     :'No changes observed after the first reading. Spending or claiming a payout can produce a new wallet update.';
    movementRows.append(empty);
  }
- for(const movement of money.changes.slice(0,9)) {
+ for(const entry of activity) {
+   if(entry.kind==='screen-fee'){
+    const fee=entry.value;
+    const row=document.createElement('div');row.className='movement-row';
+    const info=document.createElement('div');
+    const name=document.createElement('span');name.className='activity-name';
+    name.textContent='Market registration fee · screen Funds';
+    const detail=document.createElement('span');detail.className='movement-source';
+    detail.textContent='Funds '+num(fee.funds_match.before)+' → '+
+     num(fee.funds_match.after)+' · exact fee deduction · packet currency unknown';
+    info.append(name,detail);
+    const amount=document.createElement('strong');amount.className='down';
+    amount.textContent='−'+num(fee.fee);
+    const when=document.createElement('time');when.dateTime=entry.at;
+    when.textContent=new Date(entry.at).toLocaleString([],
+     {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    row.append(info,amount,when);movementRows.append(row);
+    continue;
+   }
+   const movement=entry.value;
    const row=document.createElement('div');row.className='movement-row';
    const info=document.createElement('div');
    const label=document.createElement('span');label.className='activity-name';
