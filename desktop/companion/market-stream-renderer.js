@@ -8,7 +8,7 @@
  let marketMode=false,sampleFrame=null;
  function armSampler(){
   if(timer){clearInterval(timer);timer=null;}
-  if(stream&&sampleFrame)timer=setInterval(sampleFrame,marketMode?600:1500);
+  if(stream&&sampleFrame)timer=setInterval(sampleFrame,marketMode?500:1200);
  }
  function setMode(mode){
   const next=mode==='market';

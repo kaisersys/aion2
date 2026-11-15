@@ -156,7 +156,7 @@ function captureState() {
     configured:Boolean(readConfig()), capture:captureStatus,
     marketOcr:{...marketOcrStatus,
       autoRunning:Boolean(remote && marketLiveCapture.active && marketSampleTimer && marketOcrTimer),
-      monitorMode:'automatic',sampleIntervalMs:Date.now()<marketFastModeUntil?600:1500},
+      monitorMode:'automatic',sampleIntervalMs:Date.now()<marketFastModeUntil?500:1200},
     marketObservations:remote?marketObservations.filter(x=>x.user_id===remote.user_id).slice(-200).reverse():[] };
 }
 function insert(raw, fallbackId) {

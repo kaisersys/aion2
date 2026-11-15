@@ -14,10 +14,11 @@ test('Windows preview bundles a public project connection config, never a privil
  assert.match(conf.supabaseAnonKey,/^sb_publishable_[A-Za-z0-9_-]+$/);
  assert.ok(!/sb_secret_|service_role|PRIVATE_KEY/.test(JSON.stringify(conf)));
  assert.ok(pkg.build.files.includes('config.json'));
- assert.equal(pkg.version,'0.1.10');
+ assert.equal(pkg.version,'0.1.11');
 });
 test('Market OCR state is visible regardless of selected character',()=>{
  for(const id of ['market-header-status','diagnostic-market-message','diagnostic-market-windows',
+  'diagnostic-market-funds','diagnostic-market-funds-match','market-fees-evidence',
   'diagnostic-market-chars','diagnostic-market-fee','diagnostic-market-time',
   'diagnostic-market-evidence','market-scan-diagnostics']){
   assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);

@@ -328,3 +328,10 @@ Where Tesseract's recognized text conflicts with an explicitly labeled, same-row
 
 
 The v0.1.10 live video sampler adapts automatically: roughly 1.5 seconds per compressed image during regular gameplay, and 0.6 seconds during recognized Market activity. It reverts to idle after Market evidence stops. The Diagnostics preview has no effect on capture speed.
+
+
+## v0.1.11 — faster Market reading and Kina fee deductions
+
+Earlier builds could read a Market registration fee but leave spending unrecorded if Npcap missed a wallet packet. The local OCR now reads the in-game Market **Funds** field during confirmation and compares it with the first subsequent fresh non-confirmation Market Funds display. Only an exact decrease equal to the fee, within 60 seconds and for one unique same-character confirmation, counts as an on-screen supported fee deduction. Canceled confirmations, unrelated balance changes, stale windows and ambiguous candidate prompts remain pending. The UI separates packet-backed matches from screen Funds matches, totals each fee only once, and does not fabricate bound/unbound wallet observations. The database's unverified status remains unchanged for Funds-only evidence; the before/after Funds values remain on-device.
+
+To improve responsiveness, the idle OCR detector skips positional TSV metadata and faster video capture starts at the first Market label rather than after an unnecessary full-screen OCR pass. Adaptive video sampling is ~1.2 s during ordinary gameplay and ~0.5 s after Market detection; active OCR polling is faster and full-screen rechecks are prioritized briefly while a confirmed fee awaits a subsequent Funds reading. All captures stay local. Actual timing and availability of an after-confirmation Funds field still require in-game testing.
