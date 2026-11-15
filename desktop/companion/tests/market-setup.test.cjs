@@ -40,7 +40,7 @@ test('Market OCR is gated on signed-in account and never stores raw screen conte
 
 
 test('Market scanning begins automatically on sign-in and session restoration',()=>{
- assert.ok(main.includes('marketSampleTimer=setInterval(()=>{void sampleMarketFrame();},3000)'),
+ assert.ok(main.includes('marketSampleTimer=setInterval(()=>{void sampleMarketFrame();},4500)'),
   'background market sampler must be scheduled');
  assert.ok((main.match(/startMarketOcr\(\);/g)||[]).length>=2,
   'restored sessions and new login should start automatic monitoring');

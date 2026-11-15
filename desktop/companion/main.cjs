@@ -55,6 +55,7 @@ const marketLiveCapture=new MarketLiveCapture({
 let marketObservations=[];
 let recentMarket=new Map();
 let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
+let lastCaptureHealthNoticeAt=0;
 function captureMessage(state,message){captureStatus={state,message,health:captureStatus.health};notify();}
 
 function notify() {
@@ -287,7 +288,8 @@ async function sync() {
 function marketOcrMessage(stateName,message) {
  const unchanged=marketOcrStatus.state===stateName && marketOcrStatus.message===message;
  marketOcrStatus={...marketOcrStatus,state:stateName,message,observations:marketObservations.length};
- if(!unchanged||Date.now()-lastMarketStatusNoticeAt>10000){
+ const routine=['scanning','listening','streaming','starting','waiting','warming-up'].includes(stateName);
+ if((!routine&&!unchanged)||Date.now()-lastMarketStatusNoticeAt>10000){
   lastMarketStatusNoticeAt=Date.now();notify();
  }
 }
@@ -734,7 +736,9 @@ function processCaptureMessage(message) {
       else
         captureStatus.message='Game traffic and identity records detected. Verifying the active character.';
     }
-    notify();
+    if(Date.now()-lastCaptureHealthNoticeAt>5000){
+      lastCaptureHealthNoticeAt=Date.now();notify();
+    }
     return;
   }
   if (message.kind==='roster' && Array.isArray(message.characters)) {

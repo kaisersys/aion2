@@ -34,6 +34,10 @@ class MarketLiveCapture {
  }
  async ensure(){
   if(!this.active||this.busy)return;
+  // A healthy stream already has a validated source. Avoid repeatedly asking
+  // Windows to enumerate every window while the user plays.
+  if(this.sourceId&&this.lastFrameAt&&!this.stale&&
+     Date.now()-this.lastFrameAt<10000)return;
   this.busy=true;
   try{
    const sources=await desktopCapturer.getSources({
