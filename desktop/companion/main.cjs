@@ -155,7 +155,7 @@ function captureState() {
     configured:Boolean(readConfig()), capture:captureStatus,
     marketOcr:{...marketOcrStatus,
       autoRunning:Boolean(remote && marketLiveCapture.active && marketSampleTimer && marketOcrTimer),
-      monitorMode:'automatic',sampleIntervalMs:1100},
+      monitorMode:'automatic',sampleIntervalMs:Date.now()<marketFastModeUntil?600:1500},
     marketObservations:remote?marketObservations.filter(x=>x.user_id===remote.user_id).slice(-200).reverse():[] };
 }
 function insert(raw, fallbackId) {
@@ -301,6 +301,7 @@ async function sampleMarketFrame() {
   // This discovers ONLY the AION2 window. Screens are never captured.
   // The worker streams live frames rather than using Windows thumbnail data.
   await marketLiveCapture.ensure();
+  marketLiveCapture.setMarketMode(Date.now()<marketFastModeUntil);
   marketOcrStatus.windowCandidates=marketLiveCapture.windowCandidates;
   marketOcrStatus.framesReceived=marketLiveCapture.framesReceived;
   marketOcrStatus.lastVisualChangeAt=marketLiveCapture.lastChangeAt?
@@ -421,8 +422,10 @@ async function marketOcrTick(force=false) {
    }
   }
   // Market recognition runs automatically; preview is strictly diagnostic.
-  if(parsed.status==='observed'||/\b(?:market|marketplace|registration\s+fee|list\s+for\s+sale)\b/i.test(recognized))
+  if(parsed.status==='observed'||/\b(?:market|marketplace|registration\s+fee|list\s+for\s+sale)\b/i.test(recognized)) {
    marketFastModeUntil=Date.now()+45000;
+   marketLiveCapture.setMarketMode(true);
+  }
   // Never attribute an older image if capture froze during OCR.
   if(marketLiveCapture.stale){
    marketOcrStatus.lastResult='discarded-stale';

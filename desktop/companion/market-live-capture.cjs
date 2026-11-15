@@ -8,6 +8,7 @@ class MarketLiveCapture {
  constructor({onFrame,onStatus}){
   this.onFrame=onFrame;this.onStatus=onStatus;
   this.active=false;this.busy=false;this.worker=null;this.sourceId=null;
+  this.marketMode=false;
   this.selectedAt=0;this.lastFrameAt=0;this.lastRestartAt=0;
   this.gate=new LiveFrameGate(15000);
   this.windowCandidates=0;this.framesReceived=0;
@@ -18,6 +19,13 @@ class MarketLiveCapture {
   this.statusHandler=(event,payload)=>this.receiveStatus(event,payload);
  }
  emit(status,message){this.status=status;this.onStatus?.(status,message);}
+ setMarketMode(active){
+  const next=active===true;
+  if(this.marketMode===next)return;
+  this.marketMode=next;
+  if(this.worker&&!this.worker.isDestroyed())
+   this.worker.webContents.send('market-video:mode',next?'market':'idle');
+ }
  async start(){
   if(this.active)return;
   this.active=true;
@@ -80,6 +88,8 @@ class MarketLiveCapture {
    this.selectedAt=now;this.lastFrameAt=0;this.lastRestartAt=now;
    this.gate.reset();this.stale=false;this.lastChangeAt=null;
    this.worker.webContents.send('market-video:source',this.sourceId);
+   // A source restart returns to idle mode until the scene is recognized.
+   this.marketMode=false;
    this.emit('starting','Opening live video capture of the AION2 window.');
   }catch(err){
    this.emit('error','Unable to start live AION2 video capture: '+
@@ -143,7 +153,7 @@ class MarketLiveCapture {
   this.active=false;
   ipcMain.removeListener('market-video:frame',this.frameHandler);
   ipcMain.removeListener('market-video:status',this.statusHandler);
-  this.resetSource();
+  this.resetSource();this.marketMode=false;
   if(this.worker&&!this.worker.isDestroyed())this.worker.close();
   this.worker=null;this.emit('stopped','Live video reader stopped.');
  }
