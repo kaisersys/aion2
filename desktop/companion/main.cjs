@@ -333,7 +333,7 @@ function receiveLiveMarketFrame({encodedFrame,capturedAt,dimensions,image}) {
    marketOcrStatus.framesCaptured++;
    void marketOcrTick();
   }
-  if(capturedAt-lastMarketHealthAt>5000){
+  if(capturedAt-lastMarketHealthAt>12000){
    lastMarketHealthAt=capturedAt;
    marketOcrStatus.captureHealth=inspectBgra(
     image.toBitmap(),dimensions.width,dimensions.height);
@@ -348,7 +348,7 @@ function receiveLiveMarketFrame({encodedFrame,capturedAt,dimensions,image}) {
  }
 }
 
-async function marketOcrTick() {
+async function marketOcrTick(force=false) {
  if(marketOcrBusy)return;
  if(!readConfig()){marketOcrMessage('config-missing','Supabase configuration missing from this installer. Account login and Market reading are unavailable.');return;}
  if(!remote){marketOcrMessage('sign-in','Sign in to Atreia Street in the companion to start Market screen reading.');return;}
@@ -356,7 +356,7 @@ async function marketOcrTick() {
  const scanStartedAt=Date.now();
  // Recognized Market UI activates faster OCR; idle gameplay is sampled sparingly.
  const inMarket=scanStartedAt<marketFastModeUntil;
- if(scanStartedAt-lastMarketOcrRunAt<(inMarket?1100:3500))return;
+ if(!force&&scanStartedAt-lastMarketOcrRunAt<(inMarket?1100:1850))return;
  lastMarketOcrRunAt=scanStartedAt;
  marketOcrBusy=true;
  marketOcrStatus.scans++;
@@ -366,8 +366,9 @@ async function marketOcrTick() {
  // Resetting recognizedChars/feeLabelSeen here made the interface display
  // "0 characters" throughout every long-running recognition pass.
  try {
-  // Avoid an expensive backlog of unrelated gameplay frames while idle.
-  const buffered=inMarket?marketFrameBuffer.shift():marketFrameBuffer.shiftLatest();
+  // OCR should not discard a short confirmation simply because a previous
+  // scan was busy; read only recent scenes and skip stale video backlog.
+  const buffered=marketFrameBuffer.shiftRecent(Date.now(),inMarket?7000:3500);
   marketOcrStatus.framesBuffered=marketFrameBuffer.length;
   if(!buffered)return;
   const full=nativeImage.createFromBuffer(buffered.image);
@@ -388,8 +389,10 @@ async function marketOcrTick() {
   const box={x:Math.floor(dimensions.width*.25),y:Math.floor(dimensions.height*.025),
     width:Math.floor(dimensions.width*.53),height:Math.floor(dimensions.height*.82)};
   let focus=full.crop(box);
-  if(focus.getSize().width<1600)
-   focus=focus.resize({width:Math.min(1600,focus.getSize().width*2),quality:'best'});
+  // Cheap idle text detection; enlarge only while the Market is visible.
+  const targetWidth=inMarket?1500:1050;
+  if(focus.getSize().width<targetWidth)
+   focus=focus.resize({width:Math.min(targetWidth,focus.getSize().width*2),quality:'best'});
   const screenCapturedAt=buffered.capturedAt;
   const focused=await marketOcrWorker.recognize(focus.toPNG(),{}, {tsv:true});
   const focusedSpatial=addSpatialRows(focused.data?.text||'',focused.data?.tsv);
@@ -399,8 +402,12 @@ async function marketOcrTick() {
   marketOcrStatus.recognitionMode='centered-dialog';
   // Full-window OCR is costly; only use it periodically when centered OCR
   // lacks a valid transaction. The frame itself is still timestamped.
+  const marketHint=/\b(?:market|registration\s*fee|listing\s*fee|total\s*sale\s*price|list\s*for\s*sale)\b/i.test(recognized);
+  // Preserve an occasional full-window discovery scan without repeatedly
+  // recognizing every unrelated gameplay frame at full resolution.
+  const fallbackDelay=inMarket||marketHint?4500:13000;
   if(parsed.status!=='observed' &&
-     Date.now()-lastFullMarketFallbackAt>=5000) {
+     Date.now()-lastFullMarketFallbackAt>=fallbackDelay) {
    lastFullMarketFallbackAt=Date.now();
    const fallback=await marketOcrWorker.recognize(full.toPNG(),{}, {tsv:true});
    const fullSpatial=addSpatialRows(fallback.data?.text||'',fallback.data?.tsv);
@@ -415,7 +422,7 @@ async function marketOcrTick() {
   }
   // Market recognition runs automatically; preview is strictly diagnostic.
   if(parsed.status==='observed'||/\b(?:market|marketplace|registration\s+fee|list\s+for\s+sale)\b/i.test(recognized))
-   marketFastModeUntil=Date.now()+20000;
+   marketFastModeUntil=Date.now()+45000;
   // Never attribute an older image if capture froze during OCR.
   if(marketLiveCapture.stale){
    marketOcrStatus.lastResult='discarded-stale';
@@ -435,7 +442,7 @@ async function marketOcrTick() {
     parsed.status==='empty'?'Game window captured, but OCR saw no readable text. Try borderless/windowed mode.':
     parsed.status==='unrecognized'
     ?'Game window captured. OCR read '+recognized.length+' characters; registration fee label '+(marketOcrStatus.feeLabelSeen?'found':'not found')+'. Open the Market List panel.'
-    :'Market text detected, but the fee amount was unreadable. Check recognized fee line in Diagnostics.');
+    :parsed.status==='inconsistent'?'Market numbers disagreed ('+(parsed.reason||'OCR mismatch')+'); no fee recorded. Retrying automatically.':'Market text detected, but the fee amount was unreadable. Check recognized fee line in Diagnostics.');
    return;
   }
   const current=state.activeCharacter;
@@ -1046,7 +1053,12 @@ app.whenReady().then(()=>{
   });
   ipcMain.handle('remote:logout',()=>{remote=null;clearSecureSession();void stopMarketOcr();notify();return true;});
   ipcMain.handle('remote:sync',sync);
-  ipcMain.handle('market:scan',async()=>{await sampleMarketFrame();return marketOcrStatus;});
+  ipcMain.handle('market:scan',async()=>{
+    await sampleMarketFrame();
+    // Diagnostics really requests an OCR pass; automatic capture requires no click.
+    await marketOcrTick(true);
+    return marketOcrStatus;
+   });
   ipcMain.handle('market:preview',()=>{
    if(!remote)return {error:'Sign in to inspect the local game-window capture.'};
    if(!lastMarketPreviewPng||!lastMarketPreviewAt)

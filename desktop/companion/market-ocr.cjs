@@ -85,19 +85,22 @@ function readMarket(text) {
  const fee=field(lines,FEE);
  if(fee===null||Number.isNaN(fee))return {status:'incomplete',kind:'listing_fee_observation'};
  let price=field(lines,TOTAL);
- if(Number.isNaN(price))return {status:'incomplete',kind:'listing_observation'};
- if(price===null) {
-  const unit=field(lines,UNIT);
-  if(Number.isNaN(unit))return {status:'incomplete',kind:'listing_observation'};
-  if(unit!==null && qty!==null && Number.isSafeInteger(unit*qty) && unit*qty<=MAX_AMOUNT)
-   price=unit*qty;
- }
- if(price!==null&&price<fee)return {status:'incomplete',kind:'listing_observation'};
- if(qty===null&&confirmation&&price!==null) {
-  const unit=field(lines,UNIT);
-  if(unit!==null && Number.isFinite(unit) && unit>0 && price%unit===0 &&
-     price/unit<=1000000)qty=price/unit;
- }
+ const unit=field(lines,UNIT);
+ if(Number.isNaN(price)||Number.isNaN(unit))return {status:'incomplete',kind:'listing_observation'};
+ if(price===null && unit!==null && qty!==null &&
+    Number.isSafeInteger(unit*qty) && unit*qty<=MAX_AMOUNT)price=unit*qty;
+ if(price!==null&&price<fee)return {status:'inconsistent',reason:'fee-exceeds-total'};
+ // The observed registration fee is around 2%. Since the game does not
+ // guarantee a universal published rate, apply a broad 1-4% plausibility
+ // check ONLY when a total price is available, never invent a correction.
+ if(price!==null&&price>=100 &&
+    (fee<Math.max(1,Math.floor(price/100))||fee>Math.ceil(price/25)))
+  return {status:'inconsistent',reason:'fee-price-mismatch'};
+ if(price!==null && unit!==null && qty!==null &&
+    (!Number.isSafeInteger(unit*qty)||unit*qty!==price))
+  return {status:'inconsistent',reason:'quantity-price-mismatch'};
+ if(qty===null&&confirmation&&price!==null &&
+    unit!==null && price%unit===0 && price/unit<=1000000)qty=price/unit;
  return {status:'observed',screen_phase:confirmation?'confirmation':'listing_form',evidence:{
   kind:price===null?'listing_fee_observation':'listing_observation',
   amount:price===null?fee:price,fee,quantity:qty,item_name:item

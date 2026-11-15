@@ -42,6 +42,15 @@ class MarketFrameBuffer {
   this.frames.length=0;
   return latest;
  }
+ shiftRecent(now=Date.now(),maxLagMs=6000) {
+  this.purge(now);
+  // Keep a short confirmation captured during slow OCR, but never let
+  // old gameplay create a queue that takes many seconds to drain.
+  while(this.frames.length&&now-this.frames[0].capturedAt>maxLagMs){
+   this.frames.shift();this.dropped++;
+  }
+  return this.frames.shift()||null;
+ }
  clear(){this.frames.length=0;this.lastDigest=null;this.lastStoredAt=0;}
  get length(){return this.frames.length;}
 }

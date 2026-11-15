@@ -104,3 +104,22 @@ test('reads currency icon following amount without confusing Funds for registrat
  assert.equal(x.evidence.fee,23);
  assert.equal(x.evidence.amount,1165);
 });
+
+
+test('extra OCR digit in the registration fee is flagged instead of recorded',()=>{
+ const raw='Are you sure you wish to list for sale?\nTotal Sale Price 1,165\nSale Price Per Item 233\nRegistration Fee 233\nCancel Confirm';
+ const parsed=readMarket(raw);
+ assert.equal(parsed.status,'inconsistent');
+ assert.equal(parsed.reason,'fee-price-mismatch');
+});
+test('misread quantity is rejected when per-item and total disagree',()=>{
+ const raw='Market\nSale Quantity: 55\nSale Price Per Item: 233\nTotal Sale Price: 1,165\nRegistration Fee: 23';
+ const parsed=readMarket(raw);
+ assert.equal(parsed.status,'inconsistent');
+ assert.equal(parsed.reason,'quantity-price-mismatch');
+});
+test('observed registration fees survive numerical checks without fee fabrication',()=>{
+ const parsed=readMarket('Market\nTotal Sale Price: 71,775\nRegistration Fee: 1,435');
+ assert.equal(parsed.status,'observed');
+ assert.equal(parsed.evidence.fee,1435);
+});

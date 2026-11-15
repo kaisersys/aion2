@@ -46,3 +46,15 @@ test('idle sampling uses newest frame without accumulating scan backlog',()=>{
  assert.equal(q.length,0);
  assert.equal(q.dropped,9);
 });
+
+
+test('keeps a short-lived confirmation during OCR while skipping stale gameplay',()=>{
+ const now=Date.now(),q=new MarketFrameBuffer(16,20000);
+ q.push(frame('old-gameplay',now-9000));
+ q.push(frame('confirmation',now-3400));
+ q.push(frame('closed',now-1500));
+ assert.equal(q.shiftRecent(now,4000).image.toString(),'compressed-image-confirmation');
+ assert.equal(q.shiftRecent(now,4000).image.toString(),'compressed-image-closed');
+ assert.equal(q.shiftRecent(now,4000),null);
+ assert.equal(q.dropped,1);
+});

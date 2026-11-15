@@ -58,3 +58,15 @@ test('rejects invalid and contradictory OCR positional data',()=>{
  const conflict=tsv+'\n'+word('99',1364,872);
  assert.equal(addSpatialRows(columnwise,conflict).fields['Registration Fee'],undefined);
 });
+
+
+test('spatial evidence replaces a raw fee that contains an extra digit',()=>{
+ const raw=['Are you sure you wish to list for sale?',
+  'Total Sale Price 1,165','Sale Price Per Item 233',
+  'Registration Fee 233','Funds 478,715','Cancel Confirm'].join('\n');
+ const corrected=addSpatialRows(raw,tsv);
+ assert.equal(corrected.fields['Registration Fee'],23);
+ assert.equal(readMarket(corrected.text).status,'observed');
+ assert.equal(readMarket(corrected.text).evidence.fee,23);
+ assert.ok(!corrected.text.includes('Registration Fee 233'));
+});
