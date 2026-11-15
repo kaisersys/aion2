@@ -37,8 +37,8 @@ test('OCR UI retains last COMPLETED results rather than resetting them at start 
  const ui=fs.readFileSync(path.join(root,'ui.js'),'utf8');
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
- const begin=main.slice(main.indexOf('async function marketOcrTick()'),
-  main.indexOf('const buffered=marketFrameBuffer.shift()'));
+ const begin=main.slice(main.indexOf('async function marketOcrTick(force=false)'),
+  main.indexOf('const buffered=marketFrameBuffer.shiftRecent('));
  assert.ok(begin.includes('marketOcrStatus.ocrInProgress=true'));
  assert.ok(!begin.includes('marketOcrStatus.recognizedChars=0'));
  assert.ok(!begin.includes('marketOcrStatus.feeLabelSeen=false'));

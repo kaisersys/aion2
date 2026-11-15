@@ -89,7 +89,7 @@ function readMarket(text) {
  if(Number.isNaN(price)||Number.isNaN(unit))return {status:'incomplete',kind:'listing_observation'};
  if(price===null && unit!==null && qty!==null &&
     Number.isSafeInteger(unit*qty) && unit*qty<=MAX_AMOUNT)price=unit*qty;
- if(price!==null&&price<fee)return {status:'inconsistent',reason:'fee-exceeds-total'};
+ if(price!==null&&price<fee)return {status:'incomplete',kind:'listing_observation'};
  // The observed registration fee is around 2%. Since the game does not
  // guarantee a universal published rate, apply a broad 1-4% plausibility
  // check ONLY when a total price is available, never invent a correction.
