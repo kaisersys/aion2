@@ -509,9 +509,11 @@ async function marketOcrTick(force=false) {
     }
    }
    const matched=last?.status==='corroborated';
-   marketOcrMessage(matched?'corroborated':'listening',evidence.fee!==null
+   const fundsSupported=last?.funds_match?.source==='market_funds_ocr';
+   marketOcrMessage(matched?'corroborated':fundsSupported?'funds-correlated':'listening',evidence.fee!==null
     ?('Registration fee: '+evidence.fee+' Kina. '+
-      (matched?'Matched a Kina decrease.':
+      (matched?'Matched a decoded Kina debit.':
+       fundsSupported?'Matched a decrease in on-screen Market Funds; packet source unknown.':
        parsed.screen_phase==='confirmation'
         ?'Confirm/Cancel prompt observed; awaiting a matching wallet decrease.'
         :'Listing form only. No confirmation prompt observed yet.'))
@@ -527,8 +529,14 @@ async function marketOcrTick(force=false) {
      x.screen_phase==='confirmation' && x.fee===evidence.fee &&
      x.amount===evidence.amount &&
      Date.parse(x.occurred_at)>now-30000)) {
-    marketOcrMessage('pending',
-      'Listing confirmation was shown; returned to Market form. Awaiting a matching Kina decrease (cancel is possible).');
+    const lastConfirmed=marketObservations.findLast(x=>x.user_id===remote.user_id&&
+    x.character===current.character&&x.server===current.server&&
+    x.screen_phase==='confirmation'&&x.fee===evidence.fee&&
+    x.amount===evidence.amount&&Date.parse(x.occurred_at)>now-30000);
+   const fundsSupported=lastConfirmed?.funds_match?.source==='market_funds_ocr';
+   marketOcrMessage(fundsSupported?'funds-correlated':'pending',fundsSupported?
+    'Market registration fee recorded from an exact on-screen Funds decrease (packet source unknown).':
+    'Listing confirmation was shown; returned to Market form. Awaiting a matching Kina decrease (cancel is possible).');
     return;
   }
   lastMarketFrame=key;
