@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('companion', {
   login: credentials => invoke('remote:login', credentials),
   logout: () => invoke('remote:logout'),
   sync: () => invoke('remote:sync'),
+  scanMarket: () => invoke('market:scan'),
+  previewMarketCapture: () => invoke('market:preview'),
   openWebsite: () => invoke('website:open'),
   onChange: callback => {
     const listener = () => callback();

@@ -72,7 +72,75 @@ function render(){
   select.append(placeholder);
  }
  const profile=combined.find(p=>idOf(p)===active)||null;
- $('connection-status').textContent=state.remote?'Connected · '+state.remote.email:'Local-only mode';
+ $('connection-status').textContent=state.remote?'Connected · '+state.remote.email:
+  state.configured?'Account not connected':'Account configuration missing';
+ const market=state.marketOcr||{};
+ const monitorOn=market.autoRunning===true;
+ const recentlyCaptured=market.lastCapturedAt &&
+  Date.now()-Date.parse(market.lastCapturedAt)<15000;
+ const captureFrozen=market.staleVideo===true||market.streamState==='stale';
+ const monitorLabel=captureFrozen?'AUTO MONITOR BLOCKED · game video frozen':
+  monitorOn?(recentlyCaptured?
+   'AUTO MONITOR ON · game screen being captured':
+   'AUTO MONITOR ON · waiting for a readable AION2 window'):
+   state.remote?'AUTO MONITOR NOT RUNNING':'AUTO MONITOR OFF · connect account';
+ $('market-header-status').textContent=monitorLabel+' · '+
+  (market.message||'Sign in to enable Market reading.');
+ $('market-header-status').style.borderColor=captureFrozen||!monitorOn||
+  market.state==='error'||market.state==='config-missing'?
+   '#be7578':market.state==='corroborated'?'#60987e':'#6180a5';
+ $('diagnostic-market-state').textContent=market.state||'idle';
+ $('diagnostic-market-message').textContent=market.message||'No Market scan started.';
+ $('diagnostic-market-windows').textContent=market.windowCandidates===undefined?'—':String(market.windowCandidates);
+ $('diagnostic-market-pixels').textContent=market.capturePixels||'—';
+ $('diagnostic-market-source').textContent=market.captureMethod==='window-video-stream'?
+  'AION2 video stream':'Unknown';
+ $('diagnostic-market-stream').textContent=market.streamState||'not running';
+ $('diagnostic-market-received').textContent=String(market.framesReceived||0);
+ $('diagnostic-market-last-change').textContent=market.lastVisualChangeAt?
+  new Date(market.lastVisualChangeAt).toLocaleTimeString():'Waiting for first changed frame';
+ $('diagnostic-market-freshness').textContent=captureFrozen?
+  'FROZEN · NOT RECORDING':!market.framesCaptured?
+  'Waiting for live video':'Fresh changing images';
+ $('diagnostic-market-scans').textContent=String(market.scans||0);
+ $('diagnostic-market-completed').textContent=String(market.completedScans||0);
+ $('diagnostic-market-working').textContent=market.ocrInProgress?'Yes':'No';
+ $('diagnostic-market-finished-at').textContent=market.lastCompletedAt?
+  new Date(market.lastCompletedAt).toLocaleTimeString():'Never';
+ $('diagnostic-market-last-result').textContent=market.lastResult||'No completed result';
+ $('diagnostic-market-duration').textContent=Number.isFinite(market.lastRecognitionMs)?
+  (market.lastRecognitionMs/1000).toFixed(1)+'s':'—';
+ const health=market.captureHealth;
+ $('diagnostic-market-image-health').textContent=health?
+  (health.blankLike?'POSSIBLY BLANK · ':'Detail visible · ')+
+  'contrast '+health.contrast:'Not sampled yet';
+ $('diagnostic-market-buffered').textContent=String(market.framesBuffered||0);
+ $('diagnostic-market-captured').textContent=String(market.framesCaptured||0);
+ $('diagnostic-market-captured-at').textContent=market.lastCapturedAt?
+  new Date(market.lastCapturedAt).toLocaleTimeString():'Never';
+ $('diagnostic-market-spatial-fee').textContent=Number.isSafeInteger(market.spatialFee)?
+  num(market.spatialFee)+' Kina':'—';
+ $('diagnostic-market-chars').textContent=String(market.recognizedChars||0);
+ $('diagnostic-market-fee').textContent=market.feeLabelSeen?'Yes':'No';
+ $('diagnostic-market-phase').textContent=market.screenPhase||'—';
+ $('diagnostic-market-ocr-mode').textContent=market.recognitionMode||'—';
+ $('diagnostic-market-time').textContent=market.lastScanAt?
+  new Date(market.lastScanAt).toLocaleTimeString():'Never';
+ $('diagnostic-market-evidence').textContent=Array.isArray(market.feeEvidence)&&market.feeEvidence.length?
+  'Last completed OCR fee-label line (not uploaded): '+market.feeEvidence.join(' / '):
+  !market.completedScans?'No completed OCR result yet; wait for the first scan to finish.':
+  health?.blankLike?'Captured game window looks nearly blank or black. Inspect the captured image.':
+  captureFrozen?
+   'The window video stream has stopped changing. No new Market observations are being recorded from frozen frames. Try borderless/windowed AION2 mode.':
+   'Last completed OCR did not recognize the fee label. Inspect the captured image to check what OCR actually saw.';
+ $('market-scan-diagnostics').disabled=!state.remote;
+ $('market-preview-diagnostics').disabled=!state.remote;
+ if(!state.remote){
+  marketPreviewEnabled=false;marketPreviewLastAt=null;
+  $('market-preview-diagnostics').textContent='Start refreshing local game preview';
+  const img=$('market-preview-image');
+  img.removeAttribute('src');img.hidden=true;
+ }
  $('show-login').textContent=state.remote?'Disconnect account':'Connect account';
  $('sync-now').disabled=!state.remote;
  $('feed-label').textContent=state.feedPath?'Also watching '+state.feedPath+' for decoded JSONL events':'Read-only Npcap capture; decoded events are stored locally.';
@@ -95,6 +163,9 @@ function render(){
  $('diagnostic-item-updates').textContent=h?String(h.itemUpdates):'—';
  $('diagnostic-item-deltas').textContent=h?String(h.itemDeltas):'—';
  $('diagnostic-item-stacks').textContent=h?String(h.itemStacks):'—';
+ $('diagnostic-ground-items').textContent=h?String(h.groundItems||0):'—';
+ $('diagnostic-ground-pickups').textContent=h?String(h.groundPickups||0):'—';
+ $('diagnostic-ground-matches').textContent=h?String(h.groundMatches||0):'—';
  $('diagnostic-wallet-regular').textContent=h?String(h.unboundWalletReadings):'—';
  $('diagnostic-wallet-bound').textContent=h?String(h.boundWalletReadings):'—';
  $('diagnostic-opcodes').textContent=h?.popularOpcodes?.length
@@ -140,6 +211,8 @@ function render(){
  const money=window.AtreiaWallets.movements(events,p.daily);
  const itemEconomy=window.AtreiaItemEconomy.attribute(events,money,p.daily);
  const itemByWalletId=new Map(itemEconomy.matches.map(m=>[m.walletId,m]));
+ const marketFeeByWalletId=window.AtreiaMarketAttribution.feeSources(
+  state.marketObservations||[],profile?.character,profile?.server);
  const regularWallet=walletView.regular, boundWallet=walletView.bound;
  const t={dayEarned:0,daySpent:0};
  let hasEarned=false,hasSpent=false;
@@ -204,14 +277,22 @@ function render(){
    const row=document.createElement('div');row.className='movement-row';
    const info=document.createElement('div');
    const label=document.createElement('span');label.className='activity-name';
-   label.textContent=(movement.currency==='unbound'?'Regular':'Bound')+' Kina '+(movement.direction==='in'?'in':'out');
+   const marketFee=marketFeeByWalletId.get(movement.id);
+   label.textContent=marketFee
+    ?'Market registration fee · '+(movement.currency==='unbound'?'regular':'bound')+' Kina'
+    :(movement.currency==='unbound'?'Regular':'Bound')+' Kina '+(movement.direction==='in'?'in':'out');
    const details=document.createElement('span');details.className='movement-source';
    const association=itemByWalletId.get(movement.id);
    const itemName=association?window.AtreiaItems.name(association.item_id):null;
    details.textContent='Balance '+num(movement.before)+' → '+num(movement.after)+
-     (association?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
-       itemName+' ×'+num(association.quantity)+' (unverified)'
-       :' · source unknown');
+     (marketFee
+      ?' · Market listing fee '+(marketFee.item_name||'item')+
+       (marketFee.quantity?' ×'+num(marketFee.quantity):'')+
+       ' · Confirm prompt + wallet debit (inferred)'
+      :association
+       ?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
+         itemName+' ×'+num(association.quantity)+' (unverified)'
+       :' · source not yet identified');
    info.append(label,details);
    const amount=document.createElement('strong');
    amount.className=movement.direction==='in'?'up':'down';
@@ -250,6 +331,85 @@ function render(){
    caption.textContent='Possible '+(isSpend?'purchase':'sale')+' · '+num(Math.round(group.totalKina/group.totalQuantity))+' each · unverified';
    const amountWrap=document.createElement('div');amountWrap.append(price,caption);
    row.append(detail,qty,amountWrap);itemGroups.append(row);
+ }
+ const groundGroups=$('ground-groups');
+ groundGroups.replaceChildren();
+ if(!itemEconomy.groundGroups.length) {
+  const empty=document.createElement('div');empty.className='empty';
+  empty.textContent='No corroborated ground pickups yet. Missing ground or inventory packets remain unattributed.';
+  groundGroups.append(empty);
+ }
+ for(const group of itemEconomy.groundGroups.slice(0,30)) {
+  const row=document.createElement('div');row.className='item-group-row';
+  const info=document.createElement('div');
+  const name=document.createElement('strong');
+  name.textContent=window.AtreiaItems.name(group.item_id);
+  const detail=document.createElement('span');detail.className='movement-source';
+  detail.textContent='Item #'+group.item_id+' · '+group.observations+
+   ' corroborated ground pickup'+(group.observations===1?'':'s');
+  info.append(name,detail);
+  const qty=document.createElement('span');qty.className='item-group-qty';
+  qty.textContent='×'+num(group.totalQuantity);
+  const note=document.createElement('div');note.className='item-group-caption';
+  note.textContent='Ground pickup · not Market earnings';
+  row.append(info,qty,note);groundGroups.append(row);
+ }
+ const marketStatus=$('market-ocr-status');
+ marketStatus.textContent=(market.autoRunning?
+  'Automatically monitoring Market screens · ':'Automatic Market tracking is not running · ')+
+  (market.message||'Connect the website account inside the companion.');
+ const marketHolder=$('market-observations');
+ marketHolder.replaceChildren();
+ const marketRows=(state.marketObservations||[]).filter(e=>match(e,profile));
+ const todaysFees=marketRows.filter(e=>e.fee!==null&&e.fee!==undefined &&
+  Date.parse(e.occurred_at)>=p.daily);
+ $('market-fees-quoted').textContent=todaysFees.length?
+  num(todaysFees[0].fee):'—';
+ const charged=todaysFees.filter(e=>e.status==='corroborated');
+ $('market-fees-matched').textContent=charged.length?
+  num(charged.reduce((sum,e)=>sum+e.fee,0)):'—';
+ if(!marketRows.length){
+  const empty=document.createElement('div');empty.className='empty';
+  empty.textContent='No Market observations for this character yet.';
+  marketHolder.append(empty);
+ }
+ for(const entry of marketRows.slice(0,20)){
+  const row=document.createElement('div');row.className='item-group-row';
+  const info=document.createElement('div');
+  const name=document.createElement('strong');
+  name.textContent=entry.item_name||(
+   entry.kind==='listing_fee_observation'?'Registration fee':
+   entry.kind==='listing_observation'?'Market listing':'Market settlement');
+  const desc=document.createElement('span');desc.className='movement-source';
+  const caption=entry.kind==='settlement_observation'?'Settlement shown':
+   entry.kind==='listing_fee_observation'?'Registration fee shown':'Listing shown';
+  const verified=entry.status==='corroborated';
+  const currency=entry.currency_kind==='mixed'?'bound + regular':
+   entry.currency_kind==='bound'?'bound':entry.currency_kind==='unbound'?'regular':null;
+  const since=Date.now()-Date.parse(entry.occurred_at);
+  const status=verified
+   ?'Fee matched to '+currency+' Kina debit · likely registered'
+   :entry.screen_phase==='confirmation'
+    ?since>=60000
+      ?'No matching Kina decrease observed · possibly canceled or capture missed'
+      :'Confirm/Cancel prompt seen · waiting for a Kina decrease'
+    :entry.screen_phase==='listing_form'
+     ?'Sale form only · not yet confirmed':'OCR observation only';
+  desc.textContent=caption+' · '+new Date(entry.occurred_at).toLocaleString()+
+   ' · '+status+(entry.synced?' · account synced':' · pending sync');
+  info.append(name,desc);
+  const qty=document.createElement('span');qty.className='item-group-qty';
+  qty.textContent=entry.quantity?'×'+num(entry.quantity):'—';
+  const details=document.createElement('div');
+  const total=document.createElement('strong');
+  total.textContent=(entry.kind==='listing_fee_observation'?'Fee ':'')+
+   num(entry.amount)+' Kina';
+  details.append(total);
+  if(entry.kind==='listing_observation' && entry.fee!==null&&entry.fee!==undefined){
+   const fee=document.createElement('small');fee.className='item-group-caption';
+   fee.textContent='Registration fee '+num(entry.fee)+' Kina';details.append(fee);
+  }
+  row.append(info,qty,details);marketHolder.append(row);
  }
  for(const period of ['daily','weekly']){
   const holder=$(period+'-counters');holder.replaceChildren();
@@ -334,9 +494,50 @@ $('close-login').addEventListener('click',()=>{$('auth-backdrop').hidden=true;$(
 $('auth-form').addEventListener('submit',async e=>{
  e.preventDefault();
  try{await api.login({email:$('auth-email').value.trim(),password:$('auth-password').value});
- $('auth-backdrop').hidden=true;$('auth-password').value='';await refresh();show('Website account connected. Sync is optional.');}
+ $('auth-backdrop').hidden=true;$('auth-password').value='';await refresh();show('Website account connected. Game-window Market fee reading and private syncing are active.');}
  catch(err){show(err.message,true);$('auth-backdrop').hidden=true;$('auth-password').value='';}
 });
+async function scanMarketNow(){
+ try {const result=await api.scanMarket();show(result.message||'Market scan completed.');await refresh();}
+ catch(err){show(err.message,true);}
+}
+$('market-scan-diagnostics').addEventListener('click',scanMarketNow);
+let marketPreviewEnabled=false,marketPreviewBusy=false,marketPreviewLastAt=null;
+async function updateMarketPreview(){
+ if(!marketPreviewEnabled||marketPreviewBusy||activeView!=='diagnostics'||!state?.remote)return;
+ marketPreviewBusy=true;
+ try {
+  const result=await api.previewMarketCapture();
+  if(result.error){
+   $('market-preview-note').textContent=result.error+
+    ' No screenshot is uploaded or saved.';
+   return;
+  }
+  const capturedAt=Date.parse(result.capturedAt);
+  const age=Math.max(0,Math.round((Date.now()-capturedAt)/1000));
+  if(marketPreviewLastAt!==result.capturedAt){
+   const image=$('market-preview-image');
+   image.src=result.dataUrl;
+   image.hidden=false;
+   marketPreviewLastAt=result.capturedAt;
+  }
+  $('market-preview-note').textContent=
+   (age>15?'WARNING: No new accepted game frame for '+age+' seconds. Capture may be frozen.':
+    'Live preview · last changed game frame '+age+' seconds ago.')+
+   ' Snapshot time: '+new Date(result.capturedAt).toLocaleTimeString()+
+   '. The image is local to this PC and never uploaded or stored.';
+ }catch(err){
+  $('market-preview-note').textContent='Live preview error: '+String(err.message).slice(0,120);
+ }finally{marketPreviewBusy=false;}
+}
+$('market-preview-diagnostics').addEventListener('click',()=>{
+ marketPreviewEnabled=!marketPreviewEnabled;
+ $('market-preview-diagnostics').textContent=marketPreviewEnabled?
+  'Stop refreshing local game preview':'Start refreshing local game preview';
+ if(marketPreviewEnabled)void updateMarketPreview();
+ else $('market-preview-note').textContent='Local preview paused. The image is a snapshot and will not update until resumed.';
+});
+setInterval(()=>{void updateMarketPreview();},2000);
 $('sync-now').addEventListener('click',async()=>{
  try{const r=await api.sync();show('Synced '+r.uploaded+' local records and '+r.ticketBalances+
  ' decoded ticket snapshots. '+r.unmatched+' records had no matching website character.');}

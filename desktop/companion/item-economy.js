@@ -17,6 +17,32 @@
    Date.parse(e.occurred_at)>=dayStart &&
    Date.parse(e.occurred_at)<=Date.now()+60000
   ).sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
+  // A ground pickup requires three corroborating game messages, not mere timing.
+  const byEventId=new Map(eligible.filter(e=>typeof e.id==='string').map(e=>[e.id,e]));
+  const confirmedIds=new Set();
+  const verifiedGround=[];
+  for(const ev of Array.isArray(events)?events:[]) {
+   if(!ev || ev.type!=='item_origin' || ev.source!=='decoded' ||
+      ev.origin!=='ground_pickup' || typeof ev.item_event_id!=='string' ||
+      !Number.isSafeInteger(ev.item_id) || !Number.isSafeInteger(ev.quantity) ||
+      ev.quantity<=0 || !Number.isFinite(Date.parse(ev.occurred_at)))continue;
+   const item=byEventId.get(ev.item_event_id);
+   if(!item || item.item_id!==ev.item_id || item.delta!==ev.quantity ||
+      item.observation_session!==ev.observation_session ||
+      Math.abs(Date.parse(ev.occurred_at)-Date.parse(item.occurred_at))>1500 ||
+      confirmedIds.has(item.id))continue;
+   confirmedIds.add(item.id);
+   verifiedGround.push({item_id:item.item_id,quantity:item.delta,occurred_at:item.occurred_at});
+  }
+  const groundByItem=new Map();
+  for(const row of verifiedGround) {
+   const group=groundByItem.get(row.item_id)||{item_id:row.item_id,totalQuantity:0,observations:0};
+   group.totalQuantity+=row.quantity;
+   group.observations++;
+   groundByItem.set(row.item_id,group);
+  }
+  // Proven ground loot must never be reported as a possible Market/NPC purchase.
+  const candidates=eligible.filter(e=>!confirmedIds.has(e.id));
   const wallets=walletMovements?.changes||[];
   const used=new Set();
   const associations=[],unknown=[];
@@ -27,7 +53,7 @@
    // Item removed + wallet increase => possible sale.
    const wanted=wallet.direction==='out'?1:-1;
    const time=Date.parse(wallet.occurred_at);
-   const matching=eligible.filter(e=>
+   const matching=candidates.filter(e=>
       !used.has(e.id) && e.observation_session===wallet.session &&
       Math.sign(e.delta)===wanted &&
       Math.abs(Date.parse(e.occurred_at)-time)<=WINDOW_MS
@@ -74,7 +100,10 @@
    matches:associations.slice(-150).reverse(),
    unmatched:unknown.slice(-150).reverse(),
    groups:[...byItem.values()].sort((a,b)=>b.totalKina-a.totalKina),
-   itemChanges:eligible.length,windowMs:WINDOW_MS
+   itemChanges:eligible.length,
+   verifiedGround:verifiedGround.length,
+   groundGroups:[...groundByItem.values()].sort((a,b)=>b.totalQuantity-a.totalQuantity),
+   windowMs:WINDOW_MS
   };
  }
  const api={attribute,WINDOW_MS};

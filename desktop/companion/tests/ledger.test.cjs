@@ -110,3 +110,18 @@ test('only decoded, validated item-level changes are stored locally',()=>{
  assert.throws(()=>normalizeEvent({...normal,id:'z',delta:0}));
  assert.throws(()=>normalizeEvent({...normal,id:'bad',observation_session:'xxx'}));
 });
+
+test('source evidence accepts only strictly decoded local ground pickup references',()=>{
+ const id='0123456789abcdef0123456789abcdef';
+ const session='abcdef0123456789abcdef0123456789';
+ const good={source:'decoded',item_event_id:id,item_id:531060004,
+  quantity:20,origin:'ground_pickup',observation_session:session};
+ const entry=event('ground-event','item_origin',good);
+ assert.equal(entry.item_event_id,id);
+ assert.equal(entry.origin,'ground_pickup');
+ assert.equal(entry.quantity,20);
+ assert.throws(()=>event('x','item_origin',{...good,origin:'market_purchase'}));
+ assert.throws(()=>event('x','item_origin',{...good,item_event_id:'not-a-valid-id'}));
+ assert.throws(()=>event('x','item_origin',{...good,source:'manual'}));
+ assert.throws(()=>event('x','item_origin',{...good,quantity:0}));
+});

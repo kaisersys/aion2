@@ -192,3 +192,122 @@ The offline item-name lookup covers 9,450 English client-derived names; unknown 
 4. Report the item ID (or name), currency differences, and counters if the grouping is inaccurate—no raw PCAP files are needed.
 
 This is unofficial passive packet capture and may pose an account-policy risk under NCSOFT terms.
+
+
+## Transaction-source decoding: corroborated ground pickups
+
+The capture helper now recognizes three separate, read-only Aion 2 Global messages:
+- `0x1E56`: item stack appears on the ground (opaque ground ID, item ID, quantity)
+- `0x1F56`: that same ground ID leaves the ground with the **own-pickup** flag
+- `0x1B56`: a matching **positive** change in a validated inventory stack
+
+The companion marks an item gain as a **corroborated ground pickup** only when the item ID and quantity match across all three observations within 1.5 seconds (pickup and inventory may arrive in either order). Unknown ground IDs, another player's pickup, missing inventory baseline, conflicting quantities, simultaneous ambiguous matches, duplicate pickup packets, and stale evidence do not qualify. Ground IDs stay in the decoder's memory, are capped, and are never logged or exported. Source records link only to a local item-event ID and remain excluded from optional website synchronization.
+
+**Overview** displays these pickups in their own section and excludes them from the nearby-wallet **possible purchase** model. **Diagnostics** displays ground drops, own pickups, and exact matches, without dumping game traffic. This helps avoid labeling looted items as NPC or Market purchases.
+
+This is **not** a Market/NPC transaction parser. The known inventory and wallet opcodes contain no verified Market order ID, seller, buyer, gross proceeds, fees, shop price, or transaction cause. An apparent purchase remains *possible*; delayed Market settlements, NPC sales, crafting, storage transfers and inventory consumption remain unassigned. No gross market revenue or itemized Market receipt is claimed. Additional packet mappings require evidence from controlled Global sessions. Passive capture is unofficial and has potential account-policy risk.
+
+
+## Account-connected Market OCR (experimental)
+
+When the user signs in, the companion checks **only** a window titled AION2 every eight seconds. A local Tesseract OCR worker reads the image in memory. The image and raw OCR text are never persisted or uploaded. A conservative parser accepts only Market panels containing explicitly labeled prices and listing fees or settlement proceeds. The result is an **unverified observation**, never a completed-sale or verified wallet-transaction claim. It can include item name and quantity when explicitly readable.
+
+Only structured observations (account, matched character, timestamp, type, observed amount, listing fee, item and quantity) sync over authenticated Supabase requests to `player_market_observations`. Row-level security restricts reads and inserts to the signed-in user; the table is not publicly readable. Observations are queued locally until upload succeeds. Signing out stops OCR; packet capture remains a separate existing control.
+
+**Important:** A visible Market listing is not proof of submission, and Settlement text is not proof of claiming the funds. No transaction is automatically marked as verified. OCR layouts and English UI labels need controlled testing against actual Aion 2 Global screenshots before general release. The OCR language model may download on first use; screenshots are processed locally. Tesseract OCR is not an NCSOFT-supported interface. Users must be told about continuous game-window reading and private structured-data upload before account connection. An account signup or Terms of Service alone should not be used to conceal this collection.
+
+Apply `supabase/migrations/20261109_market_observations.sql` to the matching Supabase project before distributing this build. The companion does not enable a public leaderboard or cross-account access to these observations.
+
+
+## Market fee capture troubleshooting (v0.1.1 preview)
+
+The OCR Market listener starts automatically when an Atreia Street account signs in. The user can also click **Scan visible Market now** to inspect the current visible AION2 window immediately; this is a diagnostic shortcut, not a required opt-in. OCR checks the game window every 3 seconds rather than every 8 seconds.
+
+The List panel can show a **Registration Fee** even if OCR cannot read its asking price. That value is stored as a listing_fee_observation (quoted fee, *not* an expense). It is visible in **Latest Registration Fee Shown**. When a separately decoded **bound or regular Kina** wallet decrease matches the fee's exact amount within the narrow observation window, the record advances to **corroborated**; combined debits from the two wallets must sum to that fee and be within 3 seconds of each other. The **Fees Matched to Kina Out** field sums only those corroborated records. A wallet match corroborates a payment amount, not a game-server listing receipt; never describe it as a verified successful listing.
+
+Common reasons nothing appears:
+- The installed companion is an older preview (before v0.1.1). Installing an updated Windows installer is required; updating the website does not update desktop binaries.
+- Only one *visible* game window titled AION2 or AION 2 is supported. Exclusive fullscreen or graphics capture restrictions can produce blank thumbnails. Try borderless/windowed mode.
+- The account has not been signed in or the character/server is not linked to the signed-in Atreia Street account. The Market status now reports this instead of silently discarding the fee.
+- The Market listing panel was open only briefly and the OCR did not read the displayed fee. Open the List screen, wait until **Registration fee quote captured** is displayed, or click **Scan visible Market now**, before submitting.
+- Kina balance packets were missing, so the fee remains an OCR-only quote. This is deliberately not booked as an expense. Revisit Npcap diagnostics and baseline/active character identity if wallet readings are absent.
+- OCR can read labels on a separate line from the amount and ignores the always-visible "Settlement" navigation tab while listing. Other languages or game client layouts may need additional parser rules.
+
+No screenshots or raw recognized text are uploaded. Only the structured fee/price, user/character, and reconciliation status sync to the account owner's RLS-protected Supabase rows. Upload failures remain queued and retry. All OCR source attribution is provisional until validated against actual Global game screens.
+
+
+## Market OCR setup and failure diagnostics (v0.1.2)
+
+A Windows preview must ship a real **public Supabase project URL and publishable key**. The prior build excluded the required `config.json`, so website account login and account-triggered Market OCR could not start from a fresh preview installer. This build includes only the public `sb_publishable_...` key for the Atreia Street project, never a service-role/secret key.
+
+The companion **must** be signed in once, separate from simply creating an account on the website. It now stores only an encrypted refresh token using Windows/Electron `safeStorage`; the password is never written to disk. The session resumes automatically on subsequent launches. If Windows secure storage is unavailable, the player must sign in again on launch. Signing out clears the encrypted token and stops OCR.
+
+The Market reader status is displayed **near the top of the desktop companion**, and again on the **Diagnostics** tab under Game-window reading. The diagnostics show the number of AION2 windows matching the title, capture dimensions, OCR scan count, OCR character count, last attempt time, fee-label detection and at most three recognized fee-label lines. This is ephemeral local UI data, not stored to disk, transmitted to Supabase, or uploaded with telemetry. A **Scan visible Market now** button is available on both the overview and Diagnostics tabs after account sign-in.
+
+If the scanner reports *No AION2 game window found*, try borderless/windowed mode and verify the game has a visible AION2 window. If it reports *window found but blank*, Windows game capture may be restricted. If OCR sees text but does not see *Registration Fee*, check Aion 2 language/layout and game UI scale. If the fee label is recognized but its amount is not, its exact text/placement needs a validated, user-supplied **direct screenshot** (a Lightshot shortlink may not be accessible to automated tooling).
+
+The screen reader still records **fee quotes** rather than completed transactions unless wallet reductions corroborate them. It does not reconstruct missed historical fees. Live testing in a genuine Global Market listing screen is necessary before public release.
+
+
+## Market confirmation and expense attribution (v0.1.3 preview)
+
+A real Aion 2 Global listing uses **Are you sure you wish to list for sale?** with **Confirm** and **Cancel**. For example, a Refining Stone stack of **5**, **233 Kina each**, **1,165 Kina total sale price**, and **23 Kina registration fee**. The **Funds** balance (e.g., 478,715) is *not* the fee. The registration fee and Funds can use the game's bound-currency icon, distinct from the sale price icon. Both wallets must be tracked independently.
+
+The OCR reader now focuses on the center confirmation dialog at high resolution and falls back to full-window OCR if necessary. The parser records `screen_phase=listing_form` for the ordinary Market listing editor and `screen_phase=confirmation` when it sees the Confirm/Cancel dialog. The quantity can be calculated from the exact displayed total / unit price when the stack count isn't OCR-labelled. A listing form quote does **not** count as a payment. A confirmation prompt does **not** count as a payment either.
+
+After observing the confirmation prompt, the fee matcher looks for an **exact, unambiguous decoded Kina decrease** in bound, regular, or both wallets shortly afterward (with a very short tolerance for delivery timing). If confirmed by that separate wallet evidence, the fee is labelled **wallet corroborated, likely listed** in Market observations. The specific wallet change(s) appear in Recent Balance Changes as **Market registration fee: [item] × quantity (inferred)** instead of `source unknown`. If the player presses Cancel, no matching Kina decrease should occur, so the quote remains unpaid; after a minute, the UI says **no matching debit observed — possibly canceled or capture missed**. It cannot declare a cancellation or listing as server-verified without an independently decoded response. This protects against fictional expenses.
+
+Other Kinah purchases and expenses still show **source not yet identified** unless another trusted item/packet association exists. A packet balance delta alone has no market/NPC/shop reason code; attributing all unidentified spending would fabricate information. The next protocol research step is to decode game operation-specific transaction confirmations (vendor buys, Market purchases, settlement claims) or to correlate their distinctive on-screen dialogs with wallet changes, while retaining the same evidence labels.
+
+The SQL migration `supabase/migrations/20261109_market_confirmation_phase.sql` adds the private `screen_phase` field. Screenshots and full OCR output remain in RAM only; they are not uploaded or written to disk. Market observations remain private to their signed-in account through existing row-level security. This release is a **Windows preview** until tested with a live Aion 2 Global transaction and decoder wallet events.
+
+
+## OCR startup crash hotfix (v0.1.4)
+
+The v0.1.3 Windows preview could crash with `SyntaxError: Unexpected identifier 'source'` from the `wasm-feature-detect/dist/cjs/index.cjs` dependency inside `app.asar` as the OCR worker loaded. The newer `wasm-feature-detect@1.9.0` contains experimental `import.source()` syntax unsupported by the Electron runtime bundled with the companion, despite Node 22 unit checks passing.
+
+The v0.1.4 preview forces `wasm-feature-detect@1.8.0` using an npm override and pins `tesseract.js@6.0.1`. `npm run verify:ocr-dependencies` rejects an accidental incompatible detector upgrade. The Windows CI also boots the **packaged Electron .exe** with `--atreia-startup-smoke`, initializes an English OCR worker, terminates it, and fails the release if the runtime throws or the worker cannot start. This runs before installer artifact upload, unlike prior builds that only checked JavaScript source files in Node.
+
+After downloading v0.1.4, install it over the previous preview and sign in if requested. Local ledger data is stored in the user-data directory, outside the installer, and should remain intact. Do not reinstall Npcap or reset the stored ledger to address this JavaScript startup failure. A future missing-language-data, GPU screenshot, or game capture issue will appear in Market Diagnostics rather than causing a startup parse failure.
+
+
+## Registration fee OCR reliability repair (v0.1.5 preview)
+
+A real Aion 2 Global screenshot of a Refining Stone Market listing revealed that Tesseract can read the labels in a left column and the amounts in a completely separate right column. For example, its extracted text is `Total Sale Price / Sale Price Per Item / Registration Fee / Funds / Refining Stone / 1,165 / 233 / 23 / 478,715`. The earlier parser required a value inline or on the next line, silently discarding all four numbers even with a perfectly captured image.
+
+The companion now requests **in-memory TSV bounding boxes** from Tesseract 6, aligns numeric words to their on-screen label using their vertical positions, and adds only unambiguous labeled values for normal validation. A synthetic fixture modeled on the real screenshot ensures `Registration Fee=23`, `Total Sale Price=1,165`, `Unit Price=233`, `Quantity=5`, and `Item Name=Refining Stone`; **Funds=478,715** is never mistaken for a fee. If competing numbers appear in the same row, it rejects them.
+
+A separate sampler captures **only the named AION2 game window about every 850 ms** into a bounded, RAM-only 36-frame buffer. OCR runs asynchronously, but each screenshot retains its **original capture time** so a subsequent decoded Kina decrease can still corroborate a brief Confirm/Cancel prompt even if recognition finishes later. A fixed 3-second OCR check could easily miss a prompt closed immediately after clicking Confirm. The buffer discards images older than 45 seconds, stores no screenshots on disk and uploads none to the account.
+
+Evidence is saved in the local character ledger even when the signed-in account has no corresponding website character; the upload remains blocked until a verified character and server mapping is available. Under Diagnostics, inspect `Screen frames captured`, `Screen frames buffered`, `Spatial fee read`, `Detected screen`, `OCR region`, and `Regular/Bound Kina readings`. A confirmed fee still requires an exact, unambiguous decoded Kina decrease, not merely an on-screen quotation. Other spending without linked evidence remains unattributed.
+
+This build is not validated on a live game session until the user observes both the 23-Kina screen-read and a matching packet-derived wallet decrease. Avoid presenting an unverified fee as actual spending or a confirmed listing.
+
+## Market OCR: last-completed results and local capture preview (v0.1.7)
+
+Previously the companion reset `OCR characters`, `fee label recognized`, and the recognized text diagnostics to zero at the start of **every** OCR operation. A screenshot captured while the status said *scanning* could therefore display `0 characters` even when previous passes recognized text. The counters were misleading and obscured whether the screen capture, OCR worker or Market parser was responsible for missing listing fees.
+
+The Diagnostics tab now reports **OCR scans started**, **OCR scans finished**, **OCR working**, **last finished OCR**, **last OCR result** and **recognition duration**. The last complete result remains visible while a new scan is running. The AION2 window is checked periodically for whether it looks blank or contains visible image contrast, using on-device pixel statistics. These image quality metrics do not capture or export other desktop windows.
+
+A new **Inspect captured AION2 window** button presents the exact latest captured game window **inside the companion on the local device**, from RAM only. It does not enable capture, export raw text, upload screenshots to Supabase, or write images to disk. It is purely a diagnostic to determine whether Electron's Windows game-window capture is black, obscured, cropped, or legible. Screenshots are cleared on account logout or application exit.
+
+If **OCR scans finished = 0**, the OCR engine may still be initializing or processing; do not interpret zero text as a completed failure. If finished scans are greater than zero and **last result=empty** with a **blank-looking capture**, the problem is in the game-window capture. If the captured window shows the fee legibly but OCR still returns empty, investigate the OCR preprocessing/recognition parameters rather than adjusting wallet transaction attribution. A source-unknown wallet debit cannot be attributed to a listing fee until its OCR evidence is recognized and matched.
+
+This is an instrumentation fix, **not** proof that the user's live fee is now tracked. The packaged OCR startup smoke and parser unit tests alone do not verify in-game capture fidelity.
+
+The Windows packaged-app smoke test now performs **actual text recognition** against a tiny built-in PNG reading `REGISTRATION FEE 30` and fails if Tesseract returns empty or incorrect text. Earlier smoke checks only initialized the worker, which was insufficient to establish whether it could recognize text. The fixture was checked independently against the Tesseract CLI and contains no user data.
+
+
+## Frozen game capture repair (v0.1.8 preview)
+
+**Cause:** Electron's repeated `desktopCapturer.getSources({types:['window'],thumbnailSize:{width:2560,height:1440}})` calls can return the *same cached Windows game-window thumbnail* indefinitely. The earlier sampler assigned `Date.now()` to each returned thumbnail and the bounded buffer even re-added identical thumbnails after five seconds. This made an hour-old picture appear freshly captured, allowing mistaken Market evidence timestamps.
+
+**Change:** The companion now discovers the named AION2 window by `desktopCapturer.getSources` with `thumbnailSize: {width:0,height:0}`, then starts a private, video-only `getUserMedia` stream for **that exact window source id** in a hidden, isolated Electron renderer. It does not capture whole screens, microphones, application windows or audio. Each actual video frame is passed from the renderer to the main process in memory at approximately 850 ms intervals. A first frame is *not* assumed to be live; a visible pixel change must be seen before OCR may record transaction evidence.
+
+If video frames stop changing for 15 seconds, Diagnostics explicitly reports **FROZEN · NOT RECORDING**, clears buffered images, and blocks fee attribution from stale screenshots. A bounded, automatic stream restart is attempted if Windows freezes a stream. If the game scene changes again, OCR resumes automatically and observations use capture-time timestamps. There is no silent fallback to cached thumbnails. The installed screenshot preview is only kept in RAM while frames remain valid, and is discarded on a frozen stream.
+
+In Diagnostics, **Source = AION2 video stream** indicates the streaming path, **Video frames received** counts source frames (including duplicates), **Last visual change** shows the most recent actually different image, and **Image freshness** displays `FROZEN · NOT RECORDING` when the stream is stuck. A game showing an entirely static screen can also temporarily trigger this warning: moving or opening a menu should produce a frame transition and resume. Try **borderless/windowed mode** if exclusive fullscreen or game graphics/anti-cheat prevents Windows from providing fresh video content.
+
+This is a correctness and capture-source change, not an assertion that the Aion 2 game's rendering can be video-captured on every Windows system. The Windows build validates syntax and the packaged OCR worker; *actual live game video capture still requires a user's in-game test*. No server-side records are backfilled from frozen screenshots and no screenshots are uploaded.
+
+**Local preview clarification:** v0.1.7's `Inspect captured AION2 window` showed a one-time image and did not refresh on its own. A screenshot left open for an hour could therefore look hour-old even when background OCR was still active. In v0.1.8, **Start refreshing local game preview** updates the image every two seconds while the Diagnostics tab remains visible and shows the age of the last accepted frame. It pauses when the tab is hidden or the account signs out. This distinguishes a stale *preview* from a genuinely frozen Windows capture source. The button does not enable Market tracking; only the local preview is user-controlled.

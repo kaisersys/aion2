@@ -32,6 +32,8 @@ jobs:
           }
           exit 1
       - run: npm test
+      - name: Reject OCR dependency versions unsupported by packaged Electron
+        run: npm run verify:ocr-dependencies
       - run: node --check main.cjs
       - run: node --check ui.js
       - run: node --check overlay.js
@@ -40,6 +42,15 @@ jobs:
       - run: node --check wallets.js
       - run: node --check item-catalog.js
       - run: node --check item-economy.js
+      - run: node --check market-ocr.cjs
+      - run: node --check market-fees.cjs
+      - run: node --check market-spatial.cjs
+      - run: node --check market-frame-buffer.cjs
+      - run: node --check market-capture-health.cjs
+      - run: node --check market-live-frame.cjs
+      - run: node --check market-live-capture.cjs
+      - run: node --check market-stream-preload.cjs
+      - run: node --check market-stream-renderer.js
       - run: npm run capture:build
       - name: Package Windows preview (retry transient CDN errors)
         shell: pwsh
@@ -51,6 +62,36 @@ jobs:
             Start-Sleep -Seconds (5 * $attempt)
           }
           exit 1
+      - name: Launch packaged Electron and initialize OCR worker
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'release/win-unpacked/Atreia Street Companion.exe'
+          if (-not (Test-Path $exe)) { throw "Packaged companion executable not found: $exe" }
+          $p = Start-Process -FilePath $exe -ArgumentList '--atreia-startup-smoke' -PassThru
+          if (-not $p.WaitForExit(105000)) {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            throw 'Packaged companion OCR smoke timed out'
+          }
+          $p.Refresh()
+          if ($p.ExitCode -ne 0) { throw "Packaged companion OCR smoke failed with exit code $($p.ExitCode)" }
+      - name: Verify packaged game-window video capture receives changed frames
+        # GitHub-hosted Windows build agents run without an interactive game
+        # desktop: desktopCapturer exposes only HostedComputeAgent, not even
+        # an animated test BrowserWindow. Keep failure visible in checks but do
+        # not pretend the absence of a desktop proves video capture is broken.
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'release/win-unpacked/Atreia Street Companion.exe'
+          if (-not (Test-Path $exe)) { throw "Packaged companion executable not found: $exe" }
+          $env:ATREIA_SMOKE_LOG = Join-Path $env:RUNNER_TEMP 'atreia-video-smoke.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList '--atreia-stream-smoke' -PassThru
+          $exited = $p.WaitForExit(55000)
+          if (-not $exited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+          if (Test-Path $env:ATREIA_SMOKE_LOG) { Get-Content $env:ATREIA_SMOKE_LOG }
+          if (-not $exited) { throw 'Packaged video-stream smoke timed out' }
+          $p.Refresh()
+          if ($p.ExitCode -ne 0) { throw "Packaged video-stream smoke failed with exit code $($p.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
           name: atreiastreet-companion-windows-preview

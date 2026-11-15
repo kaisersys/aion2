@@ -1,14 +1,18 @@
 {
   "name": "atreia-street-companion",
-  "version": "0.1.0",
+  "version": "0.1.8",
   "private": true,
-  "description": "Local-first Aion 2 economy and progression summary for Atreia Street",
+  "description": "Account-connected Aion 2 economy and progression companion for Atreia Street",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.cjs",
     "dist:win": "electron-builder --win nsis --x64",
-    "capture:build": "dotnet publish capture/AtreiaCapture.csproj -c Release -r win-x64 --self-contained true -o capture/publish"
+    "capture:build": "dotnet publish capture/AtreiaCapture.csproj -c Release -r win-x64 --self-contained true -o capture/publish",
+    "verify:ocr-dependencies": "node tests/check-ocr-dependencies.cjs"
+  },
+  "dependencies": {
+    "tesseract.js": "6.0.1"
   },
   "devDependencies": {
     "electron": "^33.4.11",
@@ -36,7 +40,19 @@
       "overlay-preload.cjs",
       "wallets.js",
       "item-catalog.js",
-      "item-economy.js"
+      "item-economy.js",
+      "market-ocr.cjs",
+      "market-fees.cjs",
+      "market-attribution.js",
+      "market-spatial.cjs",
+      "market-frame-buffer.cjs",
+      "market-capture-health.cjs",
+      "market-live-frame.cjs",
+      "market-live-capture.cjs",
+      "market-stream.html",
+      "market-stream-preload.cjs",
+      "market-stream-renderer.js",
+      "ocr-smoke-fixture.cjs"
     ],
     "win": {
       "target": "nsis",
@@ -55,5 +71,8 @@
         ]
       }
     ]
+  },
+  "overrides": {
+    "wasm-feature-detect": "1.8.0"
   }
 }

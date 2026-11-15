@@ -28,3 +28,14 @@ undefined
 - Verify character/capture session switches, malformed padding and duplicate stack updates.
 - Verify website synchronization skips item_change and no raw handles or packet bytes are stored.
 - Verify 531060004 displays Courage Scroll (Bound); unknown IDs remain readable.
+
+
+## Ground-pickup source decoding (local-only)
+
+- On a normal login capture a full inventory baseline and confirm Tracked inventory stacks > 0.
+- After picking up a known ground drop, check that Ground drops observed and Own ground pickups increase; when a matching inventory increase arrives, Ground pickups matched should rise.
+- In Overview, a corroborated ground pickup appears by item and quantity. Even if Kina changes within 4.5 seconds, the proven pickup must **not** appear under Possible purchases.
+- A pickup by someone else, disappearing ground item, dropped item not added to inventory, or missing pickup message must stay unverified.
+- Test inventory before and after ground-disappearance, and a delay beyond 1.5 seconds; only an exact one-to-one item/quantity match qualifies.
+- If a Market purchase, NPC buy, craft or storage transfer happens, do **not** infer its transaction source from a nearby wallet or item change. Market order receipts remain unsupported.
+- Diagnostics show counts only. Never share unredacted traffic, authentication data, packet payloads, inventory handles or IP addresses.

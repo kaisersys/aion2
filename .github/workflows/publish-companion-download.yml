@@ -1,0 +1,38 @@
+name: Publish Companion v0.1.11 preview download
+on:
+  push:
+    branches:
+      - feature/companion-transaction-sources
+    paths:
+      - '.github/workflows/publish-companion-download.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch validated v0.1.11 installer from Windows CI
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43740425212 --repo "$GITHUB_REPOSITORY" --name atreiastreet-companion-windows-preview --dir dist
+          test -f "dist/Atreia Street Companion Setup 0.1.11.exe"
+          echo "ae93f94287a6887ad939fbbcb3a33acb0688452a0ba6bdd1084e06f0d1964457  dist/Atreia Street Companion Setup 0.1.11.exe" | sha256sum --check
+          mv "dist/Atreia Street Companion Setup 0.1.11.exe" "dist/Atreia-Street-Companion-Setup-v0.1.11.exe"
+      - name: Create public experimental preview release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create companion-v0.1.11-preview "dist/Atreia-Street-Companion-Setup-v0.1.11.exe" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "57843aeb31129252c8d0874e843ae4a974db0da8" \
+            --title "Atreia Street Companion v0.1.11 (Experimental Windows Preview)" \
+            --notes "Experimental v0.1.11 performance and registration-fee tracking preview. AION2 Market OCR is faster: 1.2s idle / 0.5s recognized-Market video sampling, faster OCR scheduling and cheap idle text detection. Fee quotes still do not count as spent. If a live in-game Market confirmation includes a readable Funds balance, a distinct subsequent Market Funds reading that decreases by the exact registration fee within 60 seconds can support a new local fee deduction even if a decoded wallet packet was missed. These on-screen deductions appear in Recent Kina Changes and Market Fees, separately identified from decoded wallet packets and deduplicated when both are available. No guessed currency kind, fabricated wallet events, uploaded screenshots or raw OCR text. Funds-only evidence stays local and cloud status remains unverified. Windows source tests, installer packaging and packaged OCR startup passed. GitHub-hosted CI cannot capture its simulated game window, so live game performance and Funds availability after registration require in-game testing. Unsigned experimental installer." \
+            --prerelease --latest=false
