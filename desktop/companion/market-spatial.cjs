@@ -87,6 +87,14 @@ function addSpatialRows(text,tsv) {
  const whitelist=Object.entries(fields).filter(([label])=>
   confirmation || original.toLowerCase().includes(label.toLowerCase()));
  const lines=whitelist.map(([key,value])=>key+': '+value.toLocaleString('en-US'));
- return {text:original+(lines.length?'\n'+lines.join('\n'):''),fields,positioned:lines.length>0};
+ // A currency icon can look like an extra OCR digit. When a label/value
+ // pair is spatially verified, REPLACE that raw label row instead of
+ // appending a contradictory second reading of the same field.
+ const matched=new Set(whitelist.map(([key])=>key.toLowerCase()));
+ const cleaned=original.split(/\r?\n/).filter(line=>{
+  const label=line.match(/^\s*(total sale price|sale price per item|registration fee|sale quantity|funds)\b/i);
+  return !label||!matched.has(label[1].toLowerCase());
+ }).join('\n');
+ return {text:cleaned+(lines.length?'\n'+lines.join('\n'):''),fields,positioned:lines.length>0};
 }
 module.exports={addSpatialRows,parseWords,rowValue,numberToken};

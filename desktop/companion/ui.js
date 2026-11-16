@@ -122,6 +122,10 @@ function render(){
   num(market.spatialFee)+' Kina':'—';
  $('diagnostic-market-chars').textContent=String(market.recognizedChars||0);
  $('diagnostic-market-fee').textContent=market.feeLabelSeen?'Yes':'No';
+ $('diagnostic-market-funds').textContent=Number.isSafeInteger(market.lastFundsRead)?
+  num(market.lastFundsRead)+' Kina':'—';
+ $('diagnostic-market-funds-match').textContent=market.lastFundsMatchedAt?
+  new Date(market.lastFundsMatchedAt).toLocaleTimeString():'No match yet';
  $('diagnostic-market-phase').textContent=market.screenPhase||'—';
  $('diagnostic-market-ocr-mode').textContent=market.recognitionMode||'—';
  $('diagnostic-market-time').textContent=market.lastScanAt?
@@ -266,14 +270,43 @@ function render(){
   :'Awaiting a captured Kina balance';
  const movementRows=$('movement-rows');
  movementRows.replaceChildren();
- if(!money.changes.length) {
+ // Present OCR-supported fee spending beside actual wallet packet changes.
+ // When packet corroboration later appears, the screen row disappears.
+ const screenFees=(state.marketObservations||[]).filter(e=>match(e,profile)&&
+  e.screen_phase==='confirmation'&&e.status!=='corroborated'&&
+  e.funds_match?.source==='market_funds_ocr'&&
+  Date.parse(e.funds_match.occurred_at)>=p.daily);
+ const activity=[
+  ...money.changes.map(x=>({kind:'wallet',at:x.occurred_at,value:x})),
+  ...screenFees.map(x=>({kind:'screen-fee',at:x.funds_match.occurred_at,value:x}))
+ ].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)).slice(0,9);
+ if(!activity.length) {
    const empty=document.createElement('div');empty.className='empty';
    empty.textContent=money.observations===0
     ?'No capture-session wallet readings yet. Open Aion 2 to establish a baseline.'
     :'No changes observed after the first reading. Spending or claiming a payout can produce a new wallet update.';
    movementRows.append(empty);
  }
- for(const movement of money.changes.slice(0,9)) {
+ for(const entry of activity) {
+   if(entry.kind==='screen-fee'){
+    const fee=entry.value;
+    const row=document.createElement('div');row.className='movement-row';
+    const info=document.createElement('div');
+    const name=document.createElement('span');name.className='activity-name';
+    name.textContent='Market registration fee · screen Funds';
+    const detail=document.createElement('span');detail.className='movement-source';
+    detail.textContent='Funds '+num(fee.funds_match.before)+' → '+
+     num(fee.funds_match.after)+' · exact fee deduction · packet currency unknown';
+    info.append(name,detail);
+    const amount=document.createElement('strong');amount.className='down';
+    amount.textContent='−'+num(fee.fee);
+    const when=document.createElement('time');when.dateTime=entry.at;
+    when.textContent=new Date(entry.at).toLocaleString([],
+     {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    row.append(info,amount,when);movementRows.append(row);
+    continue;
+   }
+   const movement=entry.value;
    const row=document.createElement('div');row.className='movement-row';
    const info=document.createElement('div');
    const label=document.createElement('span');label.className='activity-name';
@@ -365,9 +398,16 @@ function render(){
   Date.parse(e.occurred_at)>=p.daily);
  $('market-fees-quoted').textContent=todaysFees.length?
   num(todaysFees[0].fee):'—';
- const charged=todaysFees.filter(e=>e.status==='corroborated');
+ // A local Funds match and a later packet-wallet match represent one fee.
+ const charged=todaysFees.filter(e=>e.screen_phase==='confirmation'&&
+  (e.status==='corroborated'||e.funds_match?.source==='market_funds_ocr'));
+ const packetCount=charged.filter(e=>e.status==='corroborated').length;
+ const fundsCount=charged.filter(e=>e.status!=='corroborated').length;
  $('market-fees-matched').textContent=charged.length?
   num(charged.reduce((sum,e)=>sum+e.fee,0)):'—';
+ $('market-fees-evidence').textContent=charged.length?
+  packetCount+' decoded-wallet match(es) · '+fundsCount+' on-screen Funds match(es) · counted once':
+  'No independently observed fee deduction yet; a quote is not spending';
  if(!marketRows.length){
   const empty=document.createElement('div');empty.className='empty';
   empty.textContent='No Market observations for this character yet.';
@@ -384,11 +424,15 @@ function render(){
   const caption=entry.kind==='settlement_observation'?'Settlement shown':
    entry.kind==='listing_fee_observation'?'Registration fee shown':'Listing shown';
   const verified=entry.status==='corroborated';
+  const fundsVerified=entry.funds_match?.source==='market_funds_ocr';
   const currency=entry.currency_kind==='mixed'?'bound + regular':
    entry.currency_kind==='bound'?'bound':entry.currency_kind==='unbound'?'regular':null;
   const since=Date.now()-Date.parse(entry.occurred_at);
   const status=verified
    ?'Fee matched to '+currency+' Kina debit · likely registered'
+   :fundsVerified
+    ?'On-screen Funds '+num(entry.funds_match.before)+' → '+num(entry.funds_match.after)+
+      ' · exact fee deduction observed; packet currency source unknown'
    :entry.screen_phase==='confirmation'
     ?since>=60000
       ?'No matching Kina decrease observed · possibly canceled or capture missed'

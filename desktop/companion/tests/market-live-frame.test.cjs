@@ -55,11 +55,15 @@ test('Windows code streams a named AION2 window instead of repeating thumbnails'
  assert.ok(renderer.includes('chromeMediaSourceId:id'));
  assert.ok(renderer.includes('audio:false'));
  assert.ok(main.includes('if(!marketFrameBuffer.length)return; // No cached thumbnail fallback.'));
+ assert.ok(main.includes('marketFrameBuffer.shiftRecent('));
+ assert.ok(main.includes('marketFastModeUntil=Date.now()+45000'));
+ assert.ok(controller.includes("data:image/jpeg;base64,"));
+ assert.ok(renderer.includes("canvas.toDataURL('image/jpeg',0.86)"));
  assert.ok(main.includes('if(marketLiveCapture.stale)'));
- for(const file of ['market-live-frame.cjs','market-live-capture.cjs',
+ for(const file of ['market-funds.cjs','market-live-frame.cjs','market-live-capture.cjs',
   'market-stream.html','market-stream-preload.cjs','market-stream-renderer.js'])
   assert.ok(pkg.build.files.includes(file),'Missing bundled file: '+file);
- assert.equal(pkg.version,'0.1.8');
+ assert.equal(pkg.version,'0.1.11');
 });
 
 test('live preview refreshes while Diagnostics is visible and reports stale snapshot age',()=>{
@@ -71,4 +75,19 @@ test('live preview refreshes while Diagnostics is visible and reports stale snap
  assert.ok(ui.includes('setInterval(()=>{void updateMarketPreview();},2000)'));
  assert.ok(ui.includes('Capture may be frozen.'));
  assert.ok(html.includes('Start refreshing local game preview'));
+});
+
+
+test('adaptive video sampling increases only inside observed Market scenes',()=>{
+ const root=path.resolve(__dirname,'..');
+ const renderer=fs.readFileSync(path.join(root,'market-stream-renderer.js'),'utf8');
+ const preload=fs.readFileSync(path.join(root,'market-stream-preload.cjs'),'utf8');
+ const controller=fs.readFileSync(path.join(root,'market-live-capture.cjs'),'utf8');
+ const main=fs.readFileSync(path.join(root,'main.cjs'),'utf8');
+ assert.ok(renderer.includes('marketMode?500:1200'));
+ assert.ok(renderer.includes('ipc.onMode(setMode)'));
+ assert.ok(preload.includes("'market-video:mode'"));
+ assert.ok(controller.includes('setMarketMode(active)'));
+ assert.ok(main.includes('marketLiveCapture.setMarketMode(true)'));
+ assert.ok(main.includes('marketLiveCapture.setMarketMode(Date.now()<marketFastModeUntil)'));
 });

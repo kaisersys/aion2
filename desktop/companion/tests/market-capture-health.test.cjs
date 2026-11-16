@@ -37,8 +37,8 @@ test('OCR UI retains last COMPLETED results rather than resetting them at start 
  const ui=fs.readFileSync(path.join(root,'ui.js'),'utf8');
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
- const begin=main.slice(main.indexOf('async function marketOcrTick()'),
-  main.indexOf('const buffered=marketFrameBuffer.shift()'));
+ const begin=main.slice(main.indexOf('async function marketOcrTick(force=false)'),
+  main.indexOf('const buffered=marketFrameBuffer.shiftRecent('));
  assert.ok(begin.includes('marketOcrStatus.ocrInProgress=true'));
  assert.ok(!begin.includes('marketOcrStatus.recognizedChars=0'));
  assert.ok(!begin.includes('marketOcrStatus.feeLabelSeen=false'));
@@ -49,7 +49,7 @@ test('OCR UI retains last COMPLETED results rather than resetting them at start 
  assert.ok(pkg.build.files.includes('ocr-smoke-fixture.cjs'));
  const sample=require('../ocr-smoke-fixture.cjs');
  assert.ok(sample.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')));
- assert.equal(pkg.version,'0.1.8');
+ assert.equal(pkg.version,'0.1.11');
  for(const id of ['diagnostic-market-completed','diagnostic-market-working',
   'diagnostic-market-finished-at','diagnostic-market-last-result',
   'diagnostic-market-image-health','market-preview-diagnostics','market-preview-image']){

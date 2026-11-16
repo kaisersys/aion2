@@ -8,6 +8,7 @@ class MarketLiveCapture {
  constructor({onFrame,onStatus}){
   this.onFrame=onFrame;this.onStatus=onStatus;
   this.active=false;this.busy=false;this.worker=null;this.sourceId=null;
+  this.marketMode=false;
   this.selectedAt=0;this.lastFrameAt=0;this.lastRestartAt=0;
   this.gate=new LiveFrameGate(15000);
   this.windowCandidates=0;this.framesReceived=0;
@@ -18,6 +19,13 @@ class MarketLiveCapture {
   this.statusHandler=(event,payload)=>this.receiveStatus(event,payload);
  }
  emit(status,message){this.status=status;this.onStatus?.(status,message);}
+ setMarketMode(active){
+  const next=active===true;
+  if(this.marketMode===next)return;
+  this.marketMode=next;
+  if(this.worker&&!this.worker.isDestroyed())
+   this.worker.webContents.send('market-video:mode',next?'market':'idle');
+ }
  async start(){
   if(this.active)return;
   this.active=true;
@@ -34,6 +42,10 @@ class MarketLiveCapture {
  }
  async ensure(){
   if(!this.active||this.busy)return;
+  // A healthy stream already has a validated source. Avoid repeatedly asking
+  // Windows to enumerate every window while the user plays.
+  if(this.sourceId&&this.lastFrameAt&&!this.stale&&
+     Date.now()-this.lastFrameAt<10000)return;
   this.busy=true;
   try{
    const sources=await desktopCapturer.getSources({
@@ -76,6 +88,8 @@ class MarketLiveCapture {
    this.selectedAt=now;this.lastFrameAt=0;this.lastRestartAt=now;
    this.gate.reset();this.stale=false;this.lastChangeAt=null;
    this.worker.webContents.send('market-video:source',this.sourceId);
+   // A source restart returns to idle mode until the scene is recognized.
+   this.marketMode=false;
    this.emit('starting','Opening live video capture of the AION2 window.');
   }catch(err){
    this.emit('error','Unable to start live AION2 video capture: '+
@@ -93,8 +107,8 @@ class MarketLiveCapture {
    event.sender!==this.worker.webContents||
    !payload||payload.sourceId!==this.sourceId||
    typeof payload.dataUrl!=='string'||
-   !payload.dataUrl.startsWith('data:image/png;base64,')||
-   payload.dataUrl.length>22000000)return;
+   !payload.dataUrl.startsWith('data:image/jpeg;base64,')||
+   payload.dataUrl.length>11000000)return;
   try{
    const img=nativeImage.createFromDataURL(payload.dataUrl);
    const sz=img.getSize();
@@ -104,8 +118,9 @@ class MarketLiveCapture {
    this.lastFrameAt=now;
    this.framesReceived++;
    this.lastPixels=sz.width+' × '+sz.height;
-   const png=img.toPNG();
-   const checked=this.gate.inspect(png,now);
+   // Hash compressed bytes without a redundant per-frame PNG encode.
+   const jpeg=Buffer.from(payload.dataUrl.slice('data:image/jpeg;base64,'.length),'base64');
+   const checked=this.gate.inspect(jpeg,now);
    this.lastChangeAt=checked.lastChangedAt;
    if(checked.stale&&!this.stale){
     this.stale=true;
@@ -119,7 +134,7 @@ class MarketLiveCapture {
    }
    if(checked.reason==='initial-frame')
     this.emit('warming-up','Waiting for a changed game frame before treating capture as live.');
-   if(checked.accepted)this.onFrame?.({png,capturedAt:now,dimensions:sz,image:img});
+   if(checked.accepted)this.onFrame?.({encodedFrame:jpeg,capturedAt:now,dimensions:sz,image:img});
   }catch(err){
    this.emit('error','Invalid live AION2 capture frame: '+
     String(err.message||err).slice(0,120));
@@ -138,7 +153,7 @@ class MarketLiveCapture {
   this.active=false;
   ipcMain.removeListener('market-video:frame',this.frameHandler);
   ipcMain.removeListener('market-video:status',this.statusHandler);
-  this.resetSource();
+  this.resetSource();this.marketMode=false;
   if(this.worker&&!this.worker.isDestroyed())this.worker.close();
   this.worker=null;this.emit('stopped','Live video reader stopped.');
  }

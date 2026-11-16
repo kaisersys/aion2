@@ -311,3 +311,27 @@ In Diagnostics, **Source = AION2 video stream** indicates the streaming path, **
 This is a correctness and capture-source change, not an assertion that the Aion 2 game's rendering can be video-captured on every Windows system. The Windows build validates syntax and the packaged OCR worker; *actual live game video capture still requires a user's in-game test*. No server-side records are backfilled from frozen screenshots and no screenshots are uploaded.
 
 **Local preview clarification:** v0.1.7's `Inspect captured AION2 window` showed a one-time image and did not refresh on its own. A screenshot left open for an hour could therefore look hour-old even when background OCR was still active. In v0.1.8, **Start refreshing local game preview** updates the image every two seconds while the Diagnostics tab remains visible and shows the age of the last accepted frame. It pauses when the tab is hidden or the account signs out. This distinguishes a stale *preview* from a genuinely frozen Windows capture source. The button does not enable Market tracking; only the local preview is user-controlled.
+
+
+## Performance and automatic Market monitor (v0.1.9 experimental preview)
+
+Live video still starts automatically after companion login, independently of Diagnostics preview. The preview remains read-only. To reduce severe v0.1.8 CPU and memory use, capture now sends 1920px maximum JPEG images about every 1.1 seconds rather than full-resolution PNG every 850ms. Cropping, upscaling and text recognition happen only during OCR jobs. The RAM buffer stores at most 16 compressed frames / 20 seconds, and unnecessary full-state renderer refreshes are reduced.
+
+OCR runs at least 3.5 seconds apart outside recognized Market UI, and switches to at least 1.1 seconds apart for 20 seconds when Market or fee text is recognized. Idle scanning uses the newest frame rather than building a backlog from ordinary gameplay. This is a performance tradeoff: an extremely brief Market confirmation dialog opened and closed before any Market text was recognized may be missed. The preview never triggers OCR. Verify CPU impact, game-window readability and the actual confirm-to-wallet fee matching path in-game before claiming a complete live fix.
+
+
+## Reliable automatic Market OCR improvements (v0.1.10 preview)
+
+v0.1.9 feedback: registration fee OCR sometimes appended an extra digit, and a user sometimes had to request additional Diagnostics capture. Automatic Market monitoring remains enabled at companion sign-in; the preview and diagnostic buttons are strictly optional. The OCR reader now uses smaller idle dialog crops and scans recent frames from a bounded window, retaining brief confirmation prompts that appeared while another recognition job was busy. Full-window OCR happens less frequently during normal gameplay; recognized Market activity temporarily enables higher-resolution, faster scans. Diagnostics' scan button now performs a real forced OCR attempt for troubleshooting, not enabling the automatic engine.
+
+Where Tesseract's recognized text conflicts with an explicitly labeled, same-row TSV value, spatial evidence replaces the erroneous raw row rather than creating contradictory duplicate numbers. Extra digits are also blocked by a conservative numeric consistency check: displayed quantity * unit price must equal total price, and the fee must be within a broad 1%-4% of the total when a total is visible. The game does not officially guarantee a universal rate; suspicious readings are flagged for retry, never automatically converted into invented fee amounts. A fee is still only marked corroborated when a distinct, exact Kina debit is decoded. All screenshots stay on-device; gameplay verification is necessary before calling accuracy fully proven.
+
+
+The v0.1.10 live video sampler adapts automatically: roughly 1.5 seconds per compressed image during regular gameplay, and 0.6 seconds during recognized Market activity. It reverts to idle after Market evidence stops. The Diagnostics preview has no effect on capture speed.
+
+
+## v0.1.11 — faster Market reading and Kina fee deductions
+
+Earlier builds could read a Market registration fee but leave spending unrecorded if Npcap missed a wallet packet. The local OCR now reads the in-game Market **Funds** field during confirmation and compares it with the first subsequent fresh non-confirmation Market Funds display. Only an exact decrease equal to the fee, within 60 seconds and for one unique same-character confirmation, counts as an on-screen supported fee deduction. Canceled confirmations, unrelated balance changes, stale windows and ambiguous candidate prompts remain pending. The UI separates packet-backed matches from screen Funds matches, totals each fee only once, and does not fabricate bound/unbound wallet observations. The database's unverified status remains unchanged for Funds-only evidence; the before/after Funds values remain on-device.
+
+To improve responsiveness, the idle OCR detector skips positional TSV metadata and faster video capture starts at the first Market label rather than after an unnecessary full-screen OCR pass. Adaptive video sampling is ~1.2 s during ordinary gameplay and ~0.5 s after Market detection; active OCR polling is faster and full-screen rechecks are prioritized briefly while a confirmed fee awaits a subsequent Funds reading. All captures stay local. Actual timing and availability of an after-confirmation Funds field still require in-game testing.

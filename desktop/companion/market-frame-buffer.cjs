@@ -13,11 +13,9 @@ class MarketFrameBuffer {
   this.dropped=0;
  }
  push(frame) {
-  if(!frame || !Buffer.isBuffer(frame.focusPng) ||
-     !Buffer.isBuffer(frame.fullPng) ||
-     !Number.isFinite(frame.capturedAt) || frame.focusPng.length>5000000 ||
-     frame.fullPng.length>15000000)return false;
-  const digest=crypto.createHash('sha1').update(frame.focusPng).digest('hex');
+  if(!frame || !Buffer.isBuffer(frame.image) ||
+     !Number.isFinite(frame.capturedAt) || frame.image.length>8000000)return false;
+  const digest=crypto.createHash('sha1').update(frame.image).digest('hex');
   if(digest===this.lastDigest && frame.capturedAt-this.lastStoredAt<5000)return false;
   this.lastDigest=digest;
   this.lastStoredAt=frame.capturedAt;
@@ -35,6 +33,22 @@ class MarketFrameBuffer {
  }
  shift(now=Date.now()) {
   this.purge(now);
+  return this.frames.shift()||null;
+ }
+ shiftLatest(now=Date.now()) {
+  this.purge(now);
+  const latest=this.frames.pop()||null;
+  this.dropped+=this.frames.length;
+  this.frames.length=0;
+  return latest;
+ }
+ shiftRecent(now=Date.now(),maxLagMs=6000) {
+  this.purge(now);
+  // Keep a short confirmation captured during slow OCR, but never let
+  // old gameplay create a queue that takes many seconds to drain.
+  while(this.frames.length&&now-this.frames[0].capturedAt>maxLagMs){
+   this.frames.shift();this.dropped++;
+  }
   return this.frames.shift()||null;
  }
  clear(){this.frames.length=0;this.lastDigest=null;this.lastStoredAt=0;}
