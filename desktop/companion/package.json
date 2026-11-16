@@ -34,7 +34,9 @@
       "overlay.css",
       "overlay.js",
       "overlay-preload.cjs",
-      "wallets.js"
+      "wallets.js",
+      "item-catalog.js",
+      "item-economy.js"
     ],
     "win": {
       "target": "nsis",

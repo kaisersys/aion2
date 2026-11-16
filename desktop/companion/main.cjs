@@ -122,6 +122,9 @@ async function sync() {
   const rows = [];
   let unmatched = 0;
   for (const ev of state.events) {
+    // Item-level movements are local-only: website telemetry schema intentionally
+    // does not support item identifiers, handles or inferred transactions.
+    if (ev.type==='item_change') continue;
     const id=byKey.get(charKey(ev.character,ev.server));
     if (!id) { unmatched++; continue; }
     rows.push({user_id:remote.user_id, character_id:id,
@@ -235,6 +238,9 @@ function processCaptureMessage(message) {
       characterPackets:value(message.characterPackets),rosterPackets:value(message.rosterPackets),
       ticketPackets:value(message.ticketPackets),
       inventoryFrames:value(message.inventoryFrames),
+      itemUpdates:value(message.itemUpdates),
+      itemDeltas:value(message.itemDeltas),
+      itemStacks:value(message.itemStacks),
       unboundWalletReadings:value(message.unboundWalletReadings),
       boundWalletReadings:value(message.boundWalletReadings),
       popularOpcodes:Array.isArray(message.popularOpcodes)

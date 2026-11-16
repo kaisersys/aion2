@@ -16,3 +16,15 @@ undefined
 - Stop/restart the capture helper or switch characters and verify the first balance on the new session is only a baseline, even if it differs substantially from the previous session.
 - Verify no fabricated movement across more than 20 minutes without a qualifying reading, nor from old/manual records without a known decode session.
 - A claimed market settlement may appear as a regular-Kina increase, but **cause attribution is not supported**. If exact gains / gross sales / buy-item names are required, a separately verified transaction packet mapping must be implemented and tested.
+
+## Item-level economy regression and live checks
+
+- A full 0x1156 snapshot establishes baseline stack counts and must not create purchases.
+- A known 0x1B56 stack increase or decrease yields only item ID, signed quantity, time, and random local capture-session ID.
+- A new unknown stack without full inventory baseline must not fabricate a gain.
+- A single item added near a Kina debit can be labeled possible purchase, never verified market purchase.
+- Two item types acquired together must remain ambiguous; one item event cannot be assigned twice.
+- Consumed items are not mistaken for purchases, and delayed Market settlement is not assigned to an old item removal.
+- Verify character/capture session switches, malformed padding and duplicate stack updates.
+- Verify website synchronization skips item_change and no raw handles or packet bytes are stored.
+- Verify 531060004 displays Courage Scroll (Bound); unknown IDs remain readable.

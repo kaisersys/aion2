@@ -1,6 +1,6 @@
 'use strict';
 const { periods } = require('./periods.cjs');
-const TYPES = new Set(['kinah_earned', 'kinah_spent', 'wallet_snapshot', 'counter']);
+const TYPES = new Set(['kinah_earned', 'kinah_spent', 'wallet_snapshot', 'counter', 'item_change']);
 const FREQ = new Set(['daily', 'weekly']);
 const SCOPES = new Set(['character', 'server']);
 const MAX_AMOUNT = 100000000000000;
@@ -30,6 +30,20 @@ function normalizeEvent(input, fallbackId) {
   if (ev.type === 'kinah_earned' || ev.type === 'kinah_spent') {
     if (!validInt(input.amount) || input.amount === 0) throw new Error('Invalid Kinah amount');
     ev.amount = input.amount;
+  } else if (ev.type === 'item_change') {
+    // Item-level observations are read-only decoder outputs, never entries
+    // entered manually or returned from untrusted remote sources.
+    if(ev.source!=='decoded' ||
+       !Number.isSafeInteger(input.item_id) || input.item_id < 100000000 ||
+       input.item_id >= 1000000000 ||
+       !Number.isSafeInteger(input.delta) || input.delta===0 ||
+       Math.abs(input.delta)>100000000000 ||
+       typeof input.observation_session!=='string' ||
+       !/^[0-9a-f]{32}$/.test(input.observation_session))
+      throw new Error('Invalid decoded item change');
+    ev.item_id=input.item_id;
+    ev.delta=input.delta;
+    ev.observation_session=input.observation_session;
   } else if (ev.type === 'wallet_snapshot') {
     if (!validInt(input.balance)) throw new Error('Invalid wallet balance');
     ev.balance = input.balance;

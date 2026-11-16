@@ -92,6 +92,9 @@ function render(){
  $('diagnostic-identity-packets').textContent=h?String(h.characterPackets+h.rosterPackets):'—';
  $('diagnostic-ticket-packets').textContent=h?String(h.ticketPackets):'—';
  $('diagnostic-inventory').textContent=h?String(h.inventoryFrames):'—';
+ $('diagnostic-item-updates').textContent=h?String(h.itemUpdates):'—';
+ $('diagnostic-item-deltas').textContent=h?String(h.itemDeltas):'—';
+ $('diagnostic-item-stacks').textContent=h?String(h.itemStacks):'—';
  $('diagnostic-wallet-regular').textContent=h?String(h.unboundWalletReadings):'—';
  $('diagnostic-wallet-bound').textContent=h?String(h.boundWalletReadings):'—';
  $('diagnostic-opcodes').textContent=h?.popularOpcodes?.length
@@ -135,6 +138,8 @@ function render(){
    .sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
  const walletView=window.AtreiaWallets.calculate(events,p.daily);
  const money=window.AtreiaWallets.movements(events,p.daily);
+ const itemEconomy=window.AtreiaItemEconomy.attribute(events,money,p.daily);
+ const itemByWalletId=new Map(itemEconomy.matches.map(m=>[m.walletId,m]));
  const regularWallet=walletView.regular, boundWallet=walletView.bound;
  const t={dayEarned:0,daySpent:0};
  let hasEarned=false,hasSpent=false;
@@ -201,7 +206,12 @@ function render(){
    const label=document.createElement('span');label.className='activity-name';
    label.textContent=(movement.currency==='unbound'?'Regular':'Bound')+' Kina '+(movement.direction==='in'?'in':'out');
    const details=document.createElement('span');details.className='movement-source';
-   details.textContent='Balance '+num(movement.before)+' → '+num(movement.after)+' · source unknown';
+   const association=itemByWalletId.get(movement.id);
+   const itemName=association?window.AtreiaItems.name(association.item_id):null;
+   details.textContent='Balance '+num(movement.before)+' → '+num(movement.after)+
+     (association?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
+       itemName+' ×'+num(association.quantity)+' (unverified)'
+       :' · source unknown');
    info.append(label,details);
    const amount=document.createElement('strong');
    amount.className=movement.direction==='in'?'up':'down';
@@ -210,6 +220,36 @@ function render(){
    when.dateTime=movement.occurred_at;
    when.textContent=new Date(movement.occurred_at).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
    row.append(info,amount,when);movementRows.append(row);
+ }
+ const itemGroups=$('item-groups');
+ itemGroups.replaceChildren();
+ if(!itemEconomy.groups.length){
+   const empty=document.createElement('div');empty.className='empty';
+   empty.textContent=itemEconomy.itemChanges
+    ?'Item movements detected, but no one-to-one Kina match yet. Transactions involving multiple items remain unassigned.'
+    :'No item changes detected yet. A full inventory snapshot on login is needed before the companion can follow stack quantities.';
+   itemGroups.append(empty);
+ }
+ for(const group of itemEconomy.groups.slice(0,30)){
+   const row=document.createElement('div');row.className='item-group-row';
+   const detail=document.createElement('div');
+   const name=document.createElement('strong');name.textContent=window.AtreiaItems.name(group.item_id);
+   const sub=document.createElement('span');sub.className='movement-source';
+   sub.textContent='Item #'+group.item_id+' · '+group.observations+
+    ' observed '+(group.direction==='out'?'spend':'receipt')+(group.observations===1?'':'s')+
+    ' · '+(group.currency==='bound'?'Bound':'Regular')+' Kina';
+   detail.append(name,sub);
+   const qty=document.createElement('span');qty.className='item-group-qty';
+   qty.textContent='×'+num(group.totalQuantity);
+   const price=document.createElement('span');price.className='item-group-cost';
+   const isSpend=group.direction==='out';
+   price.classList.add(isSpend?'down':'up');
+   price.textContent=(isSpend?'−':'+')+num(group.totalKina)+' Kina';
+   const caption=document.createElement('small');
+   caption.className='item-group-caption';
+   caption.textContent='Possible '+(isSpend?'purchase':'sale')+' · '+num(Math.round(group.totalKina/group.totalQuantity))+' each · unverified';
+   const amountWrap=document.createElement('div');amountWrap.append(price,caption);
+   row.append(detail,qty,amountWrap);itemGroups.append(row);
  }
  for(const period of ['daily','weekly']){
   const holder=$(period+'-counters');holder.replaceChildren();

@@ -38,6 +38,8 @@ jobs:
       - run: node --check overlay-preload.cjs
       - run: node --check discovery.cjs
       - run: node --check wallets.js
+      - run: node --check item-catalog.js
+      - run: node --check item-economy.js
       - run: npm run capture:build
       - name: Package Windows preview (retry transient CDN errors)
         shell: pwsh

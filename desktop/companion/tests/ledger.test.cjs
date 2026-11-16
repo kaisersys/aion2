@@ -95,3 +95,18 @@ test('observation session is preserved for decoded wallet snapshots only',()=>{
  const malformed=normalizeEvent({...decoded,id:'s3',observation_session:'not-a-session'});
  assert.equal(malformed.observation_session,undefined);
 });
+
+test('only decoded, validated item-level changes are stored locally',()=>{
+ const normal={character:'Ceti',server:'NA West',type:'item_change',item_id:531060004,
+  delta:12,source:'decoded',observation_session:'1234567890abcdef1234567890abcdef',
+  occurred_at:'2026-11-08T12:00:00Z'};
+ const item=normalizeEvent({...normal,id:'scroll'});
+ assert.equal(item.item_id,531060004);
+ assert.equal(item.delta,12);
+ assert.equal(item.observation_session,normal.observation_session);
+ assert.equal(item.source,'decoded');
+ assert.throws(()=>normalizeEvent({...normal,id:'x',source:'manual'}));
+ assert.throws(()=>normalizeEvent({...normal,id:'y',item_id:'531060004'}));
+ assert.throws(()=>normalizeEvent({...normal,id:'z',delta:0}));
+ assert.throws(()=>normalizeEvent({...normal,id:'bad',observation_session:'xxx'}));
+});

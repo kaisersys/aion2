@@ -65,7 +65,7 @@
       const kind=delta>0?'in':'out',amount=Math.abs(delta);
       const row={currency:key,direction:kind,amount,delta,
         before:before.balance,after:event.balance,
-        occurred_at:event.occurred_at,id:event.id};
+        occurred_at:event.occurred_at,id:event.id,session:event.observation_session};
       changes.push(row);
       if(at>=dayStart)byCurrency[key][kind]+=amount;
     }
