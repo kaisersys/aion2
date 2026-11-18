@@ -43,6 +43,14 @@ function shouldScanFullMarket({status,screenPhase,focusFunds,awaitingFeeFunds,ma
   return screenPhase==='confirmation'||screenPhase==='listing_form';
  return !(marketHint&&!inMarket);
 }
+// Preserve a readable confirmation dialog when a wider OCR pass sees only
+// the background listing form. Upgrade to full-window text only when it
+// adds a real transaction or a confirmation phase.
+function preferFullMarketParse(centered,full) {
+ return full?.status==='observed' &&
+  (centered?.status!=='observed' ||
+   (centered?.screen_phase!=='confirmation'&&full.screen_phase==='confirmation'));
+}
 function reconcileScreenFunds(observations,reading) {
  if(!Array.isArray(observations)||!reading||
     typeof reading.user_id!=='string'||typeof reading.character!=='string'||
@@ -77,4 +85,4 @@ function reconcileScreenFunds(observations,reading) {
  // bound/regular wallet packet or an official completed-listing receipt.
  return 1;
 }
-module.exports={readMarketFunds,reconcileScreenFunds,confirmationFundsBefore,shouldScanFullMarket,MATCH_WINDOW_MS};
+module.exports={readMarketFunds,reconcileScreenFunds,confirmationFundsBefore,shouldScanFullMarket,preferFullMarketParse,MATCH_WINDOW_MS};
