@@ -25,6 +25,32 @@ function readMarketFunds(text) {
  }
  return readings.length&&readings.every(x=>x===readings[0])?readings[0]:null;
 }
+// The modal may hide Funds. A prior same-character Funds reading is only
+// usable within one minute and must precede the confirmation frame.
+function confirmationFundsBefore(onScreen,earlier,earlierAt,confirmedAt) {
+ if(Number.isSafeInteger(onScreen)&&onScreen>=0&&onScreen<=MAX)return onScreen;
+ if(!Number.isSafeInteger(earlier)||earlier<0||earlier>MAX||
+    !Number.isFinite(earlierAt)||!Number.isFinite(confirmedAt)||
+    confirmedAt<=earlierAt||confirmedAt-earlierAt>MATCH_WINDOW_MS)return null;
+ return earlier;
+}
+// Recognizing a registration fee in the center crop must not skip a
+// full-window scan when the Market Funds balance is outside that crop.
+function shouldScanFullMarket({status,screenPhase,focusFunds,awaitingFeeFunds,marketHint,inMarket}) {
+ if(focusFunds!==null)return false;
+ if(awaitingFeeFunds)return true;
+ if(status==='observed')
+  return screenPhase==='confirmation'||screenPhase==='listing_form';
+ return !(marketHint&&!inMarket);
+}
+// Preserve a readable confirmation dialog when a wider OCR pass sees only
+// the background listing form. Upgrade to full-window text only when it
+// adds a real transaction or a confirmation phase.
+function preferFullMarketParse(centered,full) {
+ return full?.status==='observed' &&
+  (centered?.status!=='observed' ||
+   (centered?.screen_phase!=='confirmation'&&full.screen_phase==='confirmation'));
+}
 function reconcileScreenFunds(observations,reading) {
  if(!Array.isArray(observations)||!reading||
     typeof reading.user_id!=='string'||typeof reading.character!=='string'||
@@ -59,4 +85,4 @@ function reconcileScreenFunds(observations,reading) {
  // bound/regular wallet packet or an official completed-listing receipt.
  return 1;
 }
-module.exports={readMarketFunds,reconcileScreenFunds,MATCH_WINDOW_MS};
+module.exports={readMarketFunds,reconcileScreenFunds,confirmationFundsBefore,shouldScanFullMarket,preferFullMarketParse,MATCH_WINDOW_MS};
