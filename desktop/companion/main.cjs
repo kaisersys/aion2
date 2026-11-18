@@ -12,7 +12,7 @@ const { MarketFrameBuffer } = require('./market-frame-buffer.cjs');
 const { MarketLiveCapture } = require('./market-live-capture.cjs');
 const { inspectBgra } = require('./market-capture-health.cjs');
 const { reconcileFees } = require('./market-fees.cjs');
-const {readMarketFunds,reconcileScreenFunds,confirmationFundsBefore,shouldScanFullMarket,MATCH_WINDOW_MS}=require('./market-funds.cjs');
+const {readMarketFunds,reconcileScreenFunds,confirmationFundsBefore,shouldScanFullMarket,preferFullMarketParse,MATCH_WINDOW_MS}=require('./market-funds.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const STARTUP_SMOKE = process.argv.includes('--atreia-startup-smoke');
@@ -411,6 +411,7 @@ async function marketOcrTick(force=false) {
   // Switch to faster capture at the first Market hint, before costly fallback.
   if(marketHint){marketFastModeUntil=Date.now()+45000;marketLiveCapture.setMarketMode(true);}
   const focusFunds=readMarketFunds(recognized);
+  let observedFunds=focusFunds; // merge different spatial reads of the SAME frame
   const awaitingFeeFunds=marketObservations.some(row=>row.user_id===remote.user_id&&
    row.screen_phase==='confirmation'&&row.status==='unverified'&&
    !row.funds_match&&Number.isSafeInteger(row.funds_before)&&
@@ -427,11 +428,18 @@ async function marketOcrTick(force=false) {
    const fullText=fullSpatial.text;
    const fullParsed=readMarket(fullText);
    const fullFunds=readMarketFunds(fullText);
-   if(fullParsed.status==='observed' || fullFunds!==null || fullText.length>recognized.length) {
+   if(fullFunds!==null)observedFunds=fullFunds;
+   if(preferFullMarketParse(parsed,fullParsed) ||
+      (parsed.status!=='observed' &&
+       (fullFunds!==null || fullText.length>recognized.length))) {
     recognized=fullText;
     parsed=fullParsed;
     spatialFee=fullSpatial.fields['Registration Fee']??null;
     marketOcrStatus.recognitionMode='full-window';
+   }else if(fullFunds!==null) {
+    // Center crop recognized the fee/confirm prompt but not Funds; combine
+    // those independent observations from the same captured frame.
+    marketOcrStatus.recognitionMode='centered-dialog + full-window-funds';
    }
   }
   // Market recognition runs automatically; preview is strictly diagnostic.
@@ -452,7 +460,7 @@ async function marketOcrTick(force=false) {
    .slice(0,3).map(x=>x.replace(/[^\x20-\x7e]/g,' ').trim().slice(0,100));
   marketOcrStatus.screenPhase=parsed.screen_phase||null;
   marketOcrStatus.lastResult=parsed.status;
-  const funds=readMarketFunds(recognized);
+  const funds=observedFunds;
   marketOcrStatus.lastFundsRead=funds;
   const worldCharacter=state.activeCharacter;
   const validCharacter=worldCharacter&&worldCharacter.serverId&&
