@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {readMarketFunds,reconcileScreenFunds,confirmationFundsBefore,shouldScanFullMarket}=require('../market-funds.cjs');
+const {readMarketFunds,reconcileScreenFunds,confirmationFundsBefore,shouldScanFullMarket,preferFullMarketParse}=require('../market-funds.cjs');
 const base=Date.UTC(2026,10,15,18,0,0);
 const at=n=>new Date(base+n).toISOString();
 function row(overrides={}){
@@ -81,4 +81,13 @@ test('a confirmed modal with a prior Funds baseline and a later exact decrease i
  assert.equal(reconcileScreenFunds([a],reading({capturedAt:base+16000})),1);
  assert.equal(a.funds_match.before-a.funds_match.after,23);
  assert.equal(reconcileScreenFunds([a],reading({capturedAt:base+17000})),0);
+});
+
+test('full-window OCR must not demote a valid confirmation to a background form',()=>{
+ const modal={status:'observed',screen_phase:'confirmation'};
+ const form={status:'observed',screen_phase:'listing_form'};
+ assert.equal(preferFullMarketParse(modal,form),false);
+ assert.equal(preferFullMarketParse(form,modal),true);
+ assert.equal(preferFullMarketParse(modal,{status:'incomplete'}),false);
+ assert.equal(preferFullMarketParse({status:'unrecognized'},form),true);
 });
