@@ -12,7 +12,7 @@ const { MarketFrameBuffer } = require('./market-frame-buffer.cjs');
 const { MarketLiveCapture } = require('./market-live-capture.cjs');
 const { inspectBgra } = require('./market-capture-health.cjs');
 const { reconcileFees } = require('./market-fees.cjs');
-const {readMarketFunds,reconcileScreenFunds}=require('./market-funds.cjs');
+const {readMarketFunds,reconcileScreenFunds,confirmationFundsBefore,shouldScanFullMarket,MATCH_WINDOW_MS}=require('./market-funds.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const STARTUP_SMOKE = process.argv.includes('--atreia-startup-smoke');
@@ -55,6 +55,7 @@ const marketLiveCapture=new MarketLiveCapture({
 });
 let marketObservations=[];
 let recentMarket=new Map();
+let lastMarketFunds=null; // recent character-scoped, non-confirmation Funds reading
 let captureStatus = {state:'idle',message:'Npcap capture not started.',health:null};
 let lastCaptureHealthNoticeAt=0;
 function captureMessage(state,message){captureStatus={state,message,health:captureStatus.health};notify();}
@@ -414,9 +415,12 @@ async function marketOcrTick(force=false) {
    row.screen_phase==='confirmation'&&row.status==='unverified'&&
    !row.funds_match&&Number.isSafeInteger(row.funds_before)&&
    Date.now()-Date.parse(row.occurred_at)<60000);
-  const fallbackDelay=awaitingFeeFunds?2300:(inMarket||marketHint?4500:13000);
-  if(parsed.status!=='observed' && focusFunds===null && !(marketHint&&!inMarket) &&
-     Date.now()-lastFullMarketFallbackAt>=fallbackDelay) {
+  const fallbackDelay=awaitingFeeFunds?2300:
+   parsed.screen_phase==='confirmation'?1800:(inMarket||marketHint?6000:13000);
+  if(shouldScanFullMarket({
+   status:parsed.status,screenPhase:parsed.screen_phase,focusFunds,
+   awaitingFeeFunds,marketHint,inMarket
+  }) && Date.now()-lastFullMarketFallbackAt>=fallbackDelay) {
    lastFullMarketFallbackAt=Date.now();
    const fallback=await marketOcrWorker.recognize(full.toPNG(),{}, {tsv:true});
    const fullSpatial=addSpatialRows(fallback.data?.text||'',fallback.data?.tsv);
@@ -453,6 +457,11 @@ async function marketOcrTick(force=false) {
   const worldCharacter=state.activeCharacter;
   const validCharacter=worldCharacter&&worldCharacter.serverId&&
    worldCharacter.selectionSource!=='lobby-roster';
+  // Keep an actual Market balance from just before the confirmation modal
+  // obscures the Funds row. Never carry it across a character or account.
+  if(funds!==null&&validCharacter&&parsed.screen_phase!=='confirmation')
+   lastMarketFunds={user_id:remote.user_id,character:worldCharacter.character,
+    server:worldCharacter.server,funds,capturedAt:screenCapturedAt};
   const fundsMatched=funds!==null&&validCharacter?
    reconcileScreenFunds(marketObservations,{
     user_id:remote.user_id,character:worldCharacter.character,
@@ -488,6 +497,12 @@ async function marketOcrTick(force=false) {
   const evidence={...parsed.evidence,screen_phase:parsed.screen_phase};
   const key=stableFingerprint(current.character,current.server,evidence);
   const now=screenCapturedAt;
+  const previousFunds=lastMarketFunds &&
+   lastMarketFunds.user_id===remote.user_id &&
+   lastMarketFunds.character===current.character &&
+   lastMarketFunds.server===current.server?lastMarketFunds:null;
+  const confirmationFunds=confirmationFundsBefore(
+   funds,previousFunds?.funds,previousFunds?.capturedAt,now);
   lastMarketSeenAt=now;
   for(const [k,v] of recentMarket)if(now-v>120000)recentMarket.delete(k);
   // Re-reading the same open dialog is not another transaction.
@@ -499,7 +514,9 @@ async function marketOcrTick(force=false) {
     stableFingerprint(x.character,x.server,x)===key);
    if(last && last.status==='unverified' &&
       parsed.screen_phase==='confirmation' && now>=Date.parse(last.occurred_at)) {
-    if(funds!==null&&!last.funds_match)last.funds_before=funds;
+    // Do not replace a pre-fee baseline with a later post-fee scan.
+    if(funds!==null&&!Number.isSafeInteger(last.funds_before)&&!last.funds_match)
+     last.funds_before=funds;
     const previous=Date.parse(last.last_seen_at||last.occurred_at);
     if(now>previous)last.last_seen_at=new Date(now).toISOString();
     const matchedNow=reconcileFees(marketObservations,state.events);
@@ -551,7 +568,9 @@ async function marketOcrTick(force=false) {
    const formerAt=Date.parse(existing.occurred_at);
    existing.screen_phase='confirmation';
    if(funds!==null)existing.funds_before=funds;
-   else if(now-formerAt>10000)delete existing.funds_before;
+   else if(now-formerAt>MATCH_WINDOW_MS)existing.funds_before=null;
+   else if(!Number.isSafeInteger(existing.funds_before))
+    existing.funds_before=confirmationFunds;
    existing.occurred_at=new Date(now).toISOString();
    existing.last_seen_at=new Date(now).toISOString();
    if(!existing.character_id && match)existing.character_id=match.id;
@@ -565,7 +584,7 @@ async function marketOcrTick(force=false) {
    kind:evidence.kind,amount:evidence.amount,fee:evidence.fee,
    quantity:evidence.quantity,item_name:evidence.item_name,
    screen_phase:parsed.screen_phase,last_seen_at:new Date(now).toISOString(),
-   funds_before:funds,
+   funds_before:parsed.screen_phase==='confirmation'?confirmationFunds:funds,
    evidence:'screen_ocr',status:'unverified',synced:false
   });
   marketObservations=marketObservations.slice(-2000);
@@ -655,7 +674,7 @@ async function stopMarketOcr() {
  marketOcrStatus.framesBuffered=0;
  if(marketOcrTimer){clearInterval(marketOcrTimer);marketOcrTimer=null;}
  if(marketOcrWorker){const worker=marketOcrWorker;marketOcrWorker=null;await worker.terminate();}
- recentMarket.clear();lastMarketFrame=null;lastMarketSeenAt=0;
+ recentMarket.clear();lastMarketFrame=null;lastMarketSeenAt=0;lastMarketFunds=null;
  lastMarketOcrRunAt=0;marketFastModeUntil=0;
  marketOcrMessage('waiting','Sign in to resume Market reading.');
 }
