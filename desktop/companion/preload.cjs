@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('companion', {
   logout: () => invoke('remote:logout'),
   sync: () => invoke('remote:sync'),
   scanMarket: () => invoke('market:scan'),
+  toggleScreen: () => invoke('screen:toggle'),
   openWebsite: () => invoke('website:open'),
   onChange: callback => {
     const listener = () => callback();
