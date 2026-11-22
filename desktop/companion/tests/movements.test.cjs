@@ -89,3 +89,46 @@ test('old events without observation session are excluded',()=>{
  const m=movements([a,b],day);
  assert.equal(m.inToday,0);assert.equal(m.observations,0);
 });
+
+test('screen-only currency changes count as observed movement',()=>{
+ const events=[
+  e('s1','unbound',1000,'2026-11-09T08:00:00Z',S2,'screen'),
+  e('s2','unbound',800,'2026-11-09T08:00:02Z',S2,'screen')
+ ];
+ const m=movements(events,day);
+ assert.equal(m.outToday,200);
+ assert.equal(m.changes.length,1);
+ assert.equal(m.changes[0].source,'screen');
+});
+test('same change reported by OCR and network packets is counted only once',()=>{
+ const events=[
+  e('p1','bound',500,'2026-11-09T08:00:00Z',S1),
+  e('s1','bound',500,'2026-11-09T08:00:01Z',S2,'screen'),
+  e('s2','bound',450,'2026-11-09T08:00:03Z',S2,'screen'),
+  e('p2','bound',450,'2026-11-09T08:00:05Z',S1)
+ ];
+ const m=movements(events,day);
+ assert.equal(m.outToday,50);
+ assert.equal(m.changes.length,1);
+ assert.equal(m.changes[0].source,'decoded');
+});
+test('contradicting simultaneous OCR movement is not added as a second expense',()=>{
+ const events=[
+  e('p1','unbound',500,'2026-11-09T08:00:00Z',S1),
+  e('s1','unbound',500,'2026-11-09T08:00:01Z',S2,'screen'),
+  e('s2','unbound',400,'2026-11-09T08:00:03Z',S2,'screen'),
+  e('p2','unbound',450,'2026-11-09T08:00:04Z',S1)
+ ];
+ const m=movements(events,day);
+ assert.equal(m.outToday,50);
+ assert.equal(m.crossSourceDisagreements,1);
+});
+test('combined-only screen counters never become an income or an outflow',()=>{
+ const events=[
+  e('a','all',10000,'2026-11-09T08:00:00Z',S2,'screen'),
+  e('b','all',9000,'2026-11-09T08:00:02Z',S2,'screen')
+ ];
+ const m=movements(events,day);
+ assert.equal(m.outToday,0);
+ assert.equal(m.changes.length,0);
+});
