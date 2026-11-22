@@ -4,6 +4,7 @@
 (function publishWalletModel(root) {
  function calculate(events,dayStart) {
   const wallets={regular:null,bound:null,screenAll:null};
+  const latestScreen={unbound:null,bound:null};
   let regularDayFirst=null,regularDayLast=null,regularDayReadings=0;
   const ordered=(Array.isArray(events)?events:[]).filter(e=>e&&e.type==='wallet_snapshot'&&
    Number.isSafeInteger(e.balance)&&e.balance>=0&&Number.isFinite(Date.parse(e.occurred_at)))
@@ -12,12 +13,25 @@
    const value={balance:e.balance,occurred_at:e.occurred_at,source:e.source||'manual'};
    if(e.currency_kind==='unbound') {
     wallets.regular=value;
+    if(e.source==='screen')latestScreen.unbound=value;
     if(Date.parse(e.occurred_at)>=dayStart) {
      if(regularDayFirst===null)regularDayFirst=e.balance;
      regularDayLast=e.balance;regularDayReadings++;
     }
-   } else if(e.currency_kind==='bound')wallets.bound=value;
+   } else if(e.currency_kind==='bound'){
+    wallets.bound=value;
+    if(e.source==='screen')latestScreen.bound=value;
+   }
    else if(e.currency_kind==='all'&&e.source==='screen')wallets.screenAll=value;
+  }
+  // A packet arriving seconds after a verified screen image can describe an
+  // earlier server snapshot. Give the nearby on-screen counter precedence
+  // until a later packet or subsequent OCR reading supersedes it.
+  for(const [key,kind] of [['regular','unbound'],['bound','bound']]){
+   const current=wallets[key],screen=latestScreen[kind];
+   if(screen&&current&&current.source!=='screen'&&
+      Date.parse(current.occurred_at)-Date.parse(screen.occurred_at)<=8000)
+    wallets[key]=screen;
   }
   const regular=wallets.regular?.balance??null,bound=wallets.bound?.balance??null;
   const both=regular!==null&&bound!==null;
