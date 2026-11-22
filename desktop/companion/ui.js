@@ -74,6 +74,30 @@ function render(){
  const profile=combined.find(p=>idOf(p)===active)||null;
  $('connection-status').textContent=state.remote?'Connected · '+state.remote.email:
   state.configured?'Account not connected':'Account configuration missing';
+ const screen=state.screenWallet||{};
+ const screenTime=Date.parse(screen.lastSeenAt||'');
+ const screenFresh=Number.isFinite(screenTime)&&Date.now()-screenTime<20000;
+ $('diagnostic-screen-state').textContent=state.settings?.screenCapture===false?'paused':screen.state||'waiting';
+ $('diagnostic-screen-message').textContent=state.settings?.screenCapture===false
+  ?'The local screen reader is paused. Npcap can continue independently.'
+  :!screenFresh?'No recent visible counter. Values below may be stale until the currency UI appears.'
+  :screen.mapped?'Counter recognized and attributed to the captured in-world character.'
+  :'Counter recognized, but game packets have not confirmed the active character; no character history was written.';
+ $('diagnostic-screen-regular').textContent=num(screen.values?.unbound);
+ $('diagnostic-screen-bound').textContent=num(screen.values?.bound);
+ $('diagnostic-screen-all').textContent=num(screen.values?.all);
+ $('diagnostic-screen-scans').textContent=String(screen.scans||0);
+ $('diagnostic-screen-crops').textContent=String(screen.cropCount||0);
+ $('diagnostic-screen-time').textContent=screen.lastSeenAt?
+  new Date(screen.lastSeenAt).toLocaleTimeString():'Never';
+ const gained=state.screenActivity||{};
+  $('diagnostic-gain-scans').textContent=String(gained.scans||0);
+  $('diagnostic-gain-count').textContent=String(gained.rewards||0);
+  $('diagnostic-gain-last').textContent=gained.lastRewardAt
+   ?'+'+num(gained.lastAmount)+' · '+new Date(gained.lastRewardAt).toLocaleTimeString():'Never';
+  $('diagnostic-gain-region').textContent=gained.region||'Not located';
+  $('screen-toggle').textContent=state.settings?.screenCapture===false?
+  'Resume local screen reader':'Pause local screen reader';
  const market=state.marketOcr||{};
  $('market-header-status').textContent='MARKET READER · '+
   (market.message||'Sign in to enable Market reading.');
@@ -163,6 +187,26 @@ function render(){
  const money=window.AtreiaWallets.movements(events,p.daily);
  const itemEconomy=window.AtreiaItemEconomy.attribute(events,money,p.daily);
  const itemByWalletId=new Map(itemEconomy.matches.map(m=>[m.walletId,m]));
+ // Attribute only exact, time-near wallet credits to visible Kina rewards.
+  // Notification observations NEVER add currency to the balance themselves.
+  const rewardRows=(state.rewardObservations||[]).filter(e=>match(e,profile));
+  const rewardByWalletId=new Map(),usedRewardIds=new Set();
+  for(const movement of [...money.changes].reverse()) {
+   if(movement.direction!=='in')continue;
+   const time=Date.parse(movement.occurred_at);
+   const nearby=rewardRows.filter(r=>!usedRewardIds.has(r.id)&&
+    Number.isSafeInteger(r.amount)&&r.amount>0&&
+    Math.abs(Date.parse(r.occurred_at)-time)<=10000);
+   if(nearby.length>0&&nearby.length<=4&&
+    nearby.reduce((n,r)=>n+r.amount,0)===movement.amount) {
+    rewardByWalletId.set(movement.id,nearby.length);
+    for(const reward of nearby)usedRewardIds.add(reward.id);
+   }
+  }
+  const marketRows=(state.marketObservations||[]).filter(e=>match(e,profile));
+ const feeByWalletId=new Map();
+ for(const fee of marketRows)if(fee.status==='corroborated'&&Array.isArray(fee.wallet_event_ids))
+  for(const id of fee.wallet_event_ids)feeByWalletId.set(id,fee);
  const regularWallet=walletView.regular, boundWallet=walletView.bound;
  const t={dayEarned:0,daySpent:0};
  let hasEarned=false,hasSpent=false;
@@ -181,15 +225,15 @@ function render(){
  }
  $('wallet').textContent=regularWallet?num(regularWallet.balance):'—';
  $('wallet-note').textContent=regularWallet
-   ?'Tradeable Kina · last observed '+new Date(regularWallet.occurred_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})
+   ?(regularWallet.source==='screen'?'Screen confirmed':'Packet / manual')+' · last observed '+new Date(regularWallet.occurred_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})
    :'Waiting for regular Kina inventory packets';
  $('bound-wallet').textContent=boundWallet?num(boundWallet.balance):'—';
  $('bound-wallet-note').textContent=boundWallet
-   ?'Last observed '+new Date(boundWallet.occurred_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})
+   ?(boundWallet.source==='screen'?'Screen confirmed':'Packet / manual')+' · last observed '+new Date(boundWallet.occurred_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})
    :'Waiting for bound Kina inventory packets';
  if(walletView.combinedExact) {
    $('total-wallet').textContent=num(walletView.allBalance);
-   $('total-wallet-note').textContent='Regular + bound, based on latest observed balances';
+   $('total-wallet-note').textContent=walletView.combinedSource==='screen'?'Confirmed on-screen Kina (All)':'Regular + bound from observed balances';
  } else if(walletView.minimumAll!==null){
    $('total-wallet').textContent='≥ '+num(walletView.minimumAll);
    $('total-wallet-note').textContent='Minimum known; other currency not observed yet';
@@ -209,10 +253,12 @@ function render(){
    (money.netToday>0?'+':'')+num(money.netToday):'—';
  $('observed-net').className=money.netToday<0?'down':money.netToday>0?'up':'';
  $('observed-in-breakdown').textContent=money.observations>0
-  ?'Regular +'+num(money.byCurrency.unbound.in)+' · Bound +'+num(money.byCurrency.bound.in)
+  ?'Regular +'+num(money.byCurrency.unbound.in)+' · Bound +'+num(money.byCurrency.bound.in)+
+   (money.byCurrency.all.in?' · Combined-only +'+num(money.byCurrency.all.in):'')
   :'Awaiting a captured Kina balance';
  $('observed-out-breakdown').textContent=money.observations>0
-  ?'Regular −'+num(money.byCurrency.unbound.out)+' · Bound −'+num(money.byCurrency.bound.out)
+  ?'Regular −'+num(money.byCurrency.unbound.out)+' · Bound −'+num(money.byCurrency.bound.out)+
+   (money.byCurrency.all.out?' · Combined-only −'+num(money.byCurrency.all.out):'')
   :'Awaiting a captured Kina balance';
  const movementRows=$('movement-rows');
  movementRows.replaceChildren();
@@ -227,14 +273,19 @@ function render(){
    const row=document.createElement('div');row.className='movement-row';
    const info=document.createElement('div');
    const label=document.createElement('span');label.className='activity-name';
-   label.textContent=(movement.currency==='unbound'?'Regular':'Bound')+' Kina '+(movement.direction==='in'?'in':'out');
+   label.textContent=(movement.currency==='unbound'?'Regular':movement.currency==='bound'?'Bound':'Kina (All)')+
+    (movement.currency==='all'?'':' Kina')+' '+(movement.direction==='in'?'in':'out');
    const details=document.createElement('span');details.className='movement-source';
    const association=itemByWalletId.get(movement.id);
    const itemName=association?window.AtreiaItems.name(association.item_id):null;
+   const marketFee=feeByWalletId.get(movement.id);
    details.textContent='Balance '+num(movement.before)+' → '+num(movement.after)+
-     (association?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
+     (movement.source==='screen'?' · confirmed on-screen':' · decoded packet')+
+     (marketFee?' · Market fee amount matched (not a server receipt)':
+      rewardByWalletId.has(movement.id)?' · Monster reward popup agrees with wallet gain':
+       association?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
        itemName+' ×'+num(association.quantity)+' (unverified)'
-       :' · source unknown');
+       :movement.currency==='all'?' · currency split unknown; cause unknown':' · cause unknown');
    info.append(label,details);
    const amount=document.createElement('strong');
    amount.className=movement.direction==='in'?'up':'down';
@@ -300,7 +351,6 @@ function render(){
  marketStatus.textContent=state.marketOcr?.message||'Market OCR waiting for sign-in.';
  const marketHolder=$('market-observations');
  marketHolder.replaceChildren();
- const marketRows=(state.marketObservations||[]).filter(e=>match(e,profile));
  const todaysFees=marketRows.filter(e=>e.fee!==null&&e.fee!==undefined &&
   Date.parse(e.occurred_at)>=p.daily);
  $('market-fees-quoted').textContent=todaysFees.length?
@@ -325,9 +375,9 @@ function render(){
    entry.kind==='listing_fee_observation'?'Registration fee shown':'Listing shown';
   const verified=entry.status==='corroborated';
   const currency=entry.currency_kind==='mixed'?'bound + regular':
-   entry.currency_kind==='bound'?'bound':entry.currency_kind==='unbound'?'regular':null;
+   entry.currency_kind==='bound'?'bound':entry.currency_kind==='unbound'?'regular':'combined';
   desc.textContent=caption+' · '+new Date(entry.occurred_at).toLocaleString()+
-   (verified?' · Fee matched to '+currency+' Kina debit':' · OCR only, not charged')+
+   (verified?' · '+(entry.reconciliation_method==='net_with_monster_rewards'?'Reward-adjusted wallet movement':'Fee matched to '+currency+' Kina debit'):' · OCR only, not charged')+
    (entry.synced?' · account synced':' · pending sync');
   info.append(name,desc);
   const qty=document.createElement('span');qty.className='item-group-qty';
@@ -362,18 +412,28 @@ function render(){
  for(const e of events.slice(-6).reverse()){
   const row=document.createElement('div');row.className='activity-row';
   const name=e.type==='kinah_earned'?'Kinah earned':e.type==='kinah_spent'?'Kinah spent':
-      e.type==='wallet_snapshot'?(e.currency_kind==='unbound'?'Regular Kina observed':e.currency_kind==='bound'?'Bound Kina observed':'Wallet observed'):labels[e.key]||e.key;
+      e.type==='wallet_snapshot'?(e.currency_kind==='unbound'?'Regular Kina observed':e.currency_kind==='bound'?'Bound Kina observed':e.currency_kind==='all'?'Kina (All) observed':'Wallet observed'):labels[e.key]||e.key;
   const amount=e.type==='kinah_earned'?'+'+num(e.amount):e.type==='kinah_spent'?'−'+num(e.amount):
      e.type==='wallet_snapshot'?num(e.balance):num(e.current)+' / '+num(e.maximum);
   const cls=e.type==='kinah_earned'?'up':e.type==='kinah_spent'?'down':'';
   row.innerHTML='<div><span class="activity-name">'+escapeHtml(name)+'</span><span class="activity-detail">'+
-    escapeHtml(e.source==='decoded'?'Decoded observation':'Manual / imported entry')+'</span></div>'+
+    escapeHtml(e.source==='decoded'?'Decoded observation':e.source==='screen'?'Confirmed screen reading':'Manual / imported entry')+'</span></div>'+
     '<span class="activity-amount '+cls+'">'+escapeHtml(amount)+'</span>'+
     '<span class="activity-time">'+new Date(e.occurred_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'</span>';
   recent.append(row);
  }
 }
-async function refresh(){try{state=await api.state();render();}catch(e){show(e.message,true);}}
+let refreshBusy=false,refreshAgain=false;
+async function refresh(){
+ if(refreshBusy){refreshAgain=true;return;}
+ refreshBusy=true;
+ try{state=await api.state();render();}
+ catch(e){show(e.message,true);}
+ finally{
+  refreshBusy=false;
+  if(refreshAgain){refreshAgain=false;setTimeout(refresh,200);}
+ }
+}
 for(const name of ['overview','diagnostics']) {
  $('nav-'+name).addEventListener('click',()=>setView(name));
 }
@@ -406,6 +466,10 @@ $('overlay-toggle').addEventListener('click',async()=>{
  try {await api.toggleOverlay();await refresh();}
  catch(e){show(e.message,true);}
 });
+$('screen-toggle').addEventListener('click',async()=>{
+ try{await api.toggleScreen();await refresh();}
+ catch(err){show(err.message,true);}
+});
 $('capture-toggle').addEventListener('click',async()=>{
  try{
    if($('capture-toggle').dataset.capturing==='true')await api.stopCapture();
@@ -426,7 +490,7 @@ $('close-login').addEventListener('click',()=>{$('auth-backdrop').hidden=true;$(
 $('auth-form').addEventListener('submit',async e=>{
  e.preventDefault();
  try{await api.login({email:$('auth-email').value.trim(),password:$('auth-password').value});
- $('auth-backdrop').hidden=true;$('auth-password').value='';await refresh();show('Website account connected. Game-window Market fee reading and private syncing are active.');}
+ $('auth-backdrop').hidden=true;$('auth-password').value='';await refresh();show('Website account connected. Private Market observations can now sync. Local Kina monitoring remains independent.');}
  catch(err){show(err.message,true);$('auth-backdrop').hidden=true;$('auth-password').value='';}
 });
 async function scanMarketNow(){

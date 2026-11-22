@@ -247,3 +247,50 @@ The Market reader status is displayed **near the top of the desktop companion**,
 If the scanner reports *No AION2 game window found*, try borderless/windowed mode and verify the game has a visible AION2 window. If it reports *window found but blank*, Windows game capture may be restricted. If OCR sees text but does not see *Registration Fee*, check Aion 2 language/layout and game UI scale. If the fee label is recognized but its amount is not, its exact text/placement needs a validated, user-supplied **direct screenshot** (a Lightshot shortlink may not be accessible to automated tooling).
 
 The screen reader still records **fee quotes** rather than completed transactions unless wallet reductions corroborate them. It does not reconstruct missed historical fees. Live testing in a genuine Global Market listing screen is necessary before public release.
+
+## v0.1.13 preview: local live Kina reader (experimental)
+The companion now uses a second, independently sourced signal for wallet balances:
+the **visible** AION2.exe game window. It takes a game-window-only screenshot
+every two seconds when a currency counter has been located; a slower full-window
+OCR pass rediscovers the counter position and looks for Market-related context.
+Focused currency crops reduce repeated full-screen OCR cost. The app does not
+capture a display, browser or another process, nor does it save raw screenshots.
+This is screen OCR, not memory-reading or game injection.
+
+Only explicitly labeled **Regular Kina, Bound Kina and Kina (All)** counters
+can become wallet observations. A bare 'Kina 1,435' amount, such as a Market
+registration-fee quote, is **never** accepted as a wallet counter without
+another explicit currency label. A total-only counter is not silently
+reclassified as regular or bound Kina. Two distinct OCR frames must confirm
+a balance before it becomes a trusted local observation. Missing or hidden
+counters do not create zero balances. The Diagnostics tab exposes scan counts,
+last visible counter reading, crop count and a pause/resume control.
+
+Screen-observed snapshots carry source='screen' and a separate local observation
+session. The movement calculator compares them with decoded Npcap wallet updates,
+suppresses same-currency changes already covered by nearby decoded movements,
+and uses decoded movements where simultaneous sources disagree. Matching an
+OCR Market fee quotation to a wallet decrease is suggestive only; it does not
+prove that a listing was submitted, and that statement remains explicit in
+the interface. A wallet change triggers a broader Market-context scan on the
+same screen frame.
+
+The local screen reader starts with the companion **without an account login**;
+login is still needed for private Market-observation syncing. Screen-derived
+wallet snapshots are **not** uploaded by the existing player_companion_events
+sync API (which does not represent screen provenance). The existing Windows
+preview artifact can be produced using the companion-windows workflow. Test
+against a real Aion 2 Global session before treating this as a reliable balance
+or transaction log: an obscured counter, unreadable text, or two transactions
+between readings can still cause missing events. When the world character cannot
+be verified from capture, the screen counter may appear in Diagnostics, but it
+is not assigned to a character's stored history.
+
+
+## Experimental v0.1.14 — on-screen Kina reward notifications
+
+The companion scans the named Aion 2 game window in memory and looks for explicit positive Kina notifications (e.g. "Received 250 Kina", "Kina +250"). It accepts a strictly recognized positive reward popup from a single frame as an unverified observation, deduplicates lingering popups, and attempts to locate the notification region during periodic full-window discovery. Between full scans it uses the located crop or a right-side fallback region. Very brief popups and unusual text layouts may still be missed.
+
+Recognized rewards are stored as **local-only, timestamped observations**, separately from decoded or screen-observed wallet balances. They are **not** added directly into totals; wallet changes remain the accounting source of truth. A Market fee can now be corroborated either through an exact observed debit or a unique wallet movement whose net delta plus independently observed monster rewards reconciles to the displayed registration fee. If the equations do not balance, the listing fee remains **unverified**. Only one pending listing can be manually confirmed at a time in the game, but popup disappearance alone does not prove submission or cancellation. Raw screenshots and OCR text are not persisted or uploaded.
+
+The preview is not yet validated against live Aion 2 Global HUD text and capture latency. Use Diagnostics > Monster Kina Notifications to check reader performance and report the exact in-game notification style if observations stay at zero. Version 0.1.14 is experimental and not a replacement for real-game validation.

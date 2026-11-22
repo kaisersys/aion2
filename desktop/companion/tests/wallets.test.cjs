@@ -50,3 +50,25 @@ test('no readings never displays an invented zero balance',()=>{
  assert.equal(w.allBalance,null);
  assert.equal(w.minimumAll,null);
 });
+
+test('a stale screen-only All reading is not shown as an exact live balance after later packet updates',()=>{
+ const events=[
+  {...event('total','all',1000,'2026-11-09T08:00:00Z'),source:'screen'},
+  {...event('regular','unbound',900,'2026-11-09T08:00:20Z'),source:'decoded'}
+ ];
+ const w=calculate(events,day);
+ assert.equal(w.regularBalance,900);
+ assert.equal(w.allBalance,null);
+ assert.equal(w.combinedExact,false);
+ assert.equal(w.minimumAll,900);
+});
+test('fresh labeled screen All can be displayed without inventing the bound balance',()=>{
+ const events=[
+  {...event('regular','unbound',900,'2026-11-09T08:00:00Z'),source:'decoded'},
+  {...event('total','all',1300,'2026-11-09T08:00:04Z'),source:'screen'}
+ ];
+ const w=calculate(events,day);
+ assert.equal(w.allBalance,1300);
+ assert.equal(w.boundBalance,null);
+ assert.equal(w.combinedSource,'screen');
+});

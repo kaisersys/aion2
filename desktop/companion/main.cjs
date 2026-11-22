@@ -8,13 +8,15 @@ const readline = require('node:readline');
 const { normalizeEvent, addEvents, charKey, periods } = require('./ledger.cjs');
 const { readMarket,stableFingerprint } = require('./market-ocr.cjs');
 const { reconcileFees } = require('./market-fees.cjs');
+const { screenWallets, walletRegions: findWalletRegions, WalletStabilizer } = require('./screen-wallet.cjs');
+const { gainRegions: findGainRegions, fallbackGainRegion, KinaGainTracker } = require('./screen-activity.cjs');
 const { describeServer, sameName, serverMatches, discoverProfile } = require('./discovery.cjs');
 const WEBSITE = 'https://atreiastreet.com/';
 const FILE_LIMIT = 8 * 1024 * 1024;
 let win;
 let overlay;
-const DEFAULT_SETTINGS = { autoCapture:true, overlayEnabled:true, gamePort:13328 };
-let state = { profiles:[], events:[], settings:{...DEFAULT_SETTINGS}, activeCharacter:null };
+const DEFAULT_SETTINGS = { autoCapture:true, overlayEnabled:true, screenCapture:true, gamePort:13328 };
+let state = { profiles:[], events:[], rewardObservations:[], settings:{...DEFAULT_SETTINGS}, activeCharacter:null };
 let feed = null;
 let remote = null;
 let capture = null;
@@ -23,6 +25,14 @@ let marketSyncBusy=false;
 let lastMarketSyncAttemptAt=0;
 let lastMarketFrame=null;
 let lastMarketSeenAt=0;
+let lastFullScreenOcrAt=0, lastMarketStatusNotifyAt=0;
+let walletCrops=[], walletMonitor=new WalletStabilizer();
+let gainCrops=[],gainMonitor=new KinaGainTracker(),lastGainSampleAt=0;
+let screenActivityStatus={scans:0,lastRewardAt:null,lastAmount:null,rewards:0,region:'not located'};
+let walletSession=crypto.randomBytes(16).toString('hex'), walletIdentity=null;
+let lastHealthNotifiedAt=0;
+let screenWalletStatus={state:'waiting',lastSeenAt:null,lastScanAt:null,scans:0,
+  values:{},cropCount:0,mode:'idle',mapped:false};
 let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0,scans:0,lastScanAt:null,windowCandidates:0,capturePixels:null,recognizedChars:0,feeLabelSeen:false,feeEvidence:[]};
 let marketObservations=[];
 let recentMarket=new Map();
@@ -93,16 +103,20 @@ function loadState() {
     state = {
       profiles:Array.isArray(saved.profiles) ? saved.profiles.slice(0,80) : [],
       events:Array.isArray(saved.events) ? saved.events.slice(-50000) : [],
+      rewardObservations:Array.isArray(saved.rewardObservations) ? saved.rewardObservations.slice(-2000).filter(x=>
+       x&&Number.isSafeInteger(x.amount)&&x.amount>0&&typeof x.id==='string'&&
+       typeof x.character==='string'&&typeof x.server==='string'&&Number.isFinite(Date.parse(x.occurred_at))) : [],
       settings:{
         autoCapture:saved.settings?.autoCapture!==false,
         overlayEnabled:saved.settings?.overlayEnabled!==false,
+        screenCapture:saved.settings?.screenCapture!==false,
         gamePort:Number.isInteger(saved.settings?.gamePort) &&
           saved.settings.gamePort>0 && saved.settings.gamePort<=65535
           ? saved.settings.gamePort : DEFAULT_SETTINGS.gamePort
       },
       activeCharacter:saved.activeCharacter||null
     };
-  } catch { state = { profiles:[], events:[],settings:{...DEFAULT_SETTINGS},activeCharacter:null }; }
+  } catch { state = { profiles:[], events:[],rewardObservations:[],settings:{...DEFAULT_SETTINGS},activeCharacter:null }; }
   try {
    const parsed=JSON.parse(fs.readFileSync(marketPath(),'utf8'));
    marketObservations=Array.isArray(parsed)?parsed.slice(-2000).filter(x=>
@@ -120,7 +134,7 @@ function captureState() {
   return { ...state, feedPath:feed ? path.basename(feed.path) : null,
     remote:remote ? {email:remote.email,characters:remote.characters} : null,
     configured:Boolean(readConfig()), capture:captureStatus,
-    marketOcr:marketOcrStatus,
+    marketOcr:marketOcrStatus, screenWallet:screenWalletStatus, screenActivity:screenActivityStatus,
     marketObservations:remote?marketObservations.filter(x=>x.user_id===remote.user_id).slice(-30).reverse():[] };
 }
 function insert(raw, fallbackId) {
@@ -133,8 +147,8 @@ function insert(raw, fallbackId) {
     state.profiles.push({character:event.character,server:event.server});
   }
   saveState();
-  if(event.type==='wallet_snapshot' && event.source==='decoded') {
-    const n=reconcileFees(marketObservations,state.events);
+  if(event.type==='wallet_snapshot' && (event.source==='decoded'||event.source==='screen')) {
+    const n=reconcileFees(marketObservations,state.events,Date.now(),state.rewardObservations);
     if(n) {
       saveMarket();
       marketOcrMessage('corroborated',
@@ -206,7 +220,7 @@ async function sync() {
   for (const ev of state.events) {
     // Item-level movements are local-only: website telemetry schema intentionally
     // does not support item identifiers, handles or inferred transactions.
-    if (ev.type==='item_change' || ev.type==='item_origin') continue;
+    if (ev.type==='item_change' || ev.type==='item_origin' || ev.source==='screen') continue;
     const id=byKey.get(charKey(ev.character,ev.server));
     if (!id) { unmatched++; continue; }
     rows.push({user_id:remote.user_id, character_id:id,
@@ -251,82 +265,212 @@ async function sync() {
 }
 
 function marketOcrMessage(stateName,message) {
+ const changed=marketOcrStatus.state!==stateName || marketOcrStatus.message!==message;
  marketOcrStatus={...marketOcrStatus,state:stateName,message,observations:marketObservations.length};
- notify();
+ // Full overview renders are expensive; diagnostics refresh periodically, while
+ // confirmed wallet changes trigger an immediate update through insert().
+ if(changed || Date.now()-lastMarketStatusNotifyAt>10000){
+  lastMarketStatusNotifyAt=Date.now();notify();
+ }
 }
-async function marketOcrTick() {
- if(marketOcrBusy){marketOcrMessage('busy','OCR is already reading the game window; check the last scan time below.');return;}
- if(!readConfig()){marketOcrMessage('config-missing','Supabase configuration missing from this installer. Account login and Market reading are unavailable.');return;}
- if(!remote){marketOcrMessage('sign-in','Sign in to Atreia Street in the companion to start Market screen reading.');return;}
+function screenIdentity() {
+ const current=state.activeCharacter;
+ return current&&current.serverId&&current.selectionSource!=='lobby-roster'
+  ? charKey(current.character,current.server):null;
+}
+function acceptScreenReadings(readings) {
+ const identity=screenIdentity();
+ if(walletIdentity!==identity) {
+  walletIdentity=identity;
+  walletSession=crypto.randomBytes(16).toString('hex');
+  walletMonitor.reset();gainMonitor.reset();gainCrops=[];
+  screenWalletStatus.values={};
+ }
+ if(!Object.keys(readings).length)return 0;
+ const at=Date.now();
+ screenWalletStatus.lastSeenAt=new Date(at).toISOString();
+ screenWalletStatus.mapped=Boolean(identity);
+ const confirmed=walletMonitor.observe(readings,at);
+ for(const value of confirmed) {
+  screenWalletStatus.values[value.currency_kind]=value.balance;
+  // Never attach a screen balance to a character inferred only from a roster
+  // or a manually selected profile. It can still be shown in diagnostics.
+  if(!identity)continue;
+  const current=state.activeCharacter;
+  try {
+   insert({id:crypto.randomUUID(),type:'wallet_snapshot',source:'screen',
+    character:current.character,server:current.server,
+    currency_kind:value.currency_kind,balance:value.balance,
+    occurred_at:new Date(at).toISOString(),observation_session:walletSession});
+  } catch { /* OCR values are never force-inserted if validation fails. */ }
+ }
+ if(confirmed.length && !identity)notify();
+ return confirmed.length;
+}
+function acceptGainNotices(text,at=Date.now()) {
+ const gained=gainMonitor.observe(text,at);
+ if(!gained.length)return 0;
+ const identity=screenIdentity();
+ if(!identity)return 0; // Never attach OCR to an unverified character.
+ const current=state.activeCharacter;
+ for(const gain of gained) {
+  state.rewardObservations.push({id:crypto.randomUUID(),character:current.character,
+   server:current.server,amount:gain.amount,occurred_at:gain.occurred_at,
+   evidence:'screen_kina_reward_notice'});
+  screenActivityStatus.rewards++;
+  screenActivityStatus.lastRewardAt=gain.occurred_at;
+  screenActivityStatus.lastAmount=gain.amount;
+ }
+ state.rewardObservations=state.rewardObservations.slice(-2000);
+ saveState();
+ const matches=reconcileFees(marketObservations,state.events,Date.now(),state.rewardObservations);
+ if(matches) {
+  saveMarket();
+  marketOcrMessage('corroborated',matches+' registration fee(s) reconciled with Kina rewards and wallet changes.');
+  if(remote)void syncMarket().catch(()=>{});
+ }
+ notify();
+ return gained.length;
+}
+async function marketOcrTick(forceFull=false) {
+ if(marketOcrBusy || !state.settings.screenCapture)return;
  marketOcrBusy=true;
- marketOcrStatus.scans++;
- marketOcrStatus.lastScanAt=new Date().toISOString();
- marketOcrStatus.feeLabelSeen=false;
- marketOcrStatus.feeEvidence=[];
- marketOcrStatus.recognizedChars=0;
  try {
-  // Only capture the explicitly named game WINDOW. Never capture a display,
-  // desktop, companion window, browser, or a user-selected arbitrary source.
+  const now=Date.now();
+  const marketActive=now-lastMarketSeenAt<15000;
+  const fullInterval=marketActive?4500:8000;
+  let full=forceFull||now-lastFullScreenOcrAt>fullInterval;
+  // If no counter position is known, re-discover periodically instead of
+  // burning CPU on a full-resolution OCR run every two seconds.
+  if(!full && !walletCrops.length && !gainCrops.length && now-lastGainSampleAt<3500)return;
   const sources=await desktopCapturer.getSources({
-   types:['window'],thumbnailSize:{width:2560,height:1440},
+   types:['window'],thumbnailSize:{width:1920,height:1080},
    fetchWindowIcons:false
   });
   const titled=sources.filter(x=>/^AION\s*2(?:\s|$|[.:-])/i.test(x.name));
   marketOcrStatus.windowCandidates=titled.length;
   const games=titled.filter(x=>!x.thumbnail.isEmpty() && x.thumbnail.getSize().width>=640);
   if(games.length!==1) {
+   walletCrops=[];
+   gainCrops=[];screenWalletStatus.state='waiting';
+   screenWalletStatus.cropCount=0;
    marketOcrStatus.capturePixels=null;
    marketOcrMessage('waiting',titled.length===0
-    ?'No AION2 game window found. Run the game on this PC (borderless/windowed mode recommended).'
-    :titled.length>1?'Multiple AION2 windows detected; cannot select safely.'
-    :'AION2 window found but its thumbnail is blank or too small. Try borderless/windowed mode.');
+    ?'No AION2 game window found. Run the game locally in borderless/windowed mode.'
+    :titled.length>1?'Multiple AION2 windows found; selection is ambiguous.'
+    :'AION2 window is blank or minimized. The counter cannot be verified.');
    return;
   }
-  const dimensions=games[0].thumbnail.getSize();
+  const image=games[0].thumbnail;
+  const dimensions=image.getSize();
   marketOcrStatus.capturePixels=dimensions.width+' × '+dimensions.height;
-  marketOcrMessage('scanning','Game window captured ('+marketOcrStatus.capturePixels+'); running on-device OCR.');
-  // Screenshot remains in RAM; OCR is performed on this machine.
-  // Only whitelisted structured fields can enter the account ledger.
+  screenWalletStatus.scans++;
+  screenWalletStatus.lastScanAt=new Date().toISOString();
+  screenWalletStatus.mode=full?'full screen discovery':'focused wallet crop';
   if(!marketOcrWorker) {
    const {createWorker}=require('tesseract.js');
    marketOcrWorker=await createWorker('eng');
   }
-  const result=await marketOcrWorker.recognize(games[0].thumbnail.toPNG());
-  const recognized=result.data?.text||'';
-  marketOcrStatus.recognizedChars=recognized.length;
-  marketOcrStatus.feeLabelSeen=/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(recognized);
-  marketOcrStatus.feeEvidence=recognized.split(/\r?\n/)
-   .filter(x=>/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(x))
-   .slice(0,3).map(x=>x.replace(/[^\x20-\x7e]/g,' ').trim().slice(0,100));
+  let recognized='';
+  if(full) {
+   lastFullScreenOcrAt=Date.now();
+   marketOcrStatus.scans++;
+   marketOcrStatus.lastScanAt=new Date().toISOString();
+   const result=await marketOcrWorker.recognize(image.toPNG(),{}, {blocks:true});
+   recognized=result.data?.text||'';
+   walletCrops=findWalletRegions(result.data?.blocks,dimensions.width,dimensions.height);
+    gainCrops=findGainRegions(result.data?.blocks,dimensions.width,dimensions.height);
+    screenActivityStatus.region=gainCrops.length?'located notification':'fallback right-side region';
+   screenWalletStatus.cropCount=walletCrops.length;
+   marketOcrStatus.recognizedChars=recognized.length;
+   marketOcrStatus.feeLabelSeen=/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(recognized);
+   marketOcrStatus.feeEvidence=recognized.split(/\r?\n/)
+    .filter(x=>/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(x))
+    .slice(0,3).map(x=>x.replace(/[^\x20-\x7e]/g,' ').trim().slice(0,100));
+  } else {
+   // Currency labels have been located in a previous full scan; OCR only
+   // their small screen regions. Never save screenshots or raw OCR text.
+   for(const rect of walletCrops.slice(0,3)) {
+    if(rect.x<0||rect.y<0||rect.width<=0||rect.height<=0||
+      rect.x+rect.width>dimensions.width||rect.y+rect.height>dimensions.height) {
+     walletCrops=[];lastFullScreenOcrAt=0;break;
+    }
+    const result=await marketOcrWorker.recognize(image.crop(rect).toPNG());
+    recognized+='\n'+(result.data?.text||'');
+   }
+  }
+  // Scan short-lived Kina-gain notices in a cached region, or check a
+  // right-side fallback periodically until full-window discovery finds one.
+  if(!full && (gainCrops.length || now-lastGainSampleAt>=3500)) {
+   lastGainSampleAt=now;
+   const regions=gainCrops.length?gainCrops.slice(0,2):
+    [fallbackGainRegion(dimensions.width,dimensions.height)];
+   screenActivityStatus.region=gainCrops.length?'located notification':'fallback right-side region';
+   for(const rect of regions) {
+    if(rect.x<0||rect.y<0||rect.width<=0||rect.height<=0||
+     rect.x+rect.width>dimensions.width||rect.y+rect.height>dimensions.height)continue;
+    const result=await marketOcrWorker.recognize(image.crop(rect).toPNG());
+    recognized+='\n'+(result.data?.text||'');
+   }
+  }
+  const readings=screenWallets(recognized);
+  const confirmed=acceptScreenReadings(readings);
+  screenActivityStatus.scans++;
+  acceptGainNotices(recognized,Date.now());
+  screenWalletStatus.state=Object.keys(readings).length?'reading':'looking-for-counter';
+  if(!full && confirmed && remote) {
+   // A changed counter is the best moment to look for an on-screen cause.
+   // Re-scan the SAME RAM-only frame at full size immediately; don't wait
+   // another ten seconds and lose a short-lived fee notification.
+   full=true;
+   screenWalletStatus.mode='change-triggered Market context';
+   lastFullScreenOcrAt=Date.now();
+   marketOcrStatus.scans++;
+   marketOcrStatus.lastScanAt=new Date().toISOString();
+   const context=await marketOcrWorker.recognize(image.toPNG(),{}, {blocks:true});
+   recognized=context.data?.text||'';
+   walletCrops=findWalletRegions(context.data?.blocks,dimensions.width,dimensions.height);
+    gainCrops=findGainRegions(context.data?.blocks,dimensions.width,dimensions.height);
+   screenWalletStatus.cropCount=walletCrops.length;
+   marketOcrStatus.recognizedChars=recognized.length;
+   marketOcrStatus.feeLabelSeen=/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(recognized);
+   marketOcrStatus.feeEvidence=recognized.split(/\r?\n/)
+    .filter(x=>/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(x))
+    .slice(0,3).map(x=>x.replace(/[^\x20-\x7e]/g,' ').trim().slice(0,100));
+  }
+  if(!full) {
+   if(confirmed)notify();
+   return;
+  }
+  if(!remote) {
+   marketOcrMessage('wallet-only','Local Kina screen reader active. Sign in only if you want Market observations synced.');
+   return;
+  }
   const parsed=readMarket(recognized);
   if(parsed.status!=='observed') {
    if(Date.now()-lastMarketSeenAt>10000)lastMarketFrame=null;
    marketOcrMessage('listening',
-    parsed.status==='empty'?'Game window captured, but OCR saw no readable text. Try borderless/windowed mode.':
+    parsed.status==='empty'?'Game window captured but OCR saw no readable text; try borderless/windowed mode.':
     parsed.status==='unrecognized'
-    ?'Game window captured. OCR read '+recognized.length+' characters; registration fee label '+(marketOcrStatus.feeLabelSeen?'found':'not found')+'. Open the Market List panel.'
-    :'Market text detected, but the fee amount was unreadable. Check recognized fee line in Diagnostics.');
+    ?'Game window read; no Market fee or settlement visible. Kina counter is monitored separately.'
+    :'Market visible, but its fee or settlement amount was not safely readable.');
    return;
   }
   const current=state.activeCharacter;
-  // A roster selection alone is not proof of an active world character.
   if(!current || !current.serverId || current.selectionSource==='lobby-roster') {
-   marketOcrMessage('unmapped','Market fee visible, but the active in-world character has not been confirmed by capture.');
+   marketOcrMessage('unmapped','Market fee visible, but the active in-world character was not confirmed by capture.');
    return;
   }
   const match=matchWebsiteCharacter(current.character,current.server);
   if(!match) {
-   marketOcrMessage('unmapped','Market fee visible, but no matching character and server exist in the signed-in website account.');
+   marketOcrMessage('unmapped','Market fee visible, but no matching character/server exists in the account.');
    return;
   }
   const evidence=parsed.evidence;
   const key=stableFingerprint(current.character,current.server,evidence);
-  const now=Date.now();
-  lastMarketSeenAt=now;
-  for(const [k,v] of recentMarket)if(now-v>120000)recentMarket.delete(k);
-  // Re-reading the same open dialog is not another transaction.
-  // Reset after a different screen; allow a new identical listing following
-  // a confirmed debit and a later redraw.
+  const seenAt=Date.now();
+  lastMarketSeenAt=seenAt;
+  for(const [k,v] of recentMarket)if(seenAt-v>120000)recentMarket.delete(k);
   if(lastMarketFrame===key) {
    const last=marketObservations.findLast(x=>x.user_id===remote.user_id &&
     x.character===current.character && x.server===current.server &&
@@ -334,12 +478,12 @@ async function marketOcrTick() {
    const matched=last?.status==='corroborated';
    marketOcrMessage(matched?'corroborated':'listening',evidence.fee!==null
     ?('Registration fee: '+evidence.fee+' Kina. '+
-      (matched?'Matched a Kina decrease.':'Waiting for a matching bound or regular Kina decrease.'))
-    :'Market settlement amount is visible; claiming it has not been verified.');
+      (matched?'Matched to a wallet debit.':'Awaiting an independently observed wallet debit.'))
+    :'Market settlement is visible; claiming it has not been verified.');
    return;
   }
   lastMarketFrame=key;
-  recentMarket.set(key,now);
+  recentMarket.set(key,seenAt);
   marketObservations.push({
    id:crypto.randomUUID(),user_id:remote.user_id,
    character:current.character,server:current.server,
@@ -350,19 +494,18 @@ async function marketOcrTick() {
   });
   marketObservations=marketObservations.slice(-2000);
   saveMarket();
-  const n=reconcileFees(marketObservations,state.events);
+  const n=reconcileFees(marketObservations,state.events,Date.now(),state.rewardObservations);
   if(n)saveMarket();
-  marketOcrMessage(n?'corroborated':'observed',
-   evidence.fee!==null
-    ?(n?'Registration fee corroborated by a Kina decrease.':
-      'Registration fee quote captured ('+evidence.fee+' Kina); awaiting wallet confirmation.')
-    :'Settlement amount observed; collection is not yet verified.');
-  // Failures remain queued; no raw OCR text or screenshot is sent.
+  marketOcrMessage(n?'corroborated':'observed',evidence.fee!==null
+   ?(n?'Registration fee corroborated by an observed Kina decrease.':
+     'Registration fee quoted ('+evidence.fee+' Kina); awaiting wallet confirmation.')
+   :'Settlement amount observed; collection is not yet verified.');
   try {await syncMarket();}
   catch(err){marketOcrMessage('sync-error',
-   'Fee stored locally, but account sync failed: '+String(err.message).slice(0,100));}
+   'Market observation saved locally, but account sync failed: '+String(err.message).slice(0,100));}
  } catch(err) {
-  marketOcrMessage('error','Market reading unavailable: '+String(err.message).slice(0,120));
+  screenWalletStatus.state='error';
+  marketOcrMessage('error','Game-window OCR unavailable: '+String(err.message).slice(0,120));
  } finally {marketOcrBusy=false;}
 }
 async function syncMarket() {
@@ -391,7 +534,7 @@ async function syncMarket() {
  } finally {marketSyncBusy=false;}
 }
 function startMarketOcr() {
- if(marketOcrTimer)return;
+ if(marketOcrTimer || !state.settings.screenCapture)return;
  marketOcrTimer=setInterval(()=>{
   void marketOcrTick();
   if(remote && Date.now()-lastMarketSyncAttemptAt>30000 &&
@@ -399,7 +542,7 @@ function startMarketOcr() {
    void syncMarket().catch(err=>marketOcrMessage('sync-error',
     'Fee saved locally; retrying account sync: '+String(err.message).slice(0,100)));
   }
- },3000);
+ },2000);
  void marketOcrTick();
  void syncMarket().catch(err=>marketOcrMessage('sync-error',
   'Pending fee upload failed: '+String(err.message).slice(0,100)));
@@ -408,7 +551,8 @@ async function stopMarketOcr() {
  if(marketOcrTimer){clearInterval(marketOcrTimer);marketOcrTimer=null;}
  if(marketOcrWorker){const worker=marketOcrWorker;marketOcrWorker=null;await worker.terminate();}
  recentMarket.clear();lastMarketFrame=null;lastMarketSeenAt=0;
- marketOcrMessage('waiting','Sign in to resume Market reading.');
+ walletCrops=[];gainCrops=[];gainMonitor.reset();screenWalletStatus.state='paused';
+ marketOcrMessage('paused','Game-window reading paused.');
 }
 
 function pollFeed() {
@@ -537,7 +681,9 @@ function processCaptureMessage(message) {
       else
         captureStatus.message='Game traffic and identity records detected. Verifying the active character.';
     }
-    notify();
+    // Diagnostics are periodic; repainting thousands of ledger rows for each
+    // network-health heartbeat made the companion noticeably sluggish.
+    if(Date.now()-lastHealthNotifiedAt>5000){lastHealthNotifiedAt=Date.now();notify();}
     return;
   }
   if (message.kind==='roster' && Array.isArray(message.characters)) {
@@ -752,13 +898,21 @@ app.whenReady().then(()=>{
     startMarketOcr();notify();
     return {email,characters:remote.characters};
   });
-  ipcMain.handle('remote:logout',()=>{remote=null;clearSecureSession();void stopMarketOcr();notify();return true;});
+  ipcMain.handle('remote:logout',()=>{remote=null;clearSecureSession();marketOcrMessage('wallet-only','Local Kina monitoring continues. Market account sync is disconnected.');notify();return true;});
   ipcMain.handle('remote:sync',sync);
-  ipcMain.handle('market:scan',async()=>{await marketOcrTick();return marketOcrStatus;});
+  ipcMain.handle('market:scan',async()=>{await marketOcrTick(true);return marketOcrStatus;});
+  ipcMain.handle('screen:toggle',async()=>{
+    state.settings.screenCapture=!state.settings.screenCapture;
+    saveState();
+    if(state.settings.screenCapture)startMarketOcr();
+    else await stopMarketOcr();
+    notify();return state.settings.screenCapture;
+  });
   ipcMain.handle('website:open',()=>shell.openExternal(WEBSITE));
   app.on('activate',()=>showMain());
   app.on('before-quit',()=>{if(marketOcrTimer)clearInterval(marketOcrTimer);});
   createWindow();
+  if(state.settings.screenCapture)startMarketOcr();
   void restoreSecureSession();
   if (state.settings.overlayEnabled)createOverlay();
   if (state.settings.autoCapture) {

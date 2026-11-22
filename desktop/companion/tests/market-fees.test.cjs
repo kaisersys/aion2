@@ -63,3 +63,37 @@ test('never treat OCR settlement proceeds as a listing fee',()=>{
  const events=[wallet('a',-1000,1000,'bound'),wallet('b',2000,800,'bound')];
  assert.equal(reconcileFees([candidate],events,base+2200),0);
 });
+
+test('monster reward can offset a listing fee in observed net wallet decrease',()=>{
+ const candidate=fee(1435);
+ const events=[wallet('a',-1000,10000,'unbound'),wallet('b',2000,8865,'unbound')];
+ const rewards=[{id:'gain1',character:'Ceti',server:'S1',amount:300,occurred_at:t(1100)}];
+ assert.equal(reconcileFees([candidate],events,base+3000,rewards),1);
+ assert.equal(candidate.status,'corroborated');
+ assert.equal(candidate.reconciliation_method,'net_with_monster_rewards');
+ assert.deepEqual(candidate.reward_observation_ids,['gain1']);
+ assert.deepEqual(candidate.wallet_event_ids,['b']);
+ assert.equal(reconcileFees([candidate],events,base+4000,rewards),0);
+});
+test('a large monster reward can offset a fee and leave a net Kina increase',()=>{
+ const candidate=fee(1435);
+ const events=[wallet('a',-1000,10000,'unbound'),wallet('b',2000,10565,'unbound')];
+ const rewards=[{id:'gain1',character:'Ceti',server:'S1',amount:2000,occurred_at:t(1300)}];
+ assert.equal(reconcileFees([candidate],events,base+3000,rewards),1);
+ assert.equal(candidate.reconciliation_method,'net_with_monster_rewards');
+});
+test('fee remains unverified if the rewards, character or net movement do not reconcile',()=>{
+ const events=[wallet('a',-1000,10000,'unbound'),wallet('b',2000,8865,'unbound')];
+ const wrong=[{id:'gain1',character:'Other',server:'S1',amount:300,occurred_at:t(1100)}];
+ assert.equal(reconcileFees([fee(1435)],events,base+3000,wrong),0);
+ assert.equal(reconcileFees([fee(1435)],events,base+3000,[]),0);
+ assert.equal(reconcileFees([fee(1600)],events,base+3000,[{...wrong[0],character:'Ceti'}]),0);
+});
+test('exact component debit is preferred over reward-adjusted inference',()=>{
+ const candidate=fee(200);
+ const events=[wallet('a',-1000,1000,'bound'),wallet('b',2000,800,'bound')];
+ const reward=[{id:'gain1',character:'Ceti',server:'S1',amount:100,occurred_at:t(1000)}];
+ assert.equal(reconcileFees([candidate],events,base+3000,reward),1);
+ assert.equal(candidate.reconciliation_method,'exact_debit');
+ assert.deepEqual(candidate.reward_observation_ids,[]);
+});

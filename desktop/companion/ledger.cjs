@@ -26,7 +26,7 @@ function normalizeEvent(input, fallbackId) {
       time < Date.UTC(2026,0,1) || time > Date.now() + 86400000) throw new Error('Invalid event identity or time');
   const ev = { id, character, server, type: input.type,
     occurred_at: new Date(time).toISOString(),
-    source: input.source === 'decoded' ? 'decoded' : 'manual' };
+    source: input.source === 'decoded' ? 'decoded' : input.source === 'screen' ? 'screen' : 'manual' };
   if (ev.type === 'kinah_earned' || ev.type === 'kinah_spent') {
     if (!validInt(input.amount) || input.amount === 0) throw new Error('Invalid Kinah amount');
     ev.amount = input.amount;
@@ -66,11 +66,12 @@ function normalizeEvent(input, fallbackId) {
   } else if (ev.type === 'wallet_snapshot') {
     if (!validInt(input.balance)) throw new Error('Invalid wallet balance');
     ev.balance = input.balance;
-    if (input.currency_kind === 'bound' || input.currency_kind === 'unbound')
+    if (input.currency_kind === 'bound' || input.currency_kind === 'unbound' ||
+        (input.currency_kind === 'all' && ev.source === 'screen'))
       ev.currency_kind = input.currency_kind;
     // Session boundaries are local provenance only. Never upload the session
     // identifier, and never infer purchases/sales across separate game logins.
-    if (ev.source === 'decoded' && typeof input.observation_session === 'string' &&
+    if ((ev.source === 'decoded' || ev.source === 'screen') && typeof input.observation_session === 'string' &&
         /^[0-9a-f]{32}$/.test(input.observation_session))
       ev.observation_session = input.observation_session;
   } else {
