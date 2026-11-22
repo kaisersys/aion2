@@ -352,9 +352,9 @@ function render(){
    entry.kind==='listing_fee_observation'?'Registration fee shown':'Listing shown';
   const verified=entry.status==='corroborated';
   const currency=entry.currency_kind==='mixed'?'bound + regular':
-   entry.currency_kind==='bound'?'bound':entry.currency_kind==='unbound'?'regular':null;
+   entry.currency_kind==='bound'?'bound':entry.currency_kind==='unbound'?'regular':'combined';
   desc.textContent=caption+' · '+new Date(entry.occurred_at).toLocaleString()+
-   (verified?' · Fee matched to '+currency+' Kina debit':' · OCR only, not charged')+
+   (verified?' · '+(entry.reconciliation_method==='net_with_monster_rewards'?'Reward-adjusted wallet movement':'Fee matched to '+currency+' Kina debit'):' · OCR only, not charged')+
    (entry.synced?' · account synced':' · pending sync');
   info.append(name,desc);
   const qty=document.createElement('span');qty.className='item-group-qty';
