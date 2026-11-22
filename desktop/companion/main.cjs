@@ -383,10 +383,10 @@ async function marketOcrTick(forceFull=false) {
    walletCrops=findWalletRegions(context.data?.blocks,dimensions.width,dimensions.height);
    screenWalletStatus.cropCount=walletCrops.length;
    marketOcrStatus.recognizedChars=recognized.length;
-   marketOcrStatus.feeLabelSeen=/\\b(?:registration\\s*fee|listing\\s*fee|register\\s*fee)\\b/i.test(recognized);
-   marketOcrStatus.feeEvidence=recognized.split(/\\r?\\n/)
-    .filter(x=>/\\b(?:registration\\s*fee|listing\\s*fee|register\\s*fee)\\b/i.test(x))
-    .slice(0,3).map(x=>x.replace(/[^\\x20-\\x7e]/g,' ').trim().slice(0,100));
+   marketOcrStatus.feeLabelSeen=/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(recognized);
+   marketOcrStatus.feeEvidence=recognized.split(/\r?\n/)
+    .filter(x=>/\b(?:registration\s*fee|listing\s*fee|register\s*fee)\b/i.test(x))
+    .slice(0,3).map(x=>x.replace(/[^\x20-\x7e]/g,' ').trim().slice(0,100));
   }
   if(!full) {
    if(confirmed)notify();
