@@ -59,7 +59,8 @@
   let observations=0;
   const ordered=(Array.isArray(events)?events:[]).filter(e=>
    e&&e.type==='wallet_snapshot'&&(e.source==='decoded'||e.source==='screen')&&
-   (e.currency_kind==='unbound'||e.currency_kind==='bound')&&
+   (e.currency_kind==='unbound'||e.currency_kind==='bound'||
+    (e.currency_kind==='all'&&e.source==='screen'))&&
    Number.isSafeInteger(e.balance)&&e.balance>=0&&
    typeof e.observation_session==='string'&&/^[0-9a-f]{32}$/.test(e.observation_session)&&
    Number.isFinite(Date.parse(e.occurred_at))
@@ -84,7 +85,8 @@
    });
   }
   const packet=candidates.filter(r=>r.source==='decoded');
-  const screen=candidates.filter(r=>r.source==='screen');
+  const screen=candidates.filter(r=>r.source==='screen'&&r.currency!=='all');
+  const screenTotal=candidates.filter(r=>r.source==='screen'&&r.currency==='all');
   // When independent streams disagree within the same short interval, prefer
   // the decoded packet and flag the discrepancy instead of inventing a second
   // spend or gain from OCR.
@@ -99,12 +101,18 @@
    }
    matched.push(row);
   }
-  const changes=packet.concat(matched).sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
-  const byCurrency={unbound:{in:0,out:0},bound:{in:0,out:0}};
+  const componentChanges=packet.concat(matched);
+  // A combined-only counter can still prove the total changed. Keep those
+  // changes separately and suppress them if individual wallet movements
+  // already cover the same period, avoiding double-counted expenses.
+  const combinedOnly=screenTotal.filter(row=>!componentChanges.some(part=>
+   Math.abs(Date.parse(part.occurred_at)-Date.parse(row.occurred_at))<=CROSS_SOURCE_WINDOW_MS));
+  const changes=componentChanges.concat(combinedOnly).sort((a,b)=>Date.parse(a.occurred_at)-Date.parse(b.occurred_at));
+  const byCurrency={unbound:{in:0,out:0},bound:{in:0,out:0},all:{in:0,out:0}};
   for(const row of changes)if(Date.parse(row.occurred_at)>=dayStart)
    byCurrency[row.currency][row.direction]+=row.amount;
-  const inToday=byCurrency.unbound.in+byCurrency.bound.in;
-  const outToday=byCurrency.unbound.out+byCurrency.bound.out;
+  const inToday=byCurrency.unbound.in+byCurrency.bound.in+byCurrency.all.in;
+  const outToday=byCurrency.unbound.out+byCurrency.bound.out+byCurrency.all.out;
   return {inToday,outToday,netToday:inToday-outToday,byCurrency,observations,
    crossSourceDisagreements,changes:changes.slice(-150).reverse()};
  }
