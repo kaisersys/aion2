@@ -32,8 +32,8 @@ test('Market OCR state is visible regardless of selected character',()=>{
 test('local Kina monitoring starts without account login; Market sync remains account-gated',()=>{
  assert.ok(main.includes("types:['window']"));
  assert.ok(main.includes("if(state.settings.screenCapture)startMarketOcr()"));
- assert.ok(main.includes("if(!remote) {\n   marketOcrMessage('wallet-only'"));
- assert.ok(main.includes("async function syncMarket() {\n if(!remote || marketSyncBusy)return 0;"));
+ assert.match(main,/if\(!remote\)\s*\{\s*marketOcrMessage\('wallet-only'/);
+ assert.match(main,/async function syncMarket\(\)\s*\{\s*if\(!remote \|\| marketSyncBusy\)return 0;/);
  assert.ok(main.includes("safeStorage.encryptString(remote.refresh_token)"));
  assert.ok(main.includes("remote=null;clearSecureSession();marketOcrMessage('wallet-only'"));
  assert.ok(!main.includes("writeFileSync('screenshot'"));
