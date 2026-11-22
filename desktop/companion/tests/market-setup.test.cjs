@@ -40,3 +40,12 @@ test('local Kina monitoring starts without account login; Market sync remains ac
  assert.ok(!main.includes("writeFileSync('screenshot'"));
  assert.ok(!main.includes("writeFileSync('screen'"));
 });
+
+test('reward notice diagnostic counters are wired to the UI',()=>{
+ for(const id of ['diagnostic-gain-scans','diagnostic-gain-count','diagnostic-gain-last','diagnostic-gain-region']){
+  assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
+  assert.ok(ui.includes("$('"+id+"')"),id+' should be refreshed');
+ }
+ assert.ok(main.includes('acceptGainNotices(recognized'));
+ assert.ok(main.includes('rewardObservations'));
+});
