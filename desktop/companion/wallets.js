@@ -39,9 +39,14 @@
   const screen=wallets.screenAll;
   // A labeled All counter wins when it is the newest observation. It is not
   // accidentally interpreted as Bound or an independent third wallet.
-  const screenIsLatest=screen&&(!both||Date.parse(screen.occurred_at)>=Math.max(
-   Date.parse(wallets.regular.occurred_at),Date.parse(wallets.bound.occurred_at)));
-  const exact=Boolean(both||screen);
+  const componentTimestamp=Math.max(
+   wallets.regular?Date.parse(wallets.regular.occurred_at):0,
+   wallets.bound?Date.parse(wallets.bound.occurred_at):0);
+  // A once-visible All counter cannot remain an "exact live balance" forever
+  // while the packet decoder continues reporting newer component changes.
+  const screenIsLatest=Boolean(screen&&
+   (componentTimestamp===0||componentTimestamp-Date.parse(screen.occurred_at)<=8000));
+  const exact=Boolean(both||screenIsLatest);
   const all=screenIsLatest?screen.balance:derived;
   const minimum=regular!==null?regular:bound;
   const netToday=regularDayReadings>=2?regularDayLast-regularDayFirst:null;
