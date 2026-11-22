@@ -11,6 +11,7 @@ test('a combined-only number is never regular Kina',()=>{
  assert.deepEqual(screenWallets('Kina (All): 900,000'),{all:900000});
  assert.deepEqual(screenWallets('Registration Fee 1,435\nTotal Price 71,775\nQuantity: 1'),{});
  assert.deepEqual(screenWallets('Market Funds: 2,000,000'),{});
+ assert.deepEqual(screenWallets('Market\\nList\\nRegistration Fee\\nKina 1,435'),{});
 });
 test('rejects conflicting or malformed OCR currency lines',()=>{
  assert.deepEqual(screenWallets('Regular Kina: 1,000\nRegular Kina: 2,000'),{});
