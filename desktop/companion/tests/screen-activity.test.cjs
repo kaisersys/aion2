@@ -11,13 +11,13 @@ test('recognizes explicitly positive Kina reward popups, not prices or balances'
 });
 test('persistent reward emits once, a new identical toast can emit again only after disappearance',()=>{
  const tracker=new KinaGainTracker();
- assert.deepEqual(tracker.observe('Kina +100',1000),[]);
- assert.deepEqual(tracker.observe('Kina +100',2000),[{amount:100,occurred_at:new Date(2000).toISOString()}]);
+ assert.deepEqual(tracker.observe('Kina +100',1000),[{amount:100,occurred_at:new Date(1000).toISOString()}]);
+ assert.deepEqual(tracker.observe('Kina +100',2000),[]);
  assert.deepEqual(tracker.observe('Kina +100',3000),[]);
  tracker.observe('nothing',4000);tracker.observe('nothing',5000);
- assert.deepEqual(tracker.observe('Kina +100',6000),[]);
- assert.deepEqual(tracker.observe('Kina +100',7000),[{amount:100,occurred_at:new Date(7000).toISOString()}]);
- tracker.reset();assert.deepEqual(tracker.observe('Kina +100',8000),[]);
+ assert.deepEqual(tracker.observe('Kina +100',6000),[{amount:100,occurred_at:new Date(6000).toISOString()}]);
+ assert.deepEqual(tracker.observe('Kina +100',7000),[]);
+ tracker.reset();assert.deepEqual(tracker.observe('Kina +100',8000),[{amount:100,occurred_at:new Date(8000).toISOString()}]);
 });
 test('notification OCR crops stay inside game image',()=>{
  const box={paragraphs:[{lines:[{text:'Received 125 Kina',bbox:{x0:1000,x1:1130,y0:680,y1:705}}]}]};
