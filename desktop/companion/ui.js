@@ -187,7 +187,23 @@ function render(){
  const money=window.AtreiaWallets.movements(events,p.daily);
  const itemEconomy=window.AtreiaItemEconomy.attribute(events,money,p.daily);
  const itemByWalletId=new Map(itemEconomy.matches.map(m=>[m.walletId,m]));
- const marketRows=(state.marketObservations||[]).filter(e=>match(e,profile));
+ // Attribute only exact, time-near wallet credits to visible Kina rewards.
+  // Notification observations NEVER add currency to the balance themselves.
+  const rewardRows=(state.rewardObservations||[]).filter(e=>match(e,profile));
+  const rewardByWalletId=new Map(),usedRewardIds=new Set();
+  for(const movement of [...money.changes].reverse()) {
+   if(movement.direction!=='in')continue;
+   const time=Date.parse(movement.occurred_at);
+   const nearby=rewardRows.filter(r=>!usedRewardIds.has(r.id)&&
+    Number.isSafeInteger(r.amount)&&r.amount>0&&
+    Math.abs(Date.parse(r.occurred_at)-time)<=10000);
+   if(nearby.length>0&&nearby.length<=4&&
+    nearby.reduce((n,r)=>n+r.amount,0)===movement.amount) {
+    rewardByWalletId.set(movement.id,nearby.length);
+    for(const reward of nearby)usedRewardIds.add(reward.id);
+   }
+  }
+  const marketRows=(state.marketObservations||[]).filter(e=>match(e,profile));
  const feeByWalletId=new Map();
  for(const fee of marketRows)if(fee.status==='corroborated'&&Array.isArray(fee.wallet_event_ids))
   for(const id of fee.wallet_event_ids)feeByWalletId.set(id,fee);
@@ -266,7 +282,8 @@ function render(){
    details.textContent='Balance '+num(movement.before)+' → '+num(movement.after)+
      (movement.source==='screen'?' · confirmed on-screen':' · decoded packet')+
      (marketFee?' · Market fee amount matched (not a server receipt)':
-      association?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
+      rewardByWalletId.has(movement.id)?' · Monster reward popup agrees with wallet gain':
+       association?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
        itemName+' ×'+num(association.quantity)+' (unverified)'
        :movement.currency==='all'?' · currency split unknown; cause unknown':' · cause unknown');
    info.append(label,details);
