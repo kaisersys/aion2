@@ -231,10 +231,12 @@ function render(){
    (money.netToday>0?'+':'')+num(money.netToday):'—';
  $('observed-net').className=money.netToday<0?'down':money.netToday>0?'up':'';
  $('observed-in-breakdown').textContent=money.observations>0
-  ?'Regular +'+num(money.byCurrency.unbound.in)+' · Bound +'+num(money.byCurrency.bound.in)
+  ?'Regular +'+num(money.byCurrency.unbound.in)+' · Bound +'+num(money.byCurrency.bound.in)+
+   (money.byCurrency.all.in?' · Combined-only +'+num(money.byCurrency.all.in):'')
   :'Awaiting a captured Kina balance';
  $('observed-out-breakdown').textContent=money.observations>0
-  ?'Regular −'+num(money.byCurrency.unbound.out)+' · Bound −'+num(money.byCurrency.bound.out)
+  ?'Regular −'+num(money.byCurrency.unbound.out)+' · Bound −'+num(money.byCurrency.bound.out)+
+   (money.byCurrency.all.out?' · Combined-only −'+num(money.byCurrency.all.out):'')
   :'Awaiting a captured Kina balance';
  const movementRows=$('movement-rows');
  movementRows.replaceChildren();
@@ -249,7 +251,8 @@ function render(){
    const row=document.createElement('div');row.className='movement-row';
    const info=document.createElement('div');
    const label=document.createElement('span');label.className='activity-name';
-   label.textContent=(movement.currency==='unbound'?'Regular':'Bound')+' Kina '+(movement.direction==='in'?'in':'out');
+   label.textContent=(movement.currency==='unbound'?'Regular':movement.currency==='bound'?'Bound':'Kina (All)')+
+    (movement.currency==='all'?'':' Kina')+' '+(movement.direction==='in'?'in':'out');
    const details=document.createElement('span');details.className='movement-source';
    const association=itemByWalletId.get(movement.id);
    const itemName=association?window.AtreiaItems.name(association.item_id):null;
@@ -259,7 +262,7 @@ function render(){
      (marketFee?' · Market fee amount matched (not a server receipt)':
       association?' · Possible '+(movement.direction==='out'?'purchase':'sale')+': '+
        itemName+' ×'+num(association.quantity)+' (unverified)'
-       :' · cause unknown');
+       :movement.currency==='all'?' · currency split unknown; cause unknown':' · cause unknown');
    info.append(label,details);
    const amount=document.createElement('strong');
    amount.className=movement.direction==='in'?'up':'down';
