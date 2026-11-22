@@ -19,8 +19,10 @@ function screenWallets(text) {
  const lines=String(text||'').replace(/\r/g,'').split('\n')
   .map(s=>s.replace(/[：]/g,':').replace(/\s+/g,' ').trim()).filter(Boolean).slice(0,240);
  const candidates=new Map();
- function put(kind,value) {
+ let explicitRegular=false;
+ function put(kind,value,label) {
   if(value===null)return;
+  if(kind==='unbound' && !/^(?:kina|kinah)$/i.test(String(label||'').trim()))explicitRegular=true;
   if(!candidates.has(kind))candidates.set(kind,new Set());
   candidates.get(kind).add(value);
  }
@@ -30,12 +32,17 @@ function screenWallets(text) {
   const left=s.match(/^(.+?)\s*[:=]?\s+(\d[\d,]*)\s*$/);
   const right=s.match(/^(\d[\d,]*)\s+(.+?)\s*$/);
   if(left&&LABEL.test(left[1].replace(/[:= ]+$/,'')))
-   put(kindOf(left[1]),numeric(left[2]));
+   put(kindOf(left[1]),numeric(left[2]),left[1].replace(/[:= ]+$/,''));
   else if(right&&LABEL.test(right[2]))
-   put(kindOf(right[2]),numeric(right[1]));
+   put(kindOf(right[2]),numeric(right[1]),right[2]);
   else if(LABEL.test(s.replace(/[:= ]+$/,'')) && i+1<lines.length)
-   put(kindOf(s),numeric(lines[i+1].replace(/^(?:kina|kinah)\s+/i,'')));
+   put(kindOf(s),numeric(lines[i+1].replace(/^(?:kina|kinah)\s+/i,'')),s.replace(/[:= ]+$/,''));
  }
+ // Bare 'Kina 1,435' also appears beside listing fees and item prices.
+ // Accept it as Regular only when another explicit currency label confirms
+ // that this is a wallet display, never from a price dialog by itself.
+ if(!explicitRegular && !candidates.has('all') && !candidates.has('bound'))
+  candidates.delete('unbound');
  const result={};
  for(const kind of ['unbound','bound','all']) {
   const options=candidates.get(kind);
