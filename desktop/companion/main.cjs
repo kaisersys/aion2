@@ -308,7 +308,7 @@ async function marketOcrTick(forceFull=false) {
   const now=Date.now();
   const marketActive=now-lastMarketSeenAt<15000;
   const fullInterval=marketActive?4500:10000;
-  const full=forceFull||now-lastFullScreenOcrAt>fullInterval;
+  let full=forceFull||now-lastFullScreenOcrAt>fullInterval;
   // If no counter position is known, re-discover periodically instead of
   // burning CPU on a full-resolution OCR run every two seconds.
   if(!full && !walletCrops.length)return;
@@ -369,6 +369,25 @@ async function marketOcrTick(forceFull=false) {
   const readings=screenWallets(recognized);
   const confirmed=acceptScreenReadings(readings);
   screenWalletStatus.state=Object.keys(readings).length?'reading':'looking-for-counter';
+  if(!full && confirmed && remote) {
+   // A changed counter is the best moment to look for an on-screen cause.
+   // Re-scan the SAME RAM-only frame at full size immediately; don't wait
+   // another ten seconds and lose a short-lived fee notification.
+   full=true;
+   screenWalletStatus.mode='change-triggered Market context';
+   lastFullScreenOcrAt=Date.now();
+   marketOcrStatus.scans++;
+   marketOcrStatus.lastScanAt=new Date().toISOString();
+   const context=await marketOcrWorker.recognize(image.toPNG(),{}, {blocks:true});
+   recognized=context.data?.text||'';
+   walletCrops=findWalletRegions(context.data?.blocks,dimensions.width,dimensions.height);
+   screenWalletStatus.cropCount=walletCrops.length;
+   marketOcrStatus.recognizedChars=recognized.length;
+   marketOcrStatus.feeLabelSeen=/\\b(?:registration\\s*fee|listing\\s*fee|register\\s*fee)\\b/i.test(recognized);
+   marketOcrStatus.feeEvidence=recognized.split(/\\r?\\n/)
+    .filter(x=>/\\b(?:registration\\s*fee|listing\\s*fee|register\\s*fee)\\b/i.test(x))
+    .slice(0,3).map(x=>x.replace(/[^\\x20-\\x7e]/g,' ').trim().slice(0,100));
+  }
   if(!full) {
    if(confirmed)notify();
    return;
