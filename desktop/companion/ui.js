@@ -90,7 +90,13 @@ function render(){
  $('diagnostic-screen-crops').textContent=String(screen.cropCount||0);
  $('diagnostic-screen-time').textContent=screen.lastSeenAt?
   new Date(screen.lastSeenAt).toLocaleTimeString():'Never';
- $('screen-toggle').textContent=state.settings?.screenCapture===false?
+ const gained=state.screenActivity||{};
+  $('diagnostic-gain-scans').textContent=String(gained.scans||0);
+  $('diagnostic-gain-count').textContent=String(gained.rewards||0);
+  $('diagnostic-gain-last').textContent=gained.lastRewardAt
+   ?'+'+num(gained.lastAmount)+' · '+new Date(gained.lastRewardAt).toLocaleTimeString():'Never';
+  $('diagnostic-gain-region').textContent=gained.region||'Not located';
+  $('screen-toggle').textContent=state.settings?.screenCapture===false?
   'Resume local screen reader':'Pause local screen reader';
  const market=state.marketOcr||{};
  $('market-header-status').textContent='MARKET READER · '+
