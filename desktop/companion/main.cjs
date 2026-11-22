@@ -27,6 +27,7 @@ let lastMarketSeenAt=0;
 let lastFullScreenOcrAt=0, lastMarketStatusNotifyAt=0;
 let walletCrops=[], walletMonitor=new WalletStabilizer();
 let walletSession=crypto.randomBytes(16).toString('hex'), walletIdentity=null;
+let lastHealthNotifiedAt=0;
 let screenWalletStatus={state:'waiting',lastSeenAt:null,lastScanAt:null,scans:0,
   values:{},cropCount:0,mode:'idle',mapped:false};
 let marketOcrStatus={state:'waiting',message:'Sign in to read the Aion 2 Market window.',observations:0,scans:0,lastScanAt:null,windowCandidates:0,capturePixels:null,recognizedChars:0,feeLabelSeen:false,feeEvidence:[]};
@@ -611,7 +612,9 @@ function processCaptureMessage(message) {
       else
         captureStatus.message='Game traffic and identity records detected. Verifying the active character.';
     }
-    notify();
+    // Diagnostics are periodic; repainting thousands of ledger rows for each
+    // network-health heartbeat made the companion noticeably sluggish.
+    if(Date.now()-lastHealthNotifiedAt>5000){lastHealthNotifiedAt=Date.now();notify();}
     return;
   }
   if (message.kind==='roster' && Array.isArray(message.characters)) {
