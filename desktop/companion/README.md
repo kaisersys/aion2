@@ -285,3 +285,12 @@ or transaction log: an obscured counter, unreadable text, or two transactions
 between readings can still cause missing events. When the world character cannot
 be verified from capture, the screen counter may appear in Diagnostics, but it
 is not assigned to a character's stored history.
+
+
+## Experimental v0.1.14 — on-screen Kina reward notifications
+
+The companion scans the named Aion 2 game window in memory and looks for explicit positive Kina notifications (e.g. "Received 250 Kina", "Kina +250"). It requires two separately captured matching OCR readings, deduplicates lingering popups, and attempts to locate the notification region during periodic full-window discovery. Between full scans it uses the located crop or a right-side fallback region. Very brief popups and unusual text layouts may still be missed.
+
+Recognized rewards are stored as **local-only, timestamped observations**, separately from decoded or screen-observed wallet balances. They are **not** added directly into totals; wallet changes remain the accounting source of truth. A Market fee can now be corroborated either through an exact observed debit or a unique wallet movement whose net delta plus independently observed monster rewards reconciles to the displayed registration fee. If the equations do not balance, the listing fee remains **unverified**. Only one pending listing can be manually confirmed at a time in the game, but popup disappearance alone does not prove submission or cancellation. Raw screenshots and OCR text are not persisted or uploaded.
+
+The preview is not yet validated against live Aion 2 Global HUD text and capture latency. Use Diagnostics > Monster Kina Notifications to check reader performance and report the exact in-game notification style if observations stay at zero. Version 0.1.14 is experimental and not a replacement for real-game validation.
