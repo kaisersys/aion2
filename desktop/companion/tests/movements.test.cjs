@@ -123,12 +123,27 @@ test('contradicting simultaneous OCR movement is not added as a second expense',
  assert.equal(m.outToday,50);
  assert.equal(m.crossSourceDisagreements,1);
 });
-test('combined-only screen counters never become an income or an outflow',()=>{
+test('combined-only screen counter is tracked but never assigned a currency kind',()=>{
  const events=[
   e('a','all',10000,'2026-11-09T08:00:00Z',S2,'screen'),
   e('b','all',9000,'2026-11-09T08:00:02Z',S2,'screen')
  ];
  const m=movements(events,day);
- assert.equal(m.outToday,0);
- assert.equal(m.changes.length,0);
+ assert.equal(m.outToday,1000);
+ assert.equal(m.changes.length,1);
+ assert.equal(m.changes[0].currency,'all');
+ assert.equal(m.byCurrency.unbound.out,0);
+ assert.equal(m.byCurrency.bound.out,0);
+});
+test('combined counter does not double count a nearby decoded currency debit',()=>{
+ const events=[
+  e('s0','all',10000,'2026-11-09T08:00:00Z',S2,'screen'),
+  e('p0','bound',2000,'2026-11-09T08:00:01Z',S1),
+  e('s1','all',9500,'2026-11-09T08:00:03Z',S2,'screen'),
+  e('p1','bound',1500,'2026-11-09T08:00:04Z',S1)
+ ];
+ const m=movements(events,day);
+ assert.equal(m.outToday,500);
+ assert.equal(m.byCurrency.all.out,0);
+ assert.equal(m.changes.length,1);
 });
