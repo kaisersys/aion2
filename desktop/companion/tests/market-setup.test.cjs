@@ -14,7 +14,8 @@ test('Windows preview bundles a public project connection config, never a privil
  assert.match(conf.supabaseAnonKey,/^sb_publishable_[A-Za-z0-9_-]+$/);
  assert.ok(!/sb_secret_|service_role|PRIVATE_KEY/.test(JSON.stringify(conf)));
  assert.ok(pkg.build.files.includes('config.json'));
- assert.equal(pkg.version,'0.1.13');
+ assert.equal(pkg.version,'0.1.14');
+ assert.ok(pkg.build.files.includes('screen-activity.cjs'));
  assert.ok(pkg.build.files.includes('screen-wallet.cjs'));
  assert.ok(pkg.build.files.includes('market-ocr.cjs'));
 });
