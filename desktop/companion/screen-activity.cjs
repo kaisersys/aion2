@@ -66,11 +66,12 @@ class KinaGainTracker {
   for(const {amount} of parseKinaGains(text)) {
    const key=String(amount);seen.add(key);
    const old=this.active.get(key);
-   const consecutive=old && at>old.at && at-old.at<=6000;
-   const count=consecutive?old.count+1:1;
-   const emitted=consecutive?old.emitted:false;
-   if(count>=2&&!emitted)out.push({amount,occurred_at:new Date(at).toISOString()});
-   this.active.set(key,{at,count,emitted:emitted||count>=2,absences:0});
+   // Brief reward popups may last less than two complete OCR cycles.
+   // A strict single-frame match is kept as an *observation*, not a wallet
+   // credit; only a matching wallet movement can corroborate a Market fee.
+   const emitted=Boolean(old&&old.emitted);
+   if(!emitted)out.push({amount,occurred_at:new Date(at).toISOString()});
+   this.active.set(key,{at,emitted:true,absences:0});
   }
   // Require two scans where the toast is absent before accepting an identical
   // new reward. Prevent a persistent overlay from being counted on each frame.
